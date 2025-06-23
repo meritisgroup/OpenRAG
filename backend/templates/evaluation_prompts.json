@@ -1,0 +1,38 @@
+{
+    "EN": {
+        "conversationnal": {
+            "SYSTEM_PROMPT": "You are an AI assistant. You always answer with precision and honnesty.",
+            "QUERY_TEMPLATE": "Answer this question : {query}"
+        },
+        "rate_from_ground_truth": {
+            "SYSTEM_PROMPT": "You are an AI assistantevaluating a response from a LLM model to a certain metric. You will receive a question along with the expected answer and the anwser of a LLM model. Your task is to rate the response of the model for the specific metric from 1 to 5 where 0 is the worst, 5 the best\n---Evaluation Metric---\n{metric}\n---Output Format---\n Respond with only '0','1','2','3','4' or '5' without explanation.",
+            "QUERY_TEMPLATE": "-- Query --\n\n{query}\n\n -- Expected Answer -- {real_answer} -- Response of the model -- \n\n{model_answer}"
+        },
+        "answer_choice": {
+            "SYSTEM_PROMPT": "You are an AI assistant evaluating two answers to determine which is better given a certain metric. You will receive a question along with two possible answers: Answer A and Answer B. Your task is to select the answer that is most relevant to the question. ---Output Format--- Respond with only 'A' or 'B' based on the better answer. Do not provide any explanations or additional text.",
+            "QUERY_TEMPLATE": "The Initial Query : {query} \n Answer A :\n{answer_a}\n\nAnswer B :\n{answer_b}\n\n Of the two answers presented, which is the most relevant to answer the query?"
+        },
+        "rate_metric": {
+            "SYSTEM_PROMPT": "You are an AI assistant evaluating two answers based on the given metric. You will receive a question, a specific evaluation metric, and two possible answers: Answer A and Answer B. Your task is to determine which answer better aligns with the provided metric.\n---Evaluation Metric---\n{metric}\n---Output Format---\n Respond with only 'A' or 'B' based on which answer better fits the given metric. Do not provide any explanations or additional text.",
+            "QUERY_TEMPLATE": "The Initial Query : {query} \n Answer A :\n{answer_a}\n\nAnswer B :\n{answer_b}\n\n"
+        },
+        "rate_context_relevance": {
+            "SYSTEM_PROMPT": "You are an AI assistant. Extract relevant sentences from the provided context that can potentially help answer the following question. If no relevant sentences are found, or if you believe the question cannot be answered from the given context, return the phrase 'Insufficient Information' without further explanation. While extracting candidate sentences you are not allowed to make any changes to sentences from the given context. The output format should be a serie of sentences from the context and nothing more. Do not explain your choices.",
+            "QUERY_TEMPLATE": "The Initial Query :\n {query} \n ----- \n The Context :\n {model_context}"
+        },
+        "get_statements": {
+            "SYSTEM_PROMPT": "You are an AI assistant. Given a query and an expected answer, create one or more statements from each sentence in the given answer. The goal is to dissect all the information contained in the expected answer.\n ---- Output format ---- \n give all the statements without further explaination as follow : \n statement : [statement 1]\n statement : [statement 2]\n etc...",
+            "QUERY_TEMPLATE": " Query : {query} \n Expected answer : {answer}"
+        },
+        "rate_context_faithfulness": {
+            "SYSTEM_PROMPT": "You are an AI assistant. Consider the given context and following statement, then determine whether they are supported by the information presentin the context. You should respond with YES or NO and no further explanations Provide a final. Do not deviate from the specified format.",
+            "QUERY_TEMPLATE": "---- Context ---- \n {model_context} \n\n ---- Statement ---- \n {statement}"
+        }
+    },
+    "FR": {
+        "conversationnal": {
+            "SYSTEM_PROMPT": "Tu es un assistant IA qui répond de manière honnête et concise.",
+            "QUERY_TEMPLATE": "Réponds à cette question : {query}"
+        }
+    }
+}

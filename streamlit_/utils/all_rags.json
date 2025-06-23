@@ -1,0 +1,48 @@
+{
+    "ollama": {
+        "naive": "Naive RAG",
+        "query_based": "QueryBased RAG",
+        "self": "Self RAG",
+        "crag": "Corrective RAG",
+        "semantic_chunking": "Semantic Chunking RAG",
+        "contextual_retrieval": "Contextual Retrieval RAG",
+        "graph": "Graph RAG",
+        "query_reformulation_rag": "Query Reformulation RAG",
+        "naive_chatbot": "Naive Chatbot"
+    },
+    "vllm": {
+        "naive": "Naive RAG",
+        "query_based": "QueryBased RAG",
+        "self": "Self RAG",
+        "crag": "Corrective RAG",
+        "graph": "Graph RAG",
+        "semantic_chunking": "Semantic Chunking RAG",
+        "contextual_retrieval": "Contextual Retrieval RAG",
+        "advanced_rag": "Advanced RAG",
+        "reranker_rag": "Reranker RAG",
+        "query_reformulation_rag": "Query Reformulation RAG",
+        "naive_chatbot": "Naive Chatbot"
+    },
+    "openai": {
+        "naive": "Naive RAG",
+        "query_based": "QueryBased RAG",
+        "self": "Self RAG",
+        "crag": "Corrective RAG",
+        "graph": "Graph RAG",
+        "semantic_chunking": "Semantic Chunking RAG",
+        "contextual_retrieval": "Contextual Retrieval RAG",
+        "query_reformulation_rag": "Query Reformulation RAG",
+        "naive_chatbot": "Naive Chatbot"
+    },
+    "mistral": {
+        "naive": "Naive RAG",
+        "query_based": "QueryBased RAG",
+        "self": "Self RAG",
+        "crag": "Corrective RAG",
+        "graph": "Graph RAG",
+        "semantic_chunking": "Semantic Chunking RAG",
+        "contextual_retrieval": "Contextual Retrieval RAG",
+        "query_reformulation_rag": "Query Reformulation RAG",
+        "naive_chatbot": "Naive Chatbot"
+    }
+}

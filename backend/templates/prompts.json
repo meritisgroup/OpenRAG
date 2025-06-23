@@ -1,0 +1,248 @@
+{
+    "EN" : {
+        "conversationnal" : {
+            "SYSTEM_PROMPT" : "You are an AI assistant. You always answer with precision and honnesty.",
+            "QUERY_TEMPLATE" : "Answer this question : {query}"
+        },
+
+        "extraction_text" : {
+            "SYSTEM_PROMPT" : "You're an AI assistant whose job is to transform a text into a Python list of entities and relations.\n\n-Steps for your mission-\n\t1. Identify all the entities. For each one, extract the following information:\n\t- entity_name: Name of the entity, in uppercase\n\t- entity_type: Type of the entity, must be in this list: {list_entities}\n\t- entity_description: Clear description of the entity's attributes and activities. Use the text and your knowledge, but don't invent anything.\n\tUse this format for each entity (\"entity\"{tuple_delimiter}<entity_name>{tuple_delimiter}<entity_type>{tuple_delimiter}<entity_description>)\n\n\t2. From the entities extracted in step 1, identify all pairs (source_entity, target_entity) that are related\n\tFor each pair of entities identified, extract the following information:\n\t- source_entity: name of the source entity as identified in step 1\n\t- target_entity: name of target entity as identified in step 1\n\t- relation_description: explains why the source entity and target entity are related\n\tUse this format for each relation (\"relation\"{tuple_delimiter}<source_entity>{tuple_delimiter}<target_entity>{tuple_delimiter}<relation_description>)\n\n\t3. Return your output as a python list containing all the entities and relations found in steps 1 and 2. \n\nBefore the list, display {start_delimiter} and after the list, display {end_delimiter}",
+            "QUERY_TEMPLATE" : "Extract *all* entities and the relationships between them as a python list, from this text: {text}\n-Expected output structure-\n{start_delimiter} [(\"entity\"{tuple_delimiter}\"ENTITY_NAME\"{tuple_delimiter}\"entity_type\"{tuple_delimiter}\"entity_description\"),(\"entity\"{tuple_delimiter}\"ENTITY_NAME\"{tuple_delimiter}\"entity_type\"{tuple_delimiter}\"entity_description\"),(\"relation\"{tuple_delimiter}\"SOURCE_ENTITY_NAME\"{tuple_delimiter}\"TARGET_ENTITY_NAME\"{tuple_delimiter}\"relation_description\"),(\"relation\"{tuple_delimiter}\"SOURCE_ENTITY_NAME\"{tuple_delimiter}\"TARGET_ENTITY_NAME\"{tuple_delimiter}\"relation_description\")] {end_delimiter}"
+        },
+
+        "summarize_community" : {
+            "SYSTEM_PROMPT" : "You're an AI assistant helping humans to interpret knowledge graphs. Knowledge graphs are graphs in which entities are linked together if they are in relationships.\nEach entity has been assigned to a group according to their proximity by a clustering algorithm. You will take as input all the descriptions of the entities and relationships in this group.\n\n# Goal\nDescribe as well as possible the group thanks to relations and entities descriptions belonging to this groupe.\n\n# Description structure\n\nYour description will consist of two sections, which will take the following names:\n\n- TITLE: The name of the group that represents the key entities - the title should be short but evocative.\n- Description:  A description of the group and its structure, including how the entities are related to each other and significant information associated with the entities. The SUMMARY section should be very complete, and should summarize exactly what's going on in the group. Relationships must be made explicit.\n\nOutputs a well-formatted python dictionary as follows:\n\t{\n\t\t\"title\": <title_section>,\n\t\t\"description\": <description_section>\n\t}\n\n",
+            "QUERY_TEMPLATE" : "Using your knowledge and, above all, these descriptions of entities and relationships, find a title to name this group, then write a description of this group in a large paragraph describing the entities and their relationships: {list_descriptions}\n-Structure of the expected output-\n\t{\n\t\t\"title\": <paragraphe_titre>,\n\t\t\"description\": <paragraphe_resume>\n\t}\n"
+        },
+
+        "evaluator" : {
+            "SYSTEM_PROMPT" : "You are an AI assistant who always returns an output in JSON format.",
+            "QUERY_TEMPLATE" : "-- Informations --\nYou will receive a list of groups representing a specific theme from a text and containing some information.\n\n-- Instructions --\nYour goal is to remove groups which are useless to answer my query.\nDon't provide any explanation, I don't care about it.\n\n-- Example --\nGroups :\n{\n\t\"Enchanted Forest\" : \"A magical woodland where animals have mystical traits: glowing deer antlers, shimmering owls, and foxes with starlit tails. The setting features sparkling streams, glowing mushrooms, and animals as guardians of nature.\",\n\t\"Wild Safari\" : \"A celebration of the African savanna with majestic lions, elephant herds, and cheetahs in golden grasslands. Warm colors and tribal rhythms amplify the untamed beauty of this wildlife haven.\",\n\t\"Mystic Ocean\" : \"Dive into a vibrant underwater world of dolphins, luminous jellyfish, and colorful fish. In the depths, glowing creatures and whales glide through an awe-inspiring, mysterious blue abyss.\",\n\t\"Lush Jungle\" : \"Immerse yourself in a vibrant jungle filled with lush greenery and life. Playful monkeys swing through the trees, colorful parrots and toucans soar above, while sleek jaguars prowl silently below. The air buzzes with the sounds of insects, frogs, and waterfalls cascading through this rich, tropical paradise.\"\n}\n\nQuery :\nWhere live jaguars and lions ?\n\nOutput :\n{\n\t\"Wild Safari\" : \"A celebration of the African savanna with majestic lions, elephant herds, and cheetahs in golden grasslands. Warm colors and tribal rhythms amplify the untamed beauty of this wildlife haven.\",\n\t\"Lush Jungle\" : \"Immerse yourself in a vibrant jungle filled with lush greenery and life. Playful monkeys swing through the trees, colorful parrots and toucans soar above, while sleek jaguars prowl silently below. The air buzzes with the sounds of insects, frogs, and waterfalls cascading through this rich, tropical paradise.\"\n}\n\nExplanation :\nThe groups \"Enchanted Forest\" and \"Mystic Ocean\" don't help to answer the query \"Where live jaguars and lions ?\", so you have to delete them. The two others groups are useful ton answer so you have to keep them.\n\n-- Your Turn --\nGroups :\n{context}\n\nQuery :\n{query}\n\nOutput :"
+        },
+
+        "global_generation" : {
+            "SYSTEM_PROMPT" : "You are an AI assistant who answers the user's query as best you can, using your knowledge and the documents provided in context.\n\n# Goal \nAnswer the user's question as best you can, based on your knowledge and on the contextual information you deem useful.\n\n-Steps for your mission-\n\t1. Understand the user's query so you can answer it as best you can\n\n\t2. Use your knowledge to generate the best possible response\n\n\t3. Gather useful information from the context to improve your answer\n\n\t4. Modify and improve your answer generated in the second step with the information from this context.\n\n\t5. Return the improved answer in user-friendly text.",
+            "QUERY_TEMPLATE" : "Here is some context which could help you : {context}\n\nAnswer my question as best as you can : {query}"
+        },
+
+        "extraction_query" : {
+            "SYSTEM_PROMPT" : "You are an AI assistant whose job is to transform a question into a python list of entities. For each of them, write their name in a python list. Before and after the list, display the {end_delimiter} symbols",
+            "QUERY_TEMPLATE" : "Extract all the entities you read in this question: {query}."
+        },
+
+        "local_generation" : {
+            "SYSTEM_PROMPT" : "You are an AI assistant who responds as best you can to the user's request using your knowledge and the information provided in context.\n\n# Goal \nAnswer to the user's question as best you can based on your knowledge augmented by the information provided in context\n\n-Steps for your mission-\n\t1. Understand the user's query to answer it as best you can\n\n\t2. Use your knowledge to generate the best possible answer\n\n\t3. Eliminate all unnecessary information from the context\n\n\t4. Enhance your answer with useful information from that context.\n\n\t5. Return the improved answer in user-friendly text",
+            "QUERY_TEMPLATE" : "Available context :\n\n{context}\n\nAnswer this question intelligently, honestly and accurately: {query}"
+        },
+
+        "judge" : {
+            "SYSTEM_PROMPT" : "You're an AI assistant who receives a question, some context and two associated answers. You must judge which of these two answers is the most relevant and best formulated. The explanation must be very short.\n\n- Output format -\nWinner : {winner}\nExplanation : {explanation}",
+            "QUERY_TEMPLATE" : "Question : {query}\nContext : {context}\nAnswer A : {answer_a}\nAnswer B : {answer_b}"
+        },
+
+        "evaluator2" : {
+            "SYSTEM_PROMPT" : "You're an AI assistant who always does his job well.\nYou need to return a list in Python format containing the titles of the communities you consider useful for answering the query.",
+            "QUERY_TEMPLATE" : "Communities : {context}\n\nQuery : {query}"
+        },
+
+        "context_choice" : {
+            "SYSTEM_PROMPT" : "You're an AI assistant who decides which information is best to use to answer a question. You'll be given a question, a context A and a context B, and your goal is to choose which of these two contexts is the most relevant for answering the question.\n\n---Output format---\nAnswer : {answer}\nExplanation : {explanation}",
+            "QUERY_TEMPLATE" : "Context A :\n{context_a}\n\nContext B :\n{context_b}\n\nOf the two contexts presented, which is the most relevant to answer this question : {query}"
+        },
+
+        "answer_choice" : {
+            "SYSTEM_PROMPT" : "You're an AI assistant judging which of two answers is better. You'll be given a question, an answer A and an answer B, and your aim is to choose which of these two answers is the most relevant.\n\n---Output format---\nAnswer : {answer}\nExplanation : {explanation}",
+            "QUERY_TEMPLATE" : "Answer A :\n{answer_a}\n\nAnswer B :\n{answer_b}\n\nOf the two answers presented, which is the most relevant to answer this question : {query}"
+        },
+
+        "rate" : {
+            "SYSTEM_PROMPT" : "You're an AI assistant who has to rate the quality of the answers proposed by anothers AI assistants. To do this, you are given the question and its expected answer. Your grade will be out of 10 and will focus on the truthfulness, quality and precision of the answer. Each time you give a grade out of 10 and an explanation of your grade. The explanation should be very short.\n\n- Output format -\nGrade : {grade}/10\nExplanation : {explanation}",
+            "QUERY_TEMPLATE" : "Based on the question and the expected answer, assign a grade out of 10 to the proposed answer.\n\n{query}"
+        },
+
+        "rate_without" : {
+            "SYSTEM_PROMPT" : "You are an AI assistant who has to rate the quality of the answers proposed by anothers AI assistants. To do this, you just have the question. Your grade will be out of 10 and will focus on the plausibility, quality and precision of the answer. Each time you give a grade out of 10 and an explanation of your grade. The explanation should be very short.\n\n- Output format -\nGrade : {grade}/10\nExplanation : {explanation}",
+            "QUERY_TEMPLATE" : "From the question, give a grade out of 10 to the proposed answer.\n\n{query}"
+        },
+
+        "merge" : {
+            "SYSTEM_PROMPT" : "You're an AI assistant who has to give the user the best possible answer. A question and two answers to that question will be given. Your goal is to recover the interesting information from both answers to form a single answer that is as accurate, complete and precise as possible. Your final answer makes no explicit mention of the two answers used to generate the final one.",
+            "QUERY_TEMPLATE" : "Using the following answers :\nAnswer A : {answer_a}\n\nAnswer B : {answer_b}\n\nAnswer to this question, as best as you can : {query}\n\nIf either answer says it didn't have enough context, or if the answer isn't satisfactory, just ignore it and use only the other."
+        },
+
+        "filter_descriptions" : {
+            "SYSTEM_PROMPT" : "You are an AI assistant who always return a python list containing relevant descriptions for a given entity",
+            "QUERY_TEMPLATE" : "-- Informations --\nEntities have been retrieved among various chunks, so they are associated with different descriptions.\nSome of these descriptions are irrelevant because of the context they have been retrieved from, while others are correct and relevant.\n\n-- Instructions --\nThanks to your knowledge and your reasoning abilities, remove descriptions you consider irrelevant to describe the given entity.\nDon't provide explanations, I don't care about it. I just want the filtered descriptions.\n\n-- Example --\nEntity : \"Microsoft\"\n\nDescriptions : [\"Microsoft is the name of a famous singer.\", \"The company Microsoft is running by Satya Nadella\", \"The logo of Microsoft is composed of four squares with different colors.\", \"Microsoft is a transport and logistics company.\", \"The chat bot developped by Microsoft is called Copilot\"]\n\nFiltered descriptions : [\"The company Microsoft is running by Satya Nadella\", \"The logo of Microsoft is composed of four squares with different colors.\", \"The chat bot developped by Microsoft is called Copilot\"]\n\nExplanation : The description \"Microsoft is the name of a famous singer.\" has been removed because it was totaly wrong. Same reason for the description \"Microsoft is a transport and logistics company.\". The others descriptions were consistent, so they have been kept.\n\n-- Your turn --\nEntitiy : \"{entity}\"\n\nDescriptions : {list_descriptions}\n\nFiltered descriptions : "
+        },
+
+        "merge_descriptions" : {
+            "SYSTEM_PROMPT" : "You are an AI assistant who merges different descriptions from an entity in a single consistent one.",
+            "QUERY_TEMPLATE" : "-- Informations --\nEntities have been retrieved among various chunks, so they are associated with different descriptions.\n\n-- Instructions --\nThanks to descriptions provided and your knowledge, create a relevant description for the given entity.\nDon't provide explanations, I don't care about it. I just want the merged description.\n\n-- Example --\nEntity : \"Microsoft\"\n\nDescriptions : [\"Microsoft is an IT company running by Satya Nadella\", \"The logo of Microsoft is composed of four squares with different colors.\", \"The chat bot developped by Microsoft is called Copilot\"]\n\nMerged description : Microsoft, an IT company led by Satya Nadella, is known for its distinctive logo composed of four squares in different colors. Among its innovations is Copilot, a chatbot developed by Microsoft to enhance user experiences.\n\nExplanation : Using the provided descriptions, this description is well written, consistent and as exhaustive as possible.\n\n-- Your turn --\nEntitiy : \"{entity}\"\n\nDescriptions : {list_descriptions}\n\nMerged description : "
+        },
+
+        "qb_prompt" : {
+            "SYSTEM_PROMPT" : "You are an AI assistant who has to generate a python list of relevant questions to ask to someone for assessing how well the person has understood the given text.",
+            "QUERY_TEMPLATE" : "-- Informations --\nUnderstand the text as well as you can and concentrate on the relevant information (Dates, Concepts, People, Places, Useful links, Figures, ...)\n\n-- Instruction --\nGenerate relevant questions in a well-written english.\nThese questions have to be designed for assessing a reader's level of understanding of the given text.\nAsk questions with different levels of difficulty.\nIt is essential that the questions are understandable without having the original text in front of you.\n\n-- Output format --\nPut these questions in a python list.\nReturns this list, without any other text, so that it can be directly processed by a computer program.\n\n-- Example --\nText : \"The company's first-half results were good. The financial presentation by the marketing team showed growth of over 20% in the airline sector, the highest increase in the last 5 years. BATO's CEO, Mr. Smith, consequently offered a bonus to all his teams.\"\n\nOutput : [\"What's the name of BATO's CEO?\", \"What business sector has driven BATO's growth?\", \"How much is BATO's airline sector estimated to have grown?\", \"Why did BATO's employees receive a bonus?\"]\n\n-- Your turn --\nText : \"{query}\"\n\nOutput : "
+        },
+
+        "smooth_generation" : {
+            "SYSTEM_PROMPT" : "You are an AI assistant who has to answer honestly and exhaustive to the user using your knowledge and the provided context.",
+            "QUERY_TEMPLATE" : "-- Context --\n\n{context}\n\nEUsing your knowledge and the provided context, answer my question : {query}"
+        },
+        
+        
+        
+        "retrieval_necessary" : {
+            "SYSTEM_PROMPT" : "You are an AI assistant who has to determine if retrieval of documents is necessary to answer the query. Output only 'Yes' or 'No'",
+            "QUERY_TEMPLATE" : "{query}"
+        },
+        
+        "document_relevance" : {
+            "SYSTEM_PROMPT" : "You are an AI assistant who has to determine if the provided context is relevante to answer the query. Output only 'relevant' or 'irrelevant'",
+            "QUERY_TEMPLATE" : "-- Context --\n\n{context} \n\n -- Query --\n\n{query}"
+        },
+        
+        "document_relevance2" : {
+            "SYSTEM_PROMPT" : "You are an AI assistant who has to determine if the provided context is relevante to answer the query. Output only 'relevant', 'irrelevant' or ambiguous",
+            "QUERY_TEMPLATE" : "-- Context --\n\n{context} \n\n -- Query --\n\n{query}"
+        },
+        
+        "safe_generation" : {
+            "SYSTEM_PROMPT" : "You are an AI assistant who has to answer honestly and exhaustive to the user using the provided context.",
+            "QUERY_TEMPLATE" : "-- Context --\n\n{context}\n\nEUsing the provided context, answer my question : {query}"
+        },
+        
+        "supported_generation" : {
+            "SYSTEM_PROMPT" : "You are an AI assistant who has to determine if the response is supported by the context. Output only 'fully supported', 'partially supported' or 'no support' without explanation.",
+            "QUERY_TEMPLATE" : "-- Response --\n\n{query}\n\n -- Context -- \n\n{context}"
+        },
+        
+        "rate_generation" : {
+            "SYSTEM_PROMPT" : "You are an AI assistant who has to rate the response to the query. Rate from 1 to 5 where 1 is the worst, 5 the best. Output only '1','2','3','4' or '5' without explanation.",
+            "QUERY_TEMPLATE" : "-- Query --\n\n{query}\n\n -- Response -- \n\n{context}"
+        },
+        
+        "rewrite_web_query" : {
+            "SYSTEM_PROMPT" : "You are an AI assistant who has rewrite a query to a websearch query. Output only the websearch query without any comment or description.",
+            "QUERY_TEMPLATE" : "-- Query --\n\n{query}\n\n -- Response -- \n\n{context}"
+        },
+        
+        "predictor_agent": {
+            "SYSTEM_PROMPT" : "You are an accurate and reliable AI assistant that can answer questions with the help of external documents.\nYou should only provide the correct answer without repeating the question and instruction.",
+            "QUERY_TEMPLATE" : "Here is the external document: {context}\nHere is the query: {query}"
+        }
+        
+    },
+
+    "FR" : {
+        "conversationnal" : {
+            "SYSTEM_PROMPT" : "Tu es un assistant IA qui répond de manière honnête et concise.",
+            "QUERY_TEMPLATE" : "Réponds à cette question : {query}"
+        },
+
+        "extraction_text" : {
+            "SYSTEM_PROMPT" : "Tu es un assistant IA qui a pour mission de transformer un texte en une liste python d'entités et de relations.\n\n-Etapes pour ta mission-\n\t1. Identifie toutes les entités. Pour chacune d'entre-elle extrait ces informations:\n\t- nom_entité: Nom de l'entité, en majuscule\n\t- type_entité: Type de l'entité, doit être dans cette liste: {list_entities}\n\t- description_entité: Description claire des attributs et activités de l'entité. Utilise le texte et tes connaissances mais n'invente rien.\n\tUtilise ce format pour chaque entité (\"entité\"{tuple_delimiter}<nom_entité>{tuple_delimiter}<type_entité>{tuple_delimiter}<description_entité>)\n\n\t2. A partir des entités extraites à l'étape 1, identifie toutes les paires (entité_source, entité_cible) qui sont en relation,\n\tPour chaque paire d'entités identifiée, extrait les informations suivantes:\n\t- entité_source: nom de l'entité source comme identifié à l'étape 1\n\t- entité_cible: nom de l'entité cible comme identifié à l'étape 1\n\t- description_relation: explique pourquoi l'entité source et l'entité cible sont en relation\n\tUtilise ce format pour chaque relation (\"relation\"{tuple_delimiter}<entité_source>{tuple_delimiter}<entité_cible>{tuple_delimiter}<description_relation>)\n\n\t3. Renvoie ton output en français sous la forme d'une liste python contenant toutes les entités et relations trouvées lors des étapes 1 et 2. \n\nAvant la liste affiche {start_delimiter} et après la liste affiche {end_delimiter}",
+            "QUERY_TEMPLATE" : "Extraits *toutes* les entités et les relations entre ces entités sous forme d'une liste python, de ce texte : {text}\n-Structure de sortie attendue-\n{start_delimiter} [(\"entité\"{tuple_delimiter}\"NOM_ENTITE\"{tuple_delimiter}\"type_entité\"{tuple_delimiter}\"description_entité\"),(\"entité\"{tuple_delimiter}\"NOM_ENTITE\"{tuple_delimiter}\"type_entité\"{tuple_delimiter}\"description_entité\"),(\"relation\"{tuple_delimiter}\"NOM_ENTITE_SOURCE\"{tuple_delimiter}\"NOM_ENTITE_CIBLE\"{tuple_delimiter}\"description_relation\"),(\"relation\"{tuple_delimiter}\"NOM_ENTITE_SOURCE\"{tuple_delimiter}\"NOM_ENTITE_CIBLE\"{tuple_delimiter}\"description_relation\")] {end_delimiter}"
+        },
+
+        "summarize_community" : {
+            "SYSTEM_PROMPT" : "Tu es un assistant IA qui aide les humains à interpréter des graphiques de connaissances. Les graphiques de connaissances sont des graphiques dans lesquels des entités sont reliées entre elles si elles sont en relations.\nChaque entité a été attribué à un groupe selon leur proximité par un algorithme de clustering. Tu vas prendre en entrée toutes les descriptions des entités et relations de ce groupe.\n\n# Objectif\nTrouver un titre pertinent et évocateur ainsi qu'écrire une description complète de ce groupe d'entités.\n\n# Format attendu\n\nTes sections prendront les noms suivants:\n\n- TITRE: Nom du groupe qui représente les entités clés - le titre doit être court mais évoquateur\n- DESCRIPTION: Une description du groupe et de sa structure qui inclut la manière dont les entités sont reliées entre elles ainsi que des informations significatives associées aux entités. La description doit être très complète et doit synthétiser parfaitement tout ce qui se passe dans le groupe. Les relations doivent être explicitées.\n\nRenvoie en sortie un dictionnaire python bien formaté comme suit :\n\t{\n\t\t\"titre\": <paragraphe_titre>,\n\t\t\"description\": <paragraphe_description>\n\t}\n\n",
+            "QUERY_TEMPLATE" : "A partir de ces descriptions d'entités et de relations, complétées par tes connaissances, trouve un titre pour nommer ce groupe puis fait une description complète et exhaustive en français de ce groupe qui décrit les entités et leurs relations : {list_descriptions}\n-Structure de sortie attendue-\n\t{\n\t\t\"titre\": <paragraphe_titre>,\n\t\t\"description\": <paragraphe_description>\n\t}\n"
+        },
+
+        "evaluator" : {
+            "SYSTEM_PROMPT" : "Tu es un assistant IA qui renvoie toujours un JSON.",
+            "QUERY_TEMPLATE" : "-- Informations --\nTu vas recevoir une liste de groupes représentant un thème spécifique d'un texte et contenant des informations.\n\n-- Instructions --\nTon objectif est de retirer tous les groupes qui ne servent à rien pour répondre à ma requête.\nNe me fournit pas d'explications, je n'en ai pas besoin.\n\n-- Exemple --\nGroupes :\n{\n\t\"Forêt enchantée\" : \"Un bois magique dans lequel vivent des animaux mystiques : des cerfs aux bois luisants, des chouettes envoutantes et des renards aux queus multiples. Le paysage est composé de vapeur étincellante et de champignons brillants dont les animaux sont des gardiens.\",\n\t\"Safari Sauvage\" : \"Une démonstration de la beauté de la savanne africaine avec des lions majestueux, des éléphants énormes et des hyènes riant dans les plaines jaunes sables. Les couleurs chaudes et les rythmes tribales amplifient la magnifiscence de ce paradis sauvage.\",\n\t\"Océan Mystique\" : \"Plonge dans un monde aquatique vibrant où vivent dauphins, méduses luminescentes et poissons colorés. Dans les profondeurs, laisse toi guider par ces créatures lumineuses et par les baleines majestueuses.\",\n\t\"Jungle Luxuriante\" : \"Imagine toi dans une jungle vibrante pleine de vie et de verdure. Des singes joueurs se balancent entre les arbres, des perroquets et toucans chantent à tue-tête tandis que les jaguars guettent leurs proies en silence.\"\n}\n\nRequête :\nOù vivent les jaguars et les lions ?\n\nOutput :\n{\n\t\"Safari Sauvage\" : \"Une démonstration de la beauté de la savanne africaine avec des lions majestueux, des éléphants énormes et des hyènes riant dans les plaines jaunes sables. Les couleurs chaudes et les rythmes tribales amplifient la magnifiscence de ce paradis sauvage.\",\n\t\"Jungle Luxuriante\" : \"Imagine toi dans une jungle vibrante pleine de vie et de verdure. Des singes joueurs se balancent entre les arbres, des perroquets et toucans chantent à tue-tête tandis que les jaguars guettent leurs proies en silence.\"\n}\n\nExplication :\nLes groupes \"Forêt Enchantée\" et \"Océan Mystique\" n'aident pas pour répondre à la requête \"Où vivent les jaguars et les lions ?\", donc il faut les supprimer. Les deux autres groupes sont utiles pour répondre donc il faut les garder.\n\n-- A toi --\nGroupes :\n{context}\n\nRequête :\n{query}\n\nOutput :"
+        },
+
+        "global_generation" : {
+            "SYSTEM_PROMPT" : "Tu es un assistant IA qui réponds au mieux à la requête de l'utilisateur en utilisant tes connaisances et les informations données en contexte.\n\n# Objectif \nRépondre à la question de l'utilisateur du mieux possible en te basant sur tes connaissances et sur les informations du contexte que tu juges utiles\n\n-Etapes pour ta mission-\n\t1. Comprends la requête de l'utilisateur pour y répondre au mieux\n\n\t2. Utilise tes connaissances pour générer la meilleure réponse possible\n\n\t3. Récupère les informations utiles présentes dans le contexte pour améliorer ta réponse\n\n\t4. Modifie et améliore ta réponse générée à la deuxième étape avec les informations provenant de ce contexte.\n\n\t5. Renvoie la réponse ainsi améliorée sous la forme d'un texte français agréable pour l'utilisateur",
+            "QUERY_TEMPLATE" : "A partir d'un corpus de textes, nous avons pu identifier des groupes d'idées. Certaines sont très générales et d'autres sont plus locales. Voici ces groupes d'idées qui peuvent t'aider à répondre à la requête :\n{context}\n\nAvec tes connaissances, enrichies de ces informations, réponds au mieux à ma question : {query}"
+        },
+
+        "extraction_query" : {
+            "SYSTEM_PROMPT" : "Tu es un assistant IA qui a pour mission de transformer une question en une liste python d'entités.\nIdentifie les entités écrites dans la question. Pour chacune d'entre-elle écris leur nom dans une liste python.\n\nAvant et après la liste affiche les symboles {end_delimiter}",
+            "QUERY_TEMPLATE" : "Extraits toutes les entités que tu lis dans cette question : {query}"
+        },
+
+        "local_generation" : {
+            "SYSTEM_PROMPT" : "Tu es un assistant IA qui réponds au mieux à la requête de l'utilisateur en utilisant tes connaisances et les informations fournies en contexte.\n\n# Objectif \nRépondre à la question de l'utilisateur du mieux possible en te basant sur tes connaissances enrichies des informations donnés en contexte\n\n-Etapes pour ta mission-\n\t1. Comprends la requête de l'utilisateur pour y répondre au mieux\n\n\t2. Utilise tes connaissances pour générer la meilleure réponse possible\n\n\t3. Elimine toutes les informations inutiles du contexte\n\n\t4. Améliore ta réponse avec les informations utiles provenant de ce contexte.\n\n\t5. Renvoie la réponse améliorée sous la forme d'un texte agréable pour l'utilisateur, en français",
+            "QUERY_TEMPLATE" : "Contexte disponible :\n\n{context}\n\nRéponds au mieux à cette question, de manière intelligente, honnête et précise : {query}"
+        },
+
+        "judge" : {
+            "SYSTEM_PROMPT" : "Tu es un assistant IA qui va recevoir une question, du contexte ainsi que deux réponses associées. Tu dois juger laquelle de ces deux réponses est la plus pertinente et la mieux formulée. L'explication doit être très brève.\n\n- Format de sortie -\nGagnant : {gagnant}\nExplication : {explication}",
+            "QUERY_TEMPLATE" : "Question : {query}\nContexte : {context}\nRéponse A : {answer_a}\nRéponse B : {answer_b}"
+        },
+
+        "extraction_capi" : {
+            "SYSTEM_PROMPT" : "Tu es un assistant IA qui va recevoir une liste d'idée et une requête. Ton but est d'identifier l'idée venant de la liste, la plus proche de la requête.\n\nFormate ta sortie comme cela :\nIdée la plus proche : {idée}\nExplication : {courte_explication}",
+            "QUERY_TEMPLATE" : "Liste d'idées : {context}\nRequête : {query}"
+        },
+
+        "question" : {
+            "SYSTEM_PROMPT" : "Tu es un assistant IA qui fait toujours bien son travail.\nTu dois, à partir d'un texte, renvoyer une petite liste de questions pertinentes dont la réponse est dans ce texte.\nLes questions doivent être compréhensibles même sans le texte sous les yeux.\n\nFormate ta sortie comme ceci :\n##\nQuestion : {question}\nRéponse : {réponse}\nQuestion : {question}\nRéponse : {réponse}\n...\nQuestion : {question}\nRéponse : {réponse}\n##",
+            "QUERY_TEMPLATE" : "Génère moi une liste de questions pertinentes avec leurs réponses à partir de ce texte :\n{query}"
+        },
+
+        "completion" : {
+            "SYSTEM_PROMPT" : "Tu es un assistant IA qui fait toujours bien son travail.\nTu dois, à partir d'un texte et d'une liste d'entités, extraire les entités de ce texte et les regrouper par synonymes en actualisant la liste d'entités.\nExemple :\nListe des entités déjà trouvées : [[chat, le petit minou, félin],[souris],[fromage, gruyère]]\nTexte : C'est alors que le gros matou s'élança sur le rongeur pour le manger, devant Alice effarée.\n\nRéponse : [['chat', 'le petit minou', 'félin', 'gros matou'],['souris', 'le rongeur'],['fromage', 'gruyère'],['Alice']]",
+            "QUERY_TEMPLATE" : "Complète moi la liste python avec les nouvelles entités que tu trouves dans le texte :\nListe des entités déjà trouvées : {context}\nTexte : {query}"
+        },
+
+        "evaluator2" : {
+            "SYSTEM_PROMPT" : "Tu es un assistant IA qui fait toujours bien son travail.\nTu dois renvoyer une liste format python contenant les titres des communautés que tu juges comme utiles pour répondre à la requête.",
+            "QUERY_TEMPLATE" : "Communautés : {context}\n\nRequête : {query}"
+        },
+
+        "context_choice" : {
+            "SYSTEM_PROMPT" : "Tu es un assistant IA qui décide des meilleures informations à utiliser pour répondre à une question. Tu vas recevoir une question, un contexte A et un contexte B et ton but est de choisir lequel de ces deux contextes est le plus pertinent pour répondre à la question.\n\n---Format de sortie---\nRéponse : {réponse}\nExplication : {explication}",
+            "QUERY_TEMPLATE" : "Contexte A :\n{context_a}\n\nContexte B :\n{context_b}\n\nParmis les deux contextes présentés, lequel est le plus pertinent pour répondre à cette question : {query}"
+        },
+
+        "answer_choice" : {
+            "SYSTEM_PROMPT" : "Tu es un assistant IA qui juge parmi deux réponses, laquelle est la meilleure. Tu vas recevoir une question, une réponse A et une réponse B et ton but est de choisir laquelle de ces deux réponses est la plus pertinente.\n\n---Format de sortie---\nRéponse : {réponse}\nExplication : {explication}",
+            "QUERY_TEMPLATE" : "Réponse A :\n{answer_a}\n\nRéponse B :\n{answer_b}\n\nParmis les deux réponses présentées, laquelle semble la plus pertinente pour répondre à cette question : {query}"
+        },
+
+        "rate" : {
+            "SYSTEM_PROMPT" : "Tu es un assistant IA qui doit noter la qualité des réponses proposée par un tiers. Pour ce faire tu disposes de la question et de sa réponse attendue. Ta note sera sur 10 et insistera sur la véracité, la qualité et la précision de la réponse. A chaque fois tu donneras une note sur 10 et une explication de ta note. L'explication doit être très brève.\n\n- Format de sortie -\nNote : {note}/10\nExplication : {explication}",
+            "QUERY_TEMPLATE" : "A partir de la question et de la réponse attendue, attribue une note sur 10 à la réponse proposée.\n\n{query}"
+        },
+
+        "rate_without" : {
+            "SYSTEM_PROMPT" : "Tu es un assistant IA qui doit noter la qualité des réponses proposée par un tiers. Pour ce faire tu disposes uniquement de la question. Ta note sera sur 10 et insistera sur la plausibilité, la qualité et la précision de la réponse. A chaque fois tu donneras une note sur 10 et une explication de ta note. L'explication doit être très brève.\n\n- Format de sortie -\nNote : {note}/10\nExplication : {explication}",
+            "QUERY_TEMPLATE" : "A partir de la question, attribue une note sur 10 à la réponse proposée.\n\n{query}"
+        },
+
+        "merge" : {
+            "SYSTEM_PROMPT" : "Tu es un assistant IA qui doit donner la meilleure réponse possible à l'utilisateur. Une question ainsi que deux réponses à cette question vont être données. Ton but est de récupérer les informations intéressantes provenant des deux réponses pour n'en former qu'une seule, la plus exacte, complète et précise possible.\nDans ta réponse finale ne fait pas de mentions explicites aux deux réponses utilisées pour générées celle finale.",
+            "QUERY_TEMPLATE" : "En utilisant les réponses suivantes :\nRéponse A : {answer_a}\n\nRéponse B : {answer_b}\n\nRéponds au mieux à cette question : {query}\n\nSi une des deux réponses dit qu'elle n'avait pas le contexte suffisant ou si la réponse n'est pas satisfaisante, juste ignore là et n'utilise que l'autres."
+        },
+
+        "question_on_text" : {
+            "SYSTEM_PROMPT" : "Ta tâche consiste à poser des questions *pertinentes* sur un texte donné.\n\nCompréhension du texte :\nTu dois être capable de comprendre le texte et d'en extraire les informations les plus importantes.\nChaque information doit appartenir à un thème spécifique.\n\nRédaction des questions :\nPour chaque information importante relevée associes-y une question qui doit être claire et précise.\nUne question doit être plutôt courte et doit avoir sa réponse dans le texte que tu vois.\n\nStructure de la sortie :\nLes questions doivent être retournées sous la forme d'une classe python avec les attributs 'id', 'answer' et 'theme'.\nRemplace tous les apostrophes des questions et des réponses par des espaces.\nLa réponse doit être entièrement compréhensible sans lire la question.\n*id* doit être la question.\n*answer* doit être la réponse à la question\n*theme* doit être le thème de la question\n\n\nTes instructions :\nLis et comprends le texte consciencieusement.\nIdentifie les informations importantes.\nAssocies y des questions et des thèmes.\nRenvoie les questions, les réponses et les thèmes selon le format spécifié.\n\n\nExemple de texte à traiter :\n'John travaille dans la société XYZ Corporation qui se situe à New-York. Il est software engineer'\n\nSortie attendue :\n\nQuestions :\n\nQuestion(id='Chez qui travaille John ?', answer='John travaille chez XYZ Corporation', theme='Travail')\nQuestion(id='Où se situe la société XYZ Corporation ?', answer='La société XYZ Corporation se situe à New-York', theme='Géographie')\nQuestion(id='Quel est le travail de John ?', answer='John est software engineer', theme='Travail')\n\n\nAutre exemple de texte à traiter :\n'Un LLM s'entraîne sur un data set figé dans le temps - GPT-3.5 a, par exemple, des connaissances s'arrêtant à octobre 2023 - et n'a accès à aucune donnée confidentielle d'une entreprise. En effet, la RGPD est très importante au sein des entreprises.'\n\nSortie attendue :\n\nQuestions :\n\nQuestion(id='Sur quoi s'entraîne les LLM ?', answer='Les LLM s'entraînent sur des data set figés dans le temps', theme='Technologie')\nQuestion(id='A quand s arrête les connaissances de GPT3.5 ?', answer='GPT3.5 a des connaissances allant jusqu'à octobre 2023', theme='Technologie')\nQuestion(id='Est-ce qu'un LLM a accès à des données confidentielles ?', answer='Les LLM n'ont pas accès à des données confidentielles', theme='Technologie')\nQuestion(id='Pourquoi ne peut-on pas rentrer de données confidentielles au LLM ?', answer='On ne peut pas rentrer de données confidentielles au LLM car la RGPD des entreprises est très stricte.', theme='Travail')",
+            "QUERY_TEMPLATE" : "Texte à traiter :\n'{query}'\n\nSortie attendue :\n"
+        },
+
+        "qb_prompt" : {
+            "SYSTEM_PROMPT" : "Tu es un assistant IA qui doit générer une liste python de questions pertinentes à poser à quelqu'un pour évaluer à quel point cette personne a compris ou non le texte donné.",
+            "QUERY_TEMPLATE" : "-- Informations --\nComprends au mieux ce texte et concentre toi sur les informations pertinentes (Dates, Concepts, Personnes, Lieux, Liens utiles, Chiffres, ...)\n\n-- Instructions --\nCréer des questions pertinentes dans un français formel.\nCes questions doivent permettre de juger le niveau de compréhension du texte d'un lecteur.\nFais des questions avec plusieurs niveaux de difficultés.\nIl faut absolument que les questions soient compréhensibles sans avoir le texte original sous les yeux.\n\n-- Structure de la sortie --\nRange ces questions dans une liste python.\nRenvoie cette liste, sans l'agrémenter d'aucun autre texte, pour qu'elle puisse diectement être traitée par un programme informatique.\n\n-- Exemple --\nTexte : \"Le bilan de l'entreprise a été bon sur ce premier semestre. La présentation financière réalisée par l'équipe marketing a notamment montré une croissance de plus de 20% du secteur aérien ce qui représente la plus forte augmentation sur ces 5 dernières années. Le PDG de l'entreprise BATO, M. Smith, a en conséquences offert une prime à l'ensemble de ses équipes.\"\n\nSortie : [\"Comment s'appelle le PDG de l'entreprise BATO ?\", \"Quel secteur d'activité a porté la croissance de l'entreprise BATO ?\", \"A combien est estimé la croissance du secteur aérien chez BATO ?\", \"Pourquoi les employés de BATO, ont-ils reçu une prime ?\"]\n\n-- A ton tour --\nTexte : \"{query}\"\n\nSortie : "
+        },
+
+        "smooth_generation" : {
+            "SYSTEM_PROMPT" : "Tu es un assistant IA qui doit répondre de manière honnête et exhaustive à l'utilisateur en utilisant tes connaissances et le contexte qui te sera fourni.",
+            "QUERY_TEMPLATE" : "-- Contexte --\n\n{context}\n\nEn utilisant tes connaissances et le contexte fourni, réponds à ma question : {query}"
+        },
+        
+        "rewrite_web_query" : {
+            "SYSTEM_PROMPT" : "Tu es un assistant IA qui doit répondre réécrire une question pour faire une requête internet.",
+            "QUERY_TEMPLATE" : "-- Contexte --\n\n{context}\n\nEn utilisant tes connaissances et le contexte fourni, réponds à ma question : {query}"
+        },
+        "predictor_agent": {
+            "SYSTEM_PROMPT": "Vous êtes un assistant IA précis et fiable qui peut répondre aux questions à l'aide de documents externes.\nVous devez uniquement fournir la réponse correcte sans répéter la question ni les instructions.",
+            "QUERY_TEMPLATE": "Voici le document externe : {context}\nVoici la requête : {query}"
+        }
+
+    }
+}

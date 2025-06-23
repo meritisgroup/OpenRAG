@@ -1,0 +1,31 @@
+{
+    "storage_path": "./storage",
+    "params_host_llm": {
+        "url": null,
+        "type": "openai",
+        "api_key": null
+    },
+    "params_vectorbase": {
+        "backend": "elasticsearch",
+        "batch": true,
+        "url": "http://elasticsearch:9200",
+        "auth": [
+            "elastic",
+            "UDY9ydMS"
+        ]
+    },
+    "device": "cpu",
+    "model": "gpt-4o-mini",
+    "embedding_model": "text-embedding-3-small",
+    "language": "FR",
+    "type_retrieval": "hybrid",
+    "TextSplitter": "Semantic_TextSplitter",
+    "reformulate_query": false,
+    "reranker_model": "BAAI/bge-reranker-v2-m3",
+    "max_attempts": 5,
+    "nb_chunks": 15,
+    "ProcessorChunks": [
+        "Contextual"
+    ],
+    "hf_token": null
+}

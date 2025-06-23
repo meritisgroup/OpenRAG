@@ -1,0 +1,48 @@
+{
+    "FR": {
+        "community_summary": {
+            "relation": "Relation entre {entity_source} et {entity_target} : {relation_description}",
+            "entity": "Description de {entity} : {entity_description}"
+        },
+        "vector_base": {
+            "community": "{title}\n{description}",
+            "community_description": "Observations d'un groupe d'entité dans les textes initiaux pouvant être utiles : {description}"
+        },
+        "list_entities": "[rôle, humain, évènement, journal, entreprise, date, lieu, objet, chiffre, sport, animal]",
+        "global_community": "Thématique : {gc_title}\n{gc_description}\n\n",
+        "local_community": "\tCette thématique traite notamment du sujet suivant :\n\tSujet : {lc_title}\n\tDescription : {lc_description}\n\n",
+        "chunk_context": "Voici l'extrait d'un texte qui peut *potentiellement* t'aider :\n\n{chunk}\n\n\n",
+        "chunk_to_community": "Cet extrait provient d'un texte appelé « {text} » qui aborde divers sujets que j'ai regroupé par thématiques pour toi :\n\n",
+        "description_context": "Description de l'entité {entity} dans le document '{doc}' :\n",
+        "community_context": "• Thème {number} - {title} :\n{description}\n\n",
+        "rate_template": "Voici la réponse attendue : {real_answer}\n\nVoici la question : {question}\n\nVoici la réponse proposée : {proposed_answer}",
+        "compare_template": "Voici la question : {question}\n\n Voici la première réponse : {first_answer}\n\n Voici la seconde réposne: {second_answer}",
+        "cache_template": "Si on te demandes quelque chose similaire à : {question}\n\nVoilà ce qu'il faut répondre : {answer}\n\n",
+        "entity_template": "Des entitiés potentiellement intéressantes pour répondre à la question :\n\n",
+        "relation_template": "Voilà les relations qu'ont ces entités avec d'autres entités des textes :\n\n",
+        "introduce_community": "Voilà des thèmes abordés à travers les documents, qui peuvent potentiellement t'aider à répondre :\n\n"
+    },
+    "EN": {
+        "community_summary": {
+            "relation": "Relation between {entity_source} and {entity_target} : {relation_description}",
+            "entity": "Description of {entity} : {entity_description}"
+        },
+        "vector_base": {
+            "community": "{title}\n{description}",
+            "community_description": "Observation of a group with entities in intial texts which could be useful : {description}"
+        },
+        "list_entities": "[role, person, event, media, company, date, location, object, number, sport, animal]",
+        "global_community": "Theme : {gc_title}\n{gc_description}\n\n",
+        "local_community": "\tThis theme covers the following topics in particular :\n\tTopic : {lc_title}\n\tDescription : {lc_description}\n\n",
+        "chunk_context": "Here is a text's part which *could* help you :\n\n{chunk}\n\n\n",
+        "chunk_to_community": "This text's part comes from a text named '{text}' which is about different subjects that I have grouped for you :\n\n",
+        "description_context": "Description of entity {entity} in the document '{doc}' :\n",
+        "community_context": "• Theme {number} - {title} :\n{description}\n\n",
+        "rate_template": "Here is the expected answer : {real_answer}\n\nHere is the question : {question}\n\nHere is the proposed answer : {proposed_answer}",
+        "compare_template": "Here is the question : {query}\n\nHere is the first answer : {first_answer}\n\nHere is the second answer : {second_answer}",
+        "cache_template": "If someone asks you something similar to this : {question}\n\nAnswer that : {answer}\n\n",
+        "entity_template": "Here are some potentialy interesting entities' descriptions to answer the query :\n\n",
+        "relation_template": "Here are the relationships these entities have with others entities from the text set :\n\n",
+        "introduce_community": "Here are discussed themes across documents, potentially useful to answer the question :\n\n"
+    }
+}
