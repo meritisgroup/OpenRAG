@@ -1,0 +1,2 @@
+FROM gemma2:9b
+PARAMETER num_ctx 4096

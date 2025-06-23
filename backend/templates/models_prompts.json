@@ -1,0 +1,35 @@
+{
+    "llama3" : {"system_template" : "{system_prompt}", "template" : "{query}"},
+
+    "llama3.1" : {"system_template" : "{system_prompt}", "template" : "{query}"},
+    "meta-llama/Llama-3.1-8B-Instruct" : {"system_template" : "{system_prompt}", "template" : "{query}"},
+
+    "llama3.1:70b" : {"system_template" : "{system_prompt}", "template" : "{query}"},
+
+    "gemma2:2b" : {"system_template" : "{system_prompt}", "template" : "{query}"},
+    "google/gemma-2-2b-it" : {"system_template" : "{system_prompt}", "template" : "{query}"},
+
+    "gemma2:9b" : {"system_template" : "{system_prompt}", "template" : "{query}"},
+
+    "gemma2:9b-instruct-q2_K" : {"system_template" : "{system_prompt}", "template" : "{query}"},
+
+    "gemma2:27b" : {"system_template" : "{system_prompt}", "template" : "{query}"},
+    
+    "phi4" : {"system_template" : "{system_prompt}", "template" : "{query}"},
+    "microsoft/phi-4" : {"system_template" : "{system_prompt}", "template" : "{query}"},
+
+    "mistral-nemo" : {"system_template" : "{system_prompt}", "template" : "{query}"},
+
+    "mistral-large" : {"system_template" : "{system_prompt}", "template" : "{query}"},
+
+    "gpt-3.5-turbo" : {"system_template" : "{system_prompt}", "template" : "{query}"},
+
+    "gpt4" : {"system_template" : "{system_prompt}", "template" : "{query}"},
+
+    "gpt-4-turbo" : {"system_template" : "{system_prompt}", "template" : "{query}"},
+
+    "old_llama" : "<|begin_of_text|><|start_header_id|>system<|end_header_id|>{system_prompt}<|eot_id|>\n<|start_header_id|>user<|end_header_id|>{query}<|eot_id|>\n<|start_header_id|>assistant<|end_header_id|>",
+
+    "old_mistral" : "<s>[INST]{system_prompt}\nUser query : {query}[/INST]"
+
+}

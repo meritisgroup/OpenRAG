@@ -1,0 +1,316 @@
+from ..utils.agent import Agent
+from .end_to_end_evaluators import MetricComparaison, GroundTruthComparison
+from .context_evaluators import ContextFaithfulnessEvaluator, ContextRelevanceEvaluator
+from .prompts import PROMPTS
+from ..utils.progress import ProgressBar
+
+import pandas as pd
+import numpy as np
+
+
+class ArenaBattle:
+
+    def __init__(
+        self,
+        dataframe: pd.DataFrame,
+        agent: Agent,
+        eval_number=1,
+        max_attempts=5,
+        batch_size=10,
+    ):
+        """
+        An ArenaBattle takes a dataframe with a column of queries and for each RAG method,
+        a column containing the corresponding retrieved answers.
+
+        It evaluates different RAG methods based on predefined metrics and generates a score matrix.
+        """
+        self.dataframe = dataframe
+        self.queries = dataframe["QUERIES"]
+        self.ground_truths = self.dataframe["GROUND_TRUTH"]
+        self.rag_list = [
+            col
+            for col in dataframe.columns
+            if col != "QUERIES" and col != "GROUND_TRUTH"
+        ]
+        self.agent = agent
+        self.temperature = agent.temperature
+
+        self.metric_evaluator = MetricComparaison(
+            agent=self.agent, max_attemps=max_attempts, batch_size=batch_size
+        )
+        self.language = self.agent.language
+        self.metrics: dict = PROMPTS[self.language]["metrics"]
+        self.eval_number = eval_number
+
+    def process_round_scores(self, first_rag: str, second_rag: str):
+
+        first_answers = [item["ANSWER"] for item in self.dataframe[first_rag]]
+        second_answers = [item["ANSWER"] for item in self.dataframe[second_rag]]
+        final_scores = {metric: (0.0, 0.0) for metric in self.metrics.keys()}
+
+        for eval_idx in range(self.eval_number):
+
+            dict_scores = self.metric_evaluator.run_evaluation_pipeline(
+                self.queries, self.ground_truths, first_answers, second_answers
+            )
+            for metric in self.metrics.keys():
+                first_mean, second_mean = final_scores[metric]
+                first_result, second_result = dict_scores[metric]
+
+                try:
+                    final_scores[metric] = (first_result + first_mean * eval_idx) / (
+                        eval_idx + 1
+                    ), (second_result + second_mean * eval_idx) / (eval_idx + 1)
+                except Exception:
+                    final_scores[metric] = (None, None)
+
+        return final_scores
+
+    def run_battles_scores(self):
+        """
+        Runs battles between all RAG models and computes score matrices.
+
+        Returns:
+            dict: A dictionary of score matrices for each metric.
+        """
+        num_rags = len(self.rag_list)
+        all_scores = {metric: np.zeros((num_rags, num_rags)) for metric in self.metrics}
+        all_scores_dict = {}
+        total_comparisons = (num_rags * (num_rags - 1)) // 2  # Total pairs to compare
+        progress_bar = ProgressBar(
+            total=total_comparisons, desc="Arena Battles Progress"
+        )
+        k = 0
+        for i in range(num_rags):
+            for j in range(i + 1, num_rags):
+
+                first_rag = self.rag_list[i]
+                second_rag = self.rag_list[j]
+                all_scores_dict[f"{first_rag}_v_{second_rag}"] = {
+                    metric: [0, 0] for metric in self.metrics
+                }
+
+                round_scores = self.process_round_scores(first_rag, second_rag)
+
+                for metric in self.metrics.keys():
+                    first_result, second_result = round_scores[metric]
+                    all_scores[metric][i][j] = first_result
+                    all_scores[metric][j][i] = second_result
+                    all_scores_dict[f"{first_rag}_v_{second_rag}"][metric] = [
+                        first_result,
+                        second_result,
+                    ]
+
+                progress_bar.update(
+                    k,
+                    text=f"Arena Battles Progress ({k+1} / {int(num_rags * int((num_rags - 1))/2)})",
+                )
+                k += 1
+        self.all_scores_dict = all_scores_dict
+        progress_bar.success("Arena battles completed")
+
+        return all_scores
+
+
+class GroundTruthComparator:
+
+    def __init__(
+        self,
+        dataframe: pd.DataFrame,
+        agent: Agent,
+        eval_number=1,
+        max_attempts=5,
+        batch_size=10,
+    ):
+
+        self.agent = agent
+        self.comparator = GroundTruthComparison(agent, max_attempts, batch_size)
+        self.language = self.agent.language
+        self.metrics: dict = PROMPTS[self.language]["gt_metrics"]
+
+        self.dataframe = dataframe
+        self.queries = dataframe["QUERIES"]
+        self.ground_truth = dataframe["GROUND_TRUTH"]
+        self.rag_list = [
+            col
+            for col in dataframe.columns
+            if (col != "QUERIES" and col != "GROUND_TRUTH")
+        ]
+        self.eval_number = eval_number
+
+    def process_evaluation(self, rag_answers: list[str]):
+
+        final_scores = {metric: 0.0 for metric in self.metrics.keys()}
+
+        for eval_idx in range(self.eval_number):
+
+            dict_scores = self.comparator.run_evaluation_pipeline(
+                self.queries, self.ground_truth, rag_answers
+            )
+            for metric in self.metrics.keys():
+                mean = final_scores[metric]
+                result = dict_scores[metric]
+
+                try:
+                    final_scores[metric] = (result + mean * eval_idx) / (eval_idx + 1)
+                except Exception as e:
+                    final_scores[metric] = None
+
+        return final_scores
+
+    def run_evaluations(self):
+
+        num_rags = len(self.rag_list)
+        all_scores = {metric: np.zeros(num_rags) for metric in self.metrics}
+        all_scores_dict = {
+            rag: {metric: 0 for metric in self.metrics} for rag in self.rag_list
+        }
+
+        progress_bar = ProgressBar(total=num_rags, desc="Ground Truth Comparison")
+        n = len(self.rag_list)
+        for i, rag in enumerate(self.rag_list):
+            progress_bar.update(
+                i - 1,
+                text=f"Processing ground truth comparisons for {rag} rag ({i+1} / {n})",
+            )
+            rag_answers = [row["ANSWER"] for row in self.dataframe[rag]]
+            scores = self.process_evaluation(rag_answers)
+
+            for metric in self.metrics:
+                all_scores[metric][i] = scores[metric]
+                all_scores_dict[rag][metric] = scores[metric]
+
+        progress_bar.success("Ground truth comparison done")
+
+        self.all_scores_dict = all_scores_dict
+
+        return all_scores
+
+
+class ContextRelevanceComparator:
+
+    def __init__(
+        self,
+        dataframe: pd.DataFrame,
+        agent: Agent,
+        eval_number=1,
+        max_attempts=5,
+        batch_size=10,
+    ):
+
+        self.agent = agent
+        self.evaluator = ContextRelevanceEvaluator(
+            agent=self.agent, max_attemps=max_attempts, batch_size=batch_size
+        )
+        self.eval_number = eval_number
+
+        self.dataframe = dataframe
+        self.queries = dataframe["QUERIES"]
+        self.rag_list = [
+            col
+            for col in dataframe.columns
+            if col != "QUERIES" and col != "GROUND_TRUTH"
+        ]
+
+    def process_evaluation(self, model_contexts):
+        final_scores = 0
+        mean = 0
+
+        for eval_idx in range(self.eval_number):
+
+            result = self.evaluator.run_evaluation_pipeline(
+                self.queries, model_contexts
+            )
+
+            try:
+                final_scores = (result + mean * eval_idx) / (eval_idx + 1)
+            except Exception:
+                continue
+
+        return final_scores
+
+    def run_evaluations(self):
+        num_rags = len(self.rag_list)
+        all_scores = {f"{rag}": 0.0 for rag in self.rag_list}
+
+        progress_bar = ProgressBar(
+            total=num_rags, desc="Context Relevance comparison progress"
+        )
+        n = len(self.rag_list)
+        for i, rag in enumerate(self.rag_list):
+            progress_bar.update(
+                i - 1,
+                text=f"Processing context relevance evaluations for {rag} rag ({i+1} / {n})",
+            )
+            rag_contexts = [row["CONTEXT"] for row in self.dataframe[rag]]
+            score = self.process_evaluation(rag_contexts)
+
+            all_scores[rag] = score
+
+        progress_bar.success("Context relevance evaluations done")
+        return all_scores
+
+
+class ContextFaithfulnessComparator:
+
+    def __init__(
+        self,
+        dataframe: pd.DataFrame,
+        agent: Agent,
+        eval_number=1,
+        max_attempts=5,
+        batch_size=10,
+    ):
+
+        self.agent = agent
+        self.evaluator = ContextFaithfulnessEvaluator(
+            agent=self.agent, max_attemps=max_attempts, batch_size=batch_size
+        )
+        self.eval_number = eval_number
+
+        self.dataframe = dataframe
+        self.queries = dataframe["QUERIES"].tolist()
+
+        self.rag_list = [
+            col
+            for col in dataframe.columns
+            if col != "QUERIES" and col != "GROUND_TRUTH"
+        ]
+        self.ground_truth = dataframe["GROUND_TRUTH"].tolist()
+
+    def process_evaluation(self, answers: list[str], model_contexts: list[str]):
+        final_scores = 0
+        mean = 0
+
+        for eval_idx in range(self.eval_number):
+
+            result = self.evaluator.run_evaluation_pipeline(
+                self.queries, answers, model_contexts
+            )
+
+            try:
+                final_scores = (result + mean * eval_idx) / (eval_idx + 1)
+            except Exception:
+                continue
+
+        return final_scores
+
+    def run_evaluations(self):
+        num_rags = len(self.rag_list)
+        all_scores = {f"{rag}": 0.0 for rag in self.rag_list}
+
+        progress_bar = ProgressBar(
+            total=num_rags, desc="Context faithfulness comparison progress"
+        )
+        n = len(self.rag_list)
+        for i, rag in enumerate(self.rag_list):
+            progress_bar.update(
+                i - 1,
+                text=f"Processing context faithfulness evaluations for {rag} rag ({i+1} / {n})",
+            )
+            contexts = [row["CONTEXT"] for row in self.dataframe[rag]]
+            score = self.process_evaluation(self.ground_truth, contexts)
+            all_scores[rag] = score
+
+        progress_bar.success("Context faithfulness evaluations done")
+        return all_scores

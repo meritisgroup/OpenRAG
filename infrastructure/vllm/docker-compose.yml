@@ -1,0 +1,22 @@
+services:
+  vllm:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: openrag_vllm
+    container_name: ${VLLM_LOCAL_CONTAINER_NAME}
+    runtime: nvidia 
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    volumes:
+      - ../../volumes/HF:/root/.cache/huggingface
+    ports:
+      - "8000:8000"

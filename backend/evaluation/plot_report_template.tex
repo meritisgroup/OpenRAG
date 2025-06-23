@@ -1,0 +1,70 @@
+\documentclass[a4paper,10pt]{article}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{float}
+
+\title{\vspace{-2cm}Comparative Evaluation Report of RAG Systems\vspace{-1cm}}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+    This report presents a comparative evaluation of several RAG (Retrieval-Augmented Generation) systems, including an analysis of their performance relative to each other, the quality of the extracted context and generated responses, as well as their token consumption, inference time and ecological impact during indexing and response generation.
+\end{abstract}
+
+\section{Token Consumption}
+The following plot represents the number of tokens each rag has used during various stages of its process. Tokens are used during question answering and indexation. The following token prices are based on openai's embedding and GPT-4o mini batched models.
+\begin{itemize} 
+    \item \textbf{Query input tokens: } Number of tokens in the user's question and the retrieved context. \textit{\$0.075 / 1M tokens}
+    \item \textbf{Query output tokens: } Number of tokens in the generated answer to the question. \textit{\$ 0.30 / 1M tokens}
+    \item \textbf{Embedding tokens: } Tokens used to embed the documents during indexation. \textit{\$0.01 / 1M tokens}
+    \item \textbf{Indexation input tokens: } Input tokens used during indexation \textit{\$0.075 / 1M tokens}
+    \item \textbf{Indexation output tokens: } Output tokens generated during indexation \textit{\$ 0.30 / 1M tokens}
+\end{itemize}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width = 14cm]{{token_graph_path}}
+\end{figure}
+
+\section{Ground Truth Analysis}
+The following plot assesses the quality of the generated answer by each RAG compared with the expected answer (Ground Truth). The quality is determined by an LLM and decomposed in three metrics: Correctness, Completeness and Relevance. Each is given a score from 0 to 5 to assess its quality
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width = 14cm]{{gt_graph_path}}
+\end{figure}
+
+\section{Context Analysis}
+The retrieved context is judged by an LLM for every RAG in the benchmark. The context's quality is decomposed in two metrics: Relevance and Faithfulness. Context relevance represents the percentage of retrieved chunks that is relevant to answer the query. Context Faithfulness represents the percentage of context that contains the answer to the query.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width = 14cm]{{context_graph_path}}
+\end{figure}
+
+\section{Answering Time}
+The following plot shows for each rag the time that was necessary to answer all benchmark questions. Please be aware, that it is extremely dependant on your hardware and code optimization. What is relevant to asses a rag's performance in this field is to compare it with another rag. 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width = 14cm]{{time_graph}}
+\end{figure}
+
+
+\section{RAG Arena}
+Each RAG has been compared to all others on five metrics: Comprehensiveness, Diversity, Logicality, Relevance and Coherence. For all metrics, both rag have been attributed a percentage of wins over the other. A single graph is displayed in full scale to help the understanding of the following table. All results have been displayed into a table, the blue side represents the score of the row RAG and the red side the score of the column RAG. 
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width = 14cm]{{example_arena_graph}}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width = 14cm]{{report_arena_graph}}
+\end{figure}
+
+\end{document}

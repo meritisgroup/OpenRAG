@@ -1,0 +1,9 @@
+storage/*
+!storage/.gitkeep
+volumes/*
+!volumes/.gitkeep
+!volumes/dev-elasticsearch/.gitkeep
+!volumes/ollama/.gitkeep
+!volumes/HF/.gitkeep
+data/*
+backend/data/*
