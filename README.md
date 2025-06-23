@@ -2,7 +2,7 @@
 
 Welcome to **OpenRAG**, an open source, user friendly RAG benchmark tool ! 
 
-The goal a OpenRAG is to provide an intuitive tool to help users decide which RAG method, amongst the large number of existing techniques, is most appropriated to ist own use case and data.
+The goal of OpenRAG is to provide an intuitive tool to help users decide which RAG method, amongst the large number of existing techniques, is most appropriated to ist own use case and data.
 
 In OpenRAG, more than a dozen RAG methods are implemented and more will be added with time. Each RAG can be customized to better fit each user's need. 
 
