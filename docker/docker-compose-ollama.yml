@@ -1,3 +1,4 @@
+
 services:  
   ollama:
     restart: always
@@ -16,12 +17,12 @@ services:
       OLLAMA_ORIGINS: "*"
       OLLAMA_KEEP_ALIVE: "60m"
     deploy:
-        resources:
-          reservations:
-            devices:
-              - driver: nvidia
-                count: 1
-                capabilities: [gpu]
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
     networks:
       - app-network
     
