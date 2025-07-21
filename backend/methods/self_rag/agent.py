@@ -25,9 +25,7 @@ class SelfRagAgent(NaiveRagAgent):
     def get_nb_token_embeddings(self):
         return self.vb.get_nb_token_embeddings()
 
-    def get_rag_context(
-        self, query: str, nb_chunks: int = 5
-    ) -> list[str]:
+    def get_rag_context(self, query: str, nb_chunks: int = 5) -> list[str]:
         """ """
         ns = NaiveSearch(vector_base=self.vb, nb_chunks=nb_chunks)
         context = ns.get_context(query=query)
@@ -68,10 +66,10 @@ class SelfRagAgent(NaiveRagAgent):
             prompts = []
             system_prompts = []
             for i, context in enumerate(useful_contexts):
-                prompt = self.prompts["safe_generation"]["QUERY_TEMPLATE"].format(
+                prompt = self.prompts["smooth_generation"]["QUERY_TEMPLATE"].format(
                     context=context, query=query
                 )
-                system_prompt = self.prompts["safe_generation"]["SYSTEM_PROMPT"]
+                system_prompt = self.prompts["smooth_generation"]["SYSTEM_PROMPT"]
                 prompts.append(prompt)
                 system_prompts.append(system_prompt)
             answers = agent.multiple_predict(
@@ -149,8 +147,7 @@ class SelfRagAgent(NaiveRagAgent):
                 prompt = self.prompts["conversationnal"]["QUERY_TEMPLATE"].format(
                     query=query
                 )
-                system_prompt = self.prompts["conversationnal"]["SYSTEM_PROMPT"]
-                answer = agent.predict(prompt=prompt, system_prompt=system_prompt)
+                answer = agent.predict(prompt=prompt, system_prompt=self.system_prompt)
                 nb_input_tokens += np.sum(answer["nb_input_tokens"])
                 nb_output_tokens += np.sum(answer["nb_output_tokens"])
 
@@ -165,8 +162,8 @@ class SelfRagAgent(NaiveRagAgent):
             prompt = self.prompts["conversationnal"]["QUERY_TEMPLATE"].format(
                 query=query
             )
-            system_prompt = self.prompts["conversationnal"]["SYSTEM_PROMPT"]
-            answer = agent.predict(prompt=prompt, system_prompt=system_prompt)
+
+            answer = agent.predict(prompt=prompt, system_prompt=self.system_prompt)
             nb_input_tokens += np.sum(answer["nb_input_tokens"])
             nb_output_tokens += np.sum(answer["nb_output_tokens"])
 
@@ -220,10 +217,10 @@ class SelfRagAgent(NaiveRagAgent):
             answers_fully = []
             answers_partially = []
             for i, context in enumerate(useful_contexts):
-                prompt = self.prompts["safe_generation"]["QUERY_TEMPLATE"].format(
+                prompt = self.prompts["smooth_generation"]["QUERY_TEMPLATE"].format(
                     context=context, query=query
                 )
-                system_prompt = self.prompts["safe_generation"]["SYSTEM_PROMPT"]
+                system_prompt = self.prompts["smooth_generation"]["SYSTEM_PROMPT"]
                 answer = agent.predict(prompt=prompt, system_prompt=system_prompt)
                 impacts[0] += answer["impacts"][0]
                 impacts[1] += answer["impacts"][1]
@@ -290,8 +287,8 @@ class SelfRagAgent(NaiveRagAgent):
                 prompt = self.prompts["conversationnal"]["QUERY_TEMPLATE"].format(
                     query=query
                 )
-                system_prompt = self.prompts["conversationnal"]["SYSTEM_PROMPT"]
-                answer = agent.predict(prompt=prompt, system_prompt=system_prompt)
+
+                answer = agent.predict(prompt=prompt, system_prompt=self.system_prompt)
                 nb_input_tokens += np.sum(answer["nb_input_tokens"])
                 nb_output_tokens += np.sum(answer["nb_output_tokens"])
                 impacts[0] += answer["impacts"][0]
@@ -304,8 +301,8 @@ class SelfRagAgent(NaiveRagAgent):
             prompt = self.prompts["conversationnal"]["QUERY_TEMPLATE"].format(
                 query=query
             )
-            system_prompt = self.prompts["conversationnal"]["SYSTEM_PROMPT"]
-            answer = agent.predict(prompt=prompt, system_prompt=system_prompt)
+
+            answer = agent.predict(prompt=prompt, system_prompt=self.system_prompt)
             impacts[0] += answer["impacts"][0]
             impacts[1] += answer["impacts"][1]
 
@@ -364,9 +361,7 @@ class SelfRagAgent(NaiveRagAgent):
 
         answer = None
         if "yes" in retrieval_necessary.lower():
-            contexts = self.get_rag_context(
-                query=query, nb_chunks=nb_chunks
-            )
+            contexts = self.get_rag_context(query=query, nb_chunks=nb_chunks)
 
             if batch:
                 answer = self.__run_batch_answer(
@@ -383,8 +378,7 @@ class SelfRagAgent(NaiveRagAgent):
             prompt = self.prompts["conversationnal"]["QUERY_TEMPLATE"].format(
                 query=query
             )
-            system_prompt = self.prompts["conversationnal"]["SYSTEM_PROMPT"]
-            answer = agent.predict(prompt=prompt, system_prompt=system_prompt)
+            answer = agent.predict(prompt=prompt, system_prompt=self.system_prompt)
 
             nb_input_tokens += np.sum(answer["nb_input_tokens"])
             nb_output_tokens += np.sum(answer["nb_output_tokens"])
@@ -415,15 +409,11 @@ class SelfRagAgent(NaiveRagAgent):
     def release_gpu_memory(self):
         self.agent.release_memory()
 
-    def get_rag_contexts(
-        self, queries: list[str], nb_chunks: int = 5
-    ):
+    def get_rag_contexts(self, queries: list[str], nb_chunks: int = 5):
         contexts = []
         names_docs = []
         for query in queries:
-            context, name_docs = self.get_rag_context(
-                query=query, nb_chunks=nb_chunks
-            )
+            context, name_docs = self.get_rag_context(query=query, nb_chunks=nb_chunks)
             contexts.append(context)
             names_docs.append(name_docs)
         return contexts, names_docs

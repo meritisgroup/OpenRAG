@@ -319,3 +319,19 @@ def multiple_predict_mistral(
         "impacts": impacts,
         "energy": energy,
     }
+
+
+def get_system_prompt(config_server: dict, prompts: dict) -> str:
+
+    system_prompt = ""
+    system_prompt_name = config_server["local_params"]["generation_system_prompt_name"]
+
+    if config_server["local_params"]["forced_system_prompt"]:
+        system_prompt = config_server["all_system_prompt"][system_prompt_name]
+    else:
+        if config_server["local_params"]["generation_system_prompt_name"] != "default":
+            system_prompt = config_server["all_system_prompt"][system_prompt_name]
+        else:
+            system_prompt = prompts["smooth_generation"]["SYSTEM_PROMPT"]
+
+    return system_prompt

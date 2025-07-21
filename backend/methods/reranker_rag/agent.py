@@ -38,9 +38,7 @@ class RerankerRag(AdvancedRag):
         )
         self.nb_chunks = config_server["nb_chunks"]
 
-    def get_rag_context(
-        self, query: str, nb_chunks: int = 5
-    ) -> list[str]:
+    def get_rag_context(self, query: str, nb_chunks: int = 5) -> list[str]:
         """
         Takes a query and retrieves a given number of chunks using the NaiveSearch implemented in backend/methods/naive_rag/query.py
 
@@ -95,10 +93,12 @@ class RerankerRag(AdvancedRag):
         agent = self.agent
         nb_input_tokens = 0
         nb_output_tokens = 0
-        impacts, energies = [0, 0, ''], [0, 0, '']
+        impacts, energies = [0, 0, ""], [0, 0, ""]
         if self.reformulate_query:
-            queries, input_t, output_t, immpacts, energies = self.reformulater.reformulate(
-                query=query, nb_reformulation=nb_reformulation
+            queries, input_t, output_t, immpacts, energies = (
+                self.reformulater.reformulate(
+                    query=query, nb_reformulation=nb_reformulation
+                )
             )
             nb_input_tokens += input_t
             nb_output_tokens += output_t
@@ -106,8 +106,7 @@ class RerankerRag(AdvancedRag):
             queries = [query]
 
         contexts = [
-            self.get_rag_context(query=query, nb_chunks=nb_chunks)
-            for query in queries
+            self.get_rag_context(query=query, nb_chunks=nb_chunks) for query in queries
         ]
         contexts = list(chain(*contexts))
         contexts = list(set(contexts))
@@ -121,8 +120,7 @@ class RerankerRag(AdvancedRag):
         prompt = self.prompts["smooth_generation"]["QUERY_TEMPLATE"].format(
             context=context, query=query
         )
-        system_prompt = self.prompts["smooth_generation"]["SYSTEM_PROMPT"]
-        answer = agent.predict(prompt=prompt, system_prompt=system_prompt)
+        answer = agent.predict(prompt=prompt, system_prompt=self.system_prompt)
         nb_input_tokens += np.sum(answer["nb_input_tokens"])
         nb_output_tokens += np.sum(answer["nb_output_tokens"])
         impacts[2] = answer["impacts"][2]
@@ -137,19 +135,15 @@ class RerankerRag(AdvancedRag):
             "nb_input_tokens": nb_input_tokens,
             "nb_output_tokens": nb_output_tokens,
             "context": context,
-            "impacts" : impacts,
-            "energy" : energies
+            "impacts": impacts,
+            "energy": energies,
         }
 
-    def get_rag_contexts(
-        self, queries: list[str], nb_chunks: int = 5
-    ):
+    def get_rag_contexts(self, queries: list[str], nb_chunks: int = 5):
         contexts = []
         names_docs = []
         for query in queries:
-            context, name_docs = self.get_rag_context(
-                query=query, nb_chunks=nb_chunks
-            )
+            context, name_docs = self.get_rag_context(query=query, nb_chunks=nb_chunks)
             contexts.append(context)
             names_docs.append(name_docs)
         return contexts, names_docs

@@ -4,8 +4,8 @@ from .crawler import web_search
 from ...utils.splitter import get_splitter
 from tqdm import tqdm
 import numpy as np
-from .prompts import prompts
 from ..query_reformulation.query_reformulation import query_reformulation
+
 
 class CragAgent(NaiveRagAgent):
 
@@ -24,7 +24,6 @@ class CragAgent(NaiveRagAgent):
         )
         self.language = config_server["language"]
         self.type_text_splitter = config_server["TextSplitter"]
-        self.prompts = prompts[self.language]
         self.nb_chunks = config_server["nb_chunks"]
         self.max_web_requests = max_web_requests
         self.websearch = web_search(max_requests=self.max_web_requests)
@@ -35,14 +34,14 @@ class CragAgent(NaiveRagAgent):
         )
         self.reformulate_query = config_server["reformulate_query"]
         if self.reformulate_query:
-            self.reformulater = query_reformulation(agent=self.agent, language=self.language)
+            self.reformulater = query_reformulation(
+                agent=self.agent, language=self.language
+            )
 
     def get_nb_token_embeddings(self):
         return self.vb.get_nb_token_embeddings()
 
-    def get_rag_context(
-        self, query: str, nb_chunks: int = 5
-    ) -> list[str]:
+    def get_rag_context(self, query: str, nb_chunks: int = 5) -> list[str]:
         """ """
         ns = NaiveSearch(vector_base=self.vb, nb_chunks=nb_chunks)
         context = ns.get_context(query=query)
@@ -54,8 +53,8 @@ class CragAgent(NaiveRagAgent):
 
         nb_input_tokens = 0
         nb_output_tokens = 0
-        energies = [0, 0,'']
-        impacts = [0, 0, '']
+        energies = [0, 0, ""]
+        impacts = [0, 0, ""]
         useful_chunks = []
         if len(web_results) == 0:
             return useful_chunks, 0, 0
@@ -68,9 +67,9 @@ class CragAgent(NaiveRagAgent):
                     prompt = self.prompts["document_relevance2"][
                         "QUERY_TEMPLATE"
                     ].format(context=chunks[j], query=query)
-                    system_prompt = self.prompts["smooth_generation"]["SYSTEM_PROMPT"]
+
                     prompts.append(prompt)
-                    system_prompts.append(system_prompt)
+                    system_prompts.append(self.system_prompt)
                 scores = self.agent.multiple_predict(
                     prompts=prompts, system_prompts=system_prompts
                 )
@@ -96,9 +95,9 @@ class CragAgent(NaiveRagAgent):
                     prompt = self.prompts["document_relevance2"][
                         "QUERY_TEMPLATE"
                     ].format(context=chunks[j], query=query)
-                    system_prompt = self.prompts["smooth_generation"]["SYSTEM_PROMPT"]
+
                     score = self.agent.predict(
-                        prompt=prompt, system_prompt=system_prompt
+                        prompt=prompt, system_prompt=self.system_prompt
                     )
                     nb_input_tokens += np.sum(score["nb_input_tokens"])
                     nb_output_tokens += np.sum(score["nb_output_tokens"])
@@ -118,7 +117,7 @@ class CragAgent(NaiveRagAgent):
             "nb_input_tokens": nb_input_tokens,
             "nb_output_tokens": nb_output_tokens,
             "energy": energies,
-            "impacts": impacts
+            "impacts": impacts,
         }
 
     def web_search(self, query):
@@ -143,27 +142,27 @@ class CragAgent(NaiveRagAgent):
         """Generate an answer to the query"""
 
         agent = self.agent
-        
+
         nb_input_tokens = 0
         nb_output_tokens = 0
-        impacts = [0, 0, '']
-        energies = [0, 0, '']
+        impacts = [0, 0, ""]
+        energies = [0, 0, ""]
         if self.reformulate_query:
-            query, input_t, output_t, impacts, energies = self.reformulater.reformulate(query= query,nb_reformulation=1)
+            query, input_t, output_t, impacts, energies = self.reformulater.reformulate(
+                query=query, nb_reformulation=1
+            )
             query = query[0]
             nb_input_tokens += input_t
             nb_output_tokens += output_t
         context = ""
-        contexts = self.get_rag_context(
-            query=query, nb_chunks=nb_chunks
-        )
+        contexts = self.get_rag_context(query=query, nb_chunks=nb_chunks)
         useful_contexts = []
         ambiguous_contexts = []
         if batch:
             prompts = []
             system_prompts = []
             for j in range(len(contexts)):
-               
+
                 prompt = self.prompts["document_relevance2"]["QUERY_TEMPLATE"].format(
                     context=contexts[j], query=query
                 )
@@ -185,7 +184,7 @@ class CragAgent(NaiveRagAgent):
             energies[2] = scores["energy"][2]
             energies[0] += scores["energy"][0]
             energies[1] += scores["energy"][1]
-            
+
             scores = scores["texts"]
             for j in range(len(contexts)):
                 if (
@@ -242,11 +241,11 @@ class CragAgent(NaiveRagAgent):
                 )
                 nb_input_tokens += web_results["nb_input_tokens"]
                 nb_output_tokens += web_results["nb_output_token"]
-                energies[0]+=web_results["energy"][0]
-                energies[1]+=web_results["energy"][1]
-                impacts[0]+=web_results["impacts"][0]
-                impacts[1]+=web_results["impacts"][1]
-                
+                energies[0] += web_results["energy"][0]
+                energies[1] += web_results["energy"][1]
+                impacts[0] += web_results["impacts"][0]
+                impacts[1] += web_results["impacts"][1]
+
                 web_results = web_results["texts"]
             ambiguous_contexts += web_results
             context = self.concat_documents(documents=ambiguous_contexts)
@@ -257,12 +256,19 @@ class CragAgent(NaiveRagAgent):
             system_prompt = self.prompts["rewrite_web_query"]["SYSTEM_PROMPT"]
 
             query_web = agent.predict(prompt=prompt, system_prompt=system_prompt)
-            nb_input_tokens += query_web["nb_input_tokens"] if type(query_web["nb_input_tokens"]) is type(0) else query_web["nb_input_tokens"][0]
-            nb_output_tokens += query_web["nb_output_tokens"] if type(query_web["nb_output_tokens"]) is type(0) else query_web["nb_output_tokens"][0]
+            nb_input_tokens += (
+                query_web["nb_input_tokens"]
+                if type(query_web["nb_input_tokens"]) is type(0)
+                else query_web["nb_input_tokens"][0]
+            )
+            nb_output_tokens += (
+                query_web["nb_output_tokens"]
+                if type(query_web["nb_output_tokens"]) is type(0)
+                else query_web["nb_output_tokens"][0]
+            )
 
             impacts[0] += query_web["impacts"][0]
             impacts[1] += query_web["impacts"][1]
-
 
             energies[0] += query_web["energy"][0]
             energies[1] += query_web["energy"][1]
@@ -276,25 +282,32 @@ class CragAgent(NaiveRagAgent):
                 )
                 nb_input_tokens += web_results["nb_input_tokens"]
                 nb_output_tokens += web_results["nb_output_tokens"]
-                
-                energies[0]+=web_results["energy"][0]
-                energies[1]+=web_results["energy"][1]
-                impacts[0]+=web_results["impacts"][0]
-                impacts[1]+=web_results["impacts"][1]
+
+                energies[0] += web_results["energy"][0]
+                energies[1] += web_results["energy"][1]
+                impacts[0] += web_results["impacts"][0]
+                impacts[1] += web_results["impacts"][1]
                 web_results = web_results["texts"]
                 context = self.concat_documents(documents=web_results)
 
-        prompt = self.prompts["safe_generation"]["QUERY_TEMPLATE"].format(
+        prompt = self.prompts["smooth_generation"]["QUERY_TEMPLATE"].format(
             context=context, query=query
         )
-        system_prompt = self.prompts["safe_generation"]["SYSTEM_PROMPT"]
+        system_prompt = self.prompts["smooth_generation"]["SYSTEM_PROMPT"]
         answer = agent.predict(prompt=prompt, system_prompt=system_prompt)
-        nb_input_tokens += answer["nb_input_tokens"] if type(answer["nb_input_tokens"]) is type(0) else answer["nb_input_tokens"][0]
-        nb_output_tokens += answer["nb_output_tokens"] if type(answer["nb_output_tokens"]) is type(0) else answer["nb_output_tokens"][0]
+        nb_input_tokens += (
+            answer["nb_input_tokens"]
+            if type(answer["nb_input_tokens"]) is type(0)
+            else answer["nb_input_tokens"][0]
+        )
+        nb_output_tokens += (
+            answer["nb_output_tokens"]
+            if type(answer["nb_output_tokens"]) is type(0)
+            else answer["nb_output_tokens"][0]
+        )
 
         impacts[0] += answer["impacts"][0]
         impacts[1] += answer["impacts"][1]
-
 
         energies[0] += answer["energy"][0]
         energies[1] += answer["energy"][1]
@@ -304,22 +317,18 @@ class CragAgent(NaiveRagAgent):
             "nb_input_tokens": nb_input_tokens,
             "nb_output_tokens": nb_output_tokens,
             "context": context,
-            "impacts" : impacts,
-            "energy" : energies
+            "impacts": impacts,
+            "energy": energies,
         }
 
     def release_gpu_memory(self):
         self.agent.release_memory()
 
-    def get_rag_contexts(
-        self, queries: list[str], nb_chunks: int = 5
-    ):
+    def get_rag_contexts(self, queries: list[str], nb_chunks: int = 5):
         contexts = []
         names_docs = []
         for query in queries:
-            context, name_docs = self.get_rag_context(
-                query=query, nb_chunks=nb_chunks
-            )
+            context, name_docs = self.get_rag_context(query=query, nb_chunks=nb_chunks)
             contexts.append(context)
             names_docs.append(name_docs)
         return contexts, names_docs

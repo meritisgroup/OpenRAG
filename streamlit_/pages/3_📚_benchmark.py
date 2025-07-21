@@ -5,6 +5,8 @@ from backend.factory_RagAgent import (
     get_rag_agent,
     get_custom_rag_agent,
     change_config_server,
+    change_local_parameters,
+    put_default_local_parameters,
 )
 import json
 from streamlit_.utils.benchmark_funcs import (
@@ -13,7 +15,7 @@ from streamlit_.utils.benchmark_funcs import (
     match_name_cleaner,
     clean_bench_df,
 )
-from streamlit_.utils.chat_funcs import get_chat_agent
+from streamlit_.utils.chat_funcs import get_chat_agent, change_default_prompt
 
 from backend.utils.progress import ProgressBar
 
@@ -135,6 +137,48 @@ st.selectbox(
     key="benchmark_database",
 )
 
+if "all_system_prompt" not in st.session_state:
+    st.session_state["all_system_prompt"] = st.session_state["config_server"][
+        "all_system_prompt"
+    ]
+
+if "system_prompt" not in st.session_state:
+    st.session_state["system_prompt"] = st.session_state["config_server"][
+        "local_params"
+    ]["generation_system_prompt_name"]
+
+
+if "system_prompt_selected" not in st.session_state:
+    st.session_state["system_prompt_selected"] = "default"
+
+
+def force_system_prompt():
+    system_prompt_selected = st.session_state["system_prompt_selected"]
+    if system_prompt_selected != "default":
+        st.session_state["config_server"]["local_params"]["forced_system_prompt"] = True
+        st.session_state["config_server"]["local_params"][
+            "generation_system_prompt_name"
+        ] = system_prompt_selected
+    else:
+        st.session_state["config_server"]["local_params"][
+            "forced_system_prompt"
+        ] = False
+        st.session_state["config_server"]["local_params"][
+            "generation_system_prompt_name"
+        ] = "default"
+    change_local_parameters(st.session_state["config_server"]["local_params"])
+
+
+change_default_prompt()
+st.markdown("## Choose the prompt to perform benchmark on")
+system_prompt_selected = st.selectbox(
+    label="**Choose system prompt**",
+    options=st.session_state["all_system_prompt"],
+    key="system_prompt_selected",
+    on_change=force_system_prompt,
+)
+
+
 reset_index = st.checkbox(label="Reset indexing", value=False)
 
 if "benchmark_clicked" not in st.session_state:
@@ -230,6 +274,7 @@ if col1.button(
         else:
             st.session_state["benchmark_clicked"] = False
             st.error("Choose at least 2 rags methods")
+    put_default_local_parameters()
 
 
 if "report_path" in st.session_state["benchmark"]:

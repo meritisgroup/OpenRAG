@@ -1,10 +1,16 @@
 import streamlit as st
 import time
 import numpy as np
+from backend.factory_RagAgent import (
+    change_local_parameters,
+    put_default_local_parameters,
+    change_local_parameters,
+)
 from streamlit_.utils.chat_funcs import (
     get_chat_agent,
     handle_click,
     reset_success_button,
+    change_default_prompt,
 )
 
 st.markdown("# OpenRAG by Meritis")
@@ -46,7 +52,37 @@ with st.sidebar:
         ),
     )
 
-    reset_index = st.checkbox(label="Reset the indexing", value=False)
+    if "all_system_prompt" not in st.session_state:
+        st.session_state["all_system_prompt"] = st.session_state["config_server"][
+            "all_system_prompt"
+        ]
+    if "system_prompt_selected" not in st.session_state:
+        st.session_state["system_prompt_selected"] = "default"
+
+    def force_system_prompt():
+        system_prompt_selected = st.session_state["system_prompt_selected"]
+        if system_prompt_selected != "default":
+            st.session_state["config_server"]["local_params"][
+                "forced_system_prompt"
+            ] = True
+            st.session_state["config_server"]["local_params"][
+                "generation_system_prompt_name"
+            ] = system_prompt_selected
+        else:
+            st.session_state["config_server"]["local_params"][
+                "forced_system_prompt"
+            ] = False
+        change_local_parameters(st.session_state["config_server"]["local_params"])
+
+    change_default_prompt()
+    system_prompt_selected = st.selectbox(
+        label="**Choose system prompt**",
+        options=st.session_state["all_system_prompt"].keys(),
+        key="system_prompt_selected",
+        on_change=force_system_prompt,
+    )
+
+    reset_index = st.checkbox(label="Reset indexing", value=False)
 
     if st.button(
         "Initialize RAG Agent",

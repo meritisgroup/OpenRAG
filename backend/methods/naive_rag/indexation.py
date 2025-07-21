@@ -5,6 +5,7 @@ from tqdm.auto import tqdm
 import os
 import numpy as np
 
+
 class NaiveRagIndexation:
     def __init__(
         self,
@@ -37,9 +38,11 @@ class NaiveRagIndexation:
         self.agent = agent
         self.embedding_model = embedding_model
 
-        self.splitter = get_splitter(type_text_splitter=type_text_splitter,
-                                     agent=self.agent,
-                                     embedding_model=self.embedding_model)
+        self.splitter = get_splitter(
+            type_text_splitter=type_text_splitter,
+            agent=self.agent,
+            embedding_model=self.embedding_model,
+        )
 
     def __batch_indexation__(self, doc_chunks, name_docs):
         """
@@ -59,11 +62,13 @@ class NaiveRagIndexation:
         tokens = 0
         taille_batch = 500
         for i in range(0, len(elements), taille_batch):
-            tokens += np.sum(self.vb.add_str_batch_elements(
-                    elements=elements[i:i + taille_batch],
-                    docs_name=name_docs[i:i + taille_batch], 
-                    display_message=False
-            ))
+            tokens += np.sum(
+                self.vb.add_str_batch_elements(
+                    elements=elements[i : i + taille_batch],
+                    docs_name=name_docs[i : i + taille_batch],
+                    display_message=False,
+                )
+            )
         return tokens
 
     def __serial_indexation__(self, doc_chunks, name_docs):
@@ -118,8 +123,7 @@ class NaiveRagIndexation:
                     path=self.data_path + name_doc, splitter=self.splitter
                 )
                 doc_chunks = doc.chunks(
-                    chunk_size=chunk_size, 
-                    chunk_overlap=chunk_overlap
+                    chunk_size=chunk_size, chunk_overlap=chunk_overlap
                 )
                 name_docs = [name_doc for i in range(len(doc_chunks))]
                 if True:
@@ -132,12 +136,16 @@ class NaiveRagIndexation:
                         doc_indexation_tokens += self.__serial_indexation__(
                             doc_chunks=doc_chunks, name_docs=name_docs
                         )
-      
 
                 # print("Failed indexing: {}".format(name_doc))
                 if i == len(progress_bar) - 1:
                     progress_bar.set_description("Embbeding chunks - ✅")
 
-                new_doc = Document(name=name_doc,embedding_tokens=int(doc_indexation_tokens), input_tokens=0, output_tokens=0)
+                new_doc = Document(
+                    name=name_doc,
+                    embedding_tokens=int(doc_indexation_tokens),
+                    input_tokens=0,
+                    output_tokens=0,
+                )
                 self.db.add_instance(new_doc)
                 # print(b-a, c-b, time.time()-c)

@@ -5,6 +5,7 @@ Created on Thu Feb  6 16:37:47 2025
 @author: chardy
 """
 from ...utils.agent import get_Agent
+from ...utils.agent_functions import get_system_prompt
 from ...base_classes import RagAgent
 from .prompts import prompts
 import numpy as np
@@ -17,7 +18,10 @@ class NaiveChatbot(RagAgent):
 
         self.language = config_server["language"]
         self.agent = get_Agent(config_server)
+
         self.prompts = prompts[self.language]
+        self.system_prompt = get_system_prompt(config_server, self.prompts)
+
         self.nb_chunks = 0
         self.db = get_database("chatbot_dummy_db", storage_path="./storage")
 
@@ -28,29 +32,21 @@ class NaiveChatbot(RagAgent):
         self,
         path_input: str,
         reset_index: bool = False,
-        chunk_size: int = 500,
         overlap: bool = True,
     ) -> None:
         return None
 
-    def get_rag_context(
-        self, query: str, nb_chunks: int = 0
-    ) -> list[str]:
+    def get_rag_context(self, query: str, nb_chunks: int = 0) -> list[str]:
         return ""
 
-    def generate_answer(
-        self,
-        query: str,
-        nb_chunks: int = 0
-    ) -> str:
+    def generate_answer(self, query: str, nb_chunks: int = 0) -> str:
 
         agent = self.agent
         nb_input_tokens = 0
         nb_output_tokens = 0
 
         prompt = self.prompts["smooth_generation"]["QUERY_TEMPLATE"].format(query=query)
-        system_prompt = self.prompts["smooth_generation"]["SYSTEM_PROMPT"]
-        answer = agent.predict(prompt=prompt, system_prompt=system_prompt)
+        answer = agent.predict(prompt=prompt, system_prompt=self.system_prompt)
         nb_input_tokens += np.sum(answer["nb_input_tokens"])
         nb_output_tokens += np.sum(answer["nb_output_tokens"])
         return {
@@ -65,9 +61,7 @@ class NaiveChatbot(RagAgent):
     def release_gpu_memory(self):
         self.agent.release_memory()
 
-    def get_rag_contexts(
-        self, queries: list[str], nb_chunks: int = 0
-    ):
+    def get_rag_contexts(self, queries: list[str], nb_chunks: int = 0):
         contexts = []
         for query in queries:
             contexts.append("")

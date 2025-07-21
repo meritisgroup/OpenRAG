@@ -1,16 +1,12 @@
 prompts = {
     "EN": {
-        "safe_generation": {
+        "smooth_generation": {
             "SYSTEM_PROMPT": "You are an AI assistant who has to answer honestly and exhaustive to the user using the provided context. You must answer in English",
-            "QUERY_TEMPLATE": "-- Context --\n\n{context}\n\nEUsing the provided context, answer my question : {query}",
+            "QUERY_TEMPLATE": "-- Context --\n\n{context}\n\n Using the provided context, answer my question : {query}",
         },
         "document_relevance": {
             "SYSTEM_PROMPT": "You are an AI assistant who has to determine if the provided context is relevante to answer the query. Output only 'relevant', 'irrelevant' or 'ambiguous'.",
             "QUERY_TEMPLATE": "-- Context --\n\n{context} \n\n -- Query --\n\n{query}",
-        },
-        "conversationnal": {
-            "SYSTEM_PROMPT": "You are an AI assistant. You always answer with precision and honnesty. You must answer in English",
-            "QUERY_TEMPLATE": "Answer this question : {query}",
         },
         "retrieval_necessary": {
             "SYSTEM_PROMPT": "You are an AI assistant who has to determine if retrieval of documents is necessary to answer the query. Output only 'Yes' or 'No'",
@@ -26,7 +22,7 @@ prompts = {
         },
     },
     "FR": {
-        "safe_generation": {
+        "smooth_generation": {
             "SYSTEM_PROMPT": "Vous êtes un assistant IA qui doit répondre honnêtement et de manière exhaustive à l'utilisateur en utilisant le contexte fourni. Tu dois répondre en Français",
             "QUERY_TEMPLATE": "-- Contexte --\n\n{context}\n\nEn utilisant le contexte fourni, réponds à ma question: {query}",
         },
