@@ -1,0 +1,10 @@
+/volumes/*
+/storage/*
+/data/custom_rags/*
+/data/report/*
+/data/databases/*
+/data/queries/*
+/backend/data/*
+**/__pycache__/
+/docker/*
+venv

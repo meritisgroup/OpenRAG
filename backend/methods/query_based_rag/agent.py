@@ -1,4 +1,5 @@
 from ...utils.factory_vectorbase import get_vectorbase
+from ...utils.agent_functions import get_system_prompt
 from ...database.database_class import get_database
 from ...base_classes import RagAgent
 from .indexation import QbRagIndexation
@@ -28,6 +29,9 @@ class QueryBasedRagAgent(RagAgent):
 
         self.language = config_server["language"]
         self.prompts = prompts[self.language]
+        self.system_prompt = get_system_prompt(config_server, self.prompts)
+
+        self.chunk_size = config_server["chunk_length"]
 
         self.type_text_splitter = config_server["TextSplitter"]
         self.type_retrieval = config_server["type_retrieval"]
@@ -58,7 +62,6 @@ class QueryBasedRagAgent(RagAgent):
         self,
         path_input: str,
         reset_index: bool = False,
-        chunk_size: int = 500,
         model: str = None,
     ) -> None:
         """Indexation phase for QB Rag"""
@@ -76,7 +79,7 @@ class QueryBasedRagAgent(RagAgent):
             embedding_model=self.embedding_model,
         )
 
-        qb_index.run_pipeline(chunk_size=chunk_size)
+        qb_index.run_pipeline(chunk_size=self.chunk_size)
 
     def get_rag_context(
         self,
@@ -124,8 +127,8 @@ class QueryBasedRagAgent(RagAgent):
         prompt = self.prompts["smooth_generation"]["QUERY_TEMPLATE"].format(
             context=context, query=query
         )
-        system_prompt = self.prompts["smooth_generation"]["SYSTEM_PROMPT"]
-        answer = agent.predict(prompt=prompt, system_prompt=system_prompt)
+
+        answer = agent.predict(prompt=prompt, system_prompt=self.system_prompt)
         nb_input_tokens += np.sum(answer["nb_input_tokens"])
         nb_output_tokens += np.sum(answer["nb_output_tokens"])
 
@@ -148,15 +151,11 @@ class QueryBasedRagAgent(RagAgent):
     def release_gpu_memory(self):
         self.agent.release_memory()
 
-    def get_rag_contexts(
-        self, queries: list[str], nb_chunks: int = 5
-    ):
+    def get_rag_contexts(self, queries: list[str], nb_chunks: int = 5):
         contexts = []
         names_docs = []
         for query in queries:
-            context, name_docs = self.get_rag_context(
-                query=query, nb_chunks=nb_chunks
-            )
+            context, name_docs = self.get_rag_context(query=query, nb_chunks=nb_chunks)
             contexts.append(context)
             names_docs.append(name_docs)
         return contexts, names_docs

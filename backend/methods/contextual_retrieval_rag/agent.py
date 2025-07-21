@@ -1,6 +1,7 @@
 from ...base_classes import RagAgent
 from ...utils.agent import get_Agent
 from ...utils.factory_vectorbase import get_vectorbase
+from ...utils.agent_functions import get_system_prompt
 from ...database.database_class import get_database
 from .prompts import prompts
 from .indexation import ContextualRetrievalIndexation
@@ -32,6 +33,7 @@ class ContextualRetrievalRagAgent(RagAgent):
             db_name (str) : Name given to the database that keeps track of already processed docs, if it already exists adds new documents to the existing database (stored in storage/ folder)
             vb_name (str) : Name given to the vectorbase, if it already exists adds new documents to the existing vectorbase (stored in milvus/elasticsearch docker)
         """
+        self.config_server = config_server
         self.storage_path = config_server["storage_path"]
         self.language = config_server["language"]
         self.type_text_splitter = config_server["TextSplitter"]
@@ -47,7 +49,10 @@ class ContextualRetrievalRagAgent(RagAgent):
             config_server=config_server,
             agent=self.agent,
         )
+
         self.prompts = prompts[self.language]
+        self.system_prompt = get_system_prompt(self.config_server, self.prompts)
+
         self.reformulate_query = config_server["reformulate_query"]
         if self.reformulate_query:
             self.reformulater = query_reformulation(
@@ -88,9 +93,7 @@ class ContextualRetrievalRagAgent(RagAgent):
 
         return None
 
-    def get_rag_context(
-        self, query: str, nb_chunks: int = 5
-    ) -> tuple:
+    def get_rag_context(self, query: str, nb_chunks: int = 5) -> tuple:
         """
         Takes a query and retrieves a given number of chunks using the NaiveSearch implemented in backend/methods/naive_rag/query.py
 
@@ -106,15 +109,11 @@ class ContextualRetrievalRagAgent(RagAgent):
         context, name_docs = ns.get_context(query=query)
         return context, name_docs
 
-    def get_rag_contexts(
-        self, queries: list[str], nb_chunks: int = 5
-    ):
+    def get_rag_contexts(self, queries: list[str], nb_chunks: int = 5):
         contexts = []
         names_docs = []
         for query in queries:
-            context, name_docs = self.get_rag_context(
-                query=query, nb_chunks=nb_chunks
-            )
+            context, name_docs = self.get_rag_context(query=query, nb_chunks=nb_chunks)
             contexts.append(context)
             names_docs.append(name_docs)
         return contexts, names_docs
@@ -142,8 +141,7 @@ class ContextualRetrievalRagAgent(RagAgent):
         energy = [0, 0, ""]
         if self.reformulate_query:
             query, input_tokens, output_tokens, impact, energy = (
-                self.reformulater.reformulate(query=query,
-                                              nb_reformulation=1)
+                self.reformulater.reformulate(query=query, nb_reformulation=1)
             )
             query = query[0]
         context, _ = self.get_rag_context(query=query, nb_chunks=nb_chunks)
@@ -151,11 +149,9 @@ class ContextualRetrievalRagAgent(RagAgent):
             context=context, query=query
         )
 
-        system_prompt = self.prompts["smooth_generation"]["SYSTEM_PROMPT"]
-
         answer = self.agent.predict(
             prompt=prompt,
-            system_prompt=system_prompt,
+            system_prompt=self.system_prompt,
         )
         nb_input_tokens = np.sum(answer["nb_input_tokens"]) + input_tokens
         nb_output_tokens = np.sum(answer["nb_output_tokens"]) + output_tokens

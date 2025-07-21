@@ -8,6 +8,7 @@ from .indexation import NaiveRagIndexation
 from .query import NaiveSearch
 from ...base_classes import RagAgent
 from ...utils.factory_vectorbase import get_vectorbase
+from ...utils.agent_functions import get_system_prompt
 from ...database.database_class import get_database
 from ...utils.agent import get_Agent
 from .prompts import prompts
@@ -58,7 +59,10 @@ class NaiveRagAgent(RagAgent):
             vb_name=self.vb_name, config_server=config_server, agent=self.agent
         )
         self.prompts = prompts[self.language]
+        self.system_prompt = get_system_prompt(self.config_server, self.prompts)
+        self.chunk_size = config_server["chunk_length"]
         self.reformulate_query = config_server["reformulate_query"]
+
         if self.reformulate_query:
             self.reformulater = query_reformulation(
                 agent=self.agent, language=self.language
@@ -71,14 +75,12 @@ class NaiveRagAgent(RagAgent):
         self,
         path_input: str,
         reset_index: bool = False,
-        chunk_size: int = 500,
         overlap: bool = True,
     ) -> None:
         """
         Does the indexation of a given knowledge base, full process is located in indexation.py
         Args:
             path_input (str) : where the documents to be processed are stored
-            chunk_size (str) : number of characters in each chunk
             overlap (bool) : Wether chunks overlap each other
 
         """
@@ -97,16 +99,14 @@ class NaiveRagAgent(RagAgent):
         )
 
         index.run_pipeline(
-            chunk_size=chunk_size,
+            chunk_size=self.chunk_size,
             chunk_overlap=overlap,
             batch=self.params_vectorbase["batch"],
         )
 
         return None
 
-    def get_rag_context(
-        self, query: str, nb_chunks: int = 5
-    ) -> list[str]:
+    def get_rag_context(self, query: str, nb_chunks: int = 5) -> list[str]:
         """
         Takes a query and retrieves a given number of chunks using the NaiveSearch implemented
 
@@ -116,8 +116,7 @@ class NaiveRagAgent(RagAgent):
         Output:
             context (list[str]) : All retrieved chunks
         """
-        ns = NaiveSearch(vector_base=self.vb,
-                         nb_chunks=nb_chunks)
+        ns = NaiveSearch(vector_base=self.vb, nb_chunks=nb_chunks)
         context, docs_name = ns.get_context(query=query)
         return context, docs_name
 
@@ -148,14 +147,12 @@ class NaiveRagAgent(RagAgent):
             nb_input_tokens += input_t
             nb_output_tokens = output_t
 
-        context, _ = self.get_rag_context(
-            query=query, nb_chunks=nb_chunks
-        )
+        context, _ = self.get_rag_context(query=query, nb_chunks=nb_chunks)
         prompt = self.prompts["smooth_generation"]["QUERY_TEMPLATE"].format(
             context=context, query=query
         )
-        system_prompt = self.prompts["smooth_generation"]["SYSTEM_PROMPT"]
-        answer = agent.predict(prompt=prompt, system_prompt=system_prompt)
+
+        answer = agent.predict(prompt=prompt, system_prompt=self.system_prompt)
         nb_input_tokens += np.sum(answer["nb_input_tokens"])
         nb_output_tokens += np.sum(answer["nb_output_tokens"])
         impacts[2] = answer["impacts"][2]
@@ -177,14 +174,11 @@ class NaiveRagAgent(RagAgent):
     def release_gpu_memory(self):
         self.agent.release_memory()
 
-    def get_rag_contexts(
-        self, queries: list[str], nb_chunks: int = 5
-    ):
+    def get_rag_contexts(self, queries: list[str], nb_chunks: int = 5):
         contexts = []
         names_docs = []
         for query in queries:
-            context, name_docs = self.get_rag_context(
-                query=query, nb_chunks=nb_chunks)
+            context, name_docs = self.get_rag_context(query=query, nb_chunks=nb_chunks)
             contexts.append(context)
             names_docs.append(name_docs)
         return contexts, names_docs

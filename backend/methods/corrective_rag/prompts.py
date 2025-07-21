@@ -4,10 +4,6 @@ prompts = {
             "SYSTEM_PROMPT": "You are an AI assistant who has rewrite a query to a websearch query. Output only the websearch query without any comment or description. You must answer in English",
             "QUERY_TEMPLATE": "-- Query --\n\n{query}",
         },
-        "safe_generation": {
-            "SYSTEM_PROMPT": "You are an AI assistant who has to answer honestly and exhaustive to the user using the provided context. You must answer in English",
-            "QUERY_TEMPLATE": "-- Context --\n\n{context}\n\nEUsing the provided context, answer my question : {query}",
-        },
         "document_relevance2": {
             "SYSTEM_PROMPT": "You are an AI assistant who has to determine if the provided context is relevante to answer the query. Output only 'relevant', 'irrelevant' or ambiguous.You must answer in English",
             "QUERY_TEMPLATE": "-- Context --\n\n{context} \n\n -- Query --\n\n{query}",
@@ -21,10 +17,6 @@ prompts = {
         "rewrite_web_query": {
             "SYSTEM_PROMPT": "Tu es un assistant IA qui doit reformuler une requête en une requête de recherche web. Ne fournis que la requête de recherche web, sans aucun commentaire ni description. Tu dois répondre en Français",
             "QUERY_TEMPLATE": "-- Question --\n\n{query}",
-        },
-        "safe_generation": {
-            "SYSTEM_PROMPT": "Tu es un assistant IA qui doit répondre honnêtement et de manière exhaustive à l'utilisateur en utilisant le contexte fourni. Tu dois répondre en Français",
-            "QUERY_TEMPLATE": "-- Contexte --\n\n{context}\n\nEUsing the provided context, answer my question : {query}",
         },
         "document_relevance2": {
             "SYSTEM_PROMPT": "Tu es un assistant IA qui doit déterminer si le contexte fourni est pertinent pour répondre à la requête. Réponds uniquement par 'pertinent', 'non pertinent' ou 'ambigu'",

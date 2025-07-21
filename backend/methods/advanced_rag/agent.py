@@ -59,14 +59,12 @@ class AdvancedRag(NaiveRagAgent):
         self,
         path_input: str,
         reset_index: bool = False,
-        chunk_size: int = 500,
         overlap: bool = True,
     ) -> None:
         """
         Does the indexation of a given knowledge base, full process is located in indexation.py
         Args:
             path_input (str) : where the documents to be processed are stored
-            chunk_size (str) : number of characters in each chunk
             overlap (bool) : Wether chunks overlap each other
 
         """
@@ -75,26 +73,25 @@ class AdvancedRag(NaiveRagAgent):
             self.db.clean_database()
 
         index = NaiveRagIndexation(
-                                data_path=path_input,
-                                db=self.db,
-                                vb=self.vb,
-                                type_text_splitter=self.type_text_splitter,
-                                agent=self.agent,
-                                embedding_model=self.embedding_model,
-                                type_processor_chunks=self.type_processor_chunks,
-                                language=self.language,
-                            )
+            data_path=path_input,
+            db=self.db,
+            vb=self.vb,
+            type_text_splitter=self.type_text_splitter,
+            agent=self.agent,
+            embedding_model=self.embedding_model,
+            type_processor_chunks=self.type_processor_chunks,
+            language=self.language,
+        )
 
         index.run_pipeline(
-                        chunk_size=chunk_size,
-                        chunk_overlap=overlap,
-                        batch=self.params_vectorbase["batch"],
-                    )
+            chunk_size=self.chunk_size,
+            chunk_overlap=overlap,
+            batch=self.params_vectorbase["batch"],
+        )
 
         return None
 
-    def get_rag_context(
-        self, query: str, nb_chunks: int = 5) -> list[str]:
+    def get_rag_context(self, query: str, nb_chunks: int = 5) -> list[str]:
         """
         Takes a query and retrieves a given number of chunks using the NaiveSearch implemented in backend/methods/naive_rag/query.py
 
@@ -160,8 +157,7 @@ class AdvancedRag(NaiveRagAgent):
             queries = [query]
 
         contexts = [
-            self.get_rag_context(query=query, nb_chunks=nb_chunks)
-            for query in queries
+            self.get_rag_context(query=query, nb_chunks=nb_chunks) for query in queries
         ]
         contexts = list(chain(*contexts))
         contexts = list(set(contexts))
@@ -177,8 +173,8 @@ class AdvancedRag(NaiveRagAgent):
         prompt = self.prompts["smooth_generation"]["QUERY_TEMPLATE"].format(
             context=context, query=query
         )
-        system_prompt = self.prompts["smooth_generation"]["SYSTEM_PROMPT"]
-        answer = agent.predict(prompt=prompt, system_prompt=system_prompt)
+
+        answer = agent.predict(prompt=prompt, system_prompt=self.system_prompt)
         self.nb_input_tokens += np.sum(answer["nb_input_tokens"])
         self.nb_output_tokens += np.sum(answer["nb_output_tokens"])
 
@@ -199,15 +195,11 @@ class AdvancedRag(NaiveRagAgent):
             "energy": energies,
         }
 
-    def get_rag_contexts(
-        self, queries: list[str], nb_chunks: int = 5
-    ):
+    def get_rag_contexts(self, queries: list[str], nb_chunks: int = 5):
         contexts = []
         names_docs = []
         for query in queries:
-            context, name_docs = self.get_rag_context(
-                query=query, nb_chunks=nb_chunks
-            )
+            context, name_docs = self.get_rag_context(query=query, nb_chunks=nb_chunks)
             contexts.append(context)
             names_docs.append(name_docs)
         return contexts, names_docs

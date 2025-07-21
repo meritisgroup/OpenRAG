@@ -6,6 +6,7 @@ from ...base_classes import RagAgent
 from ...utils.factory_vectorbase import get_vectorbase
 from ...database.database_class import get_graph_database
 from ...utils.agent import get_Agent
+from ...utils.agent_functions import get_system_prompt
 from .prompts import PROMPTS
 from ..query_reformulation.query_reformulation import query_reformulation
 
@@ -49,11 +50,15 @@ class GraphRagAgent(RagAgent):
                 agent=self.agent, language=self.language
             )
 
+        self.prompts = PROMPTS[self.language]
+        self.system_prompt = get_system_prompt(config_server, self.prompts)
+
+        self.chunk_size = config_server["chunk_length"]
+
     def indexation_phase(
         self,
         path_input: str,
         reset_index: bool = False,
-        chunk_size: int = 500,
         overlap: bool = True,
     ) -> None:
 
@@ -72,7 +77,7 @@ class GraphRagAgent(RagAgent):
             vb=self.vb,
         )
 
-        index.run_pipeline(chunk_size=chunk_size, overlap=overlap)
+        index.run_pipeline(chunk_size=self.chunk_size, overlap=overlap)
 
     def get_rag_context(
         self,
@@ -122,18 +127,13 @@ class GraphRagAgent(RagAgent):
                 query=query, nb_reformulation=1
             )
             query = query[0]
-        prompt_template: str = PROMPTS[self.language]["smooth_generation"][
-            "QUERY_TEMPLATE"
-        ]
-        system_prompt_template: str = PROMPTS[self.language]["smooth_generation"][
-            "SYSTEM_PROMPT"
-        ]
+        prompt_template: str = self.prompts["smooth_generation"]["QUERY_TEMPLATE"]
 
         context_base = dict(context=context, language=self.language, query=query)
 
         prompt = prompt_template.format(**context_base)
 
-        answer = self.agent.predict(prompt=prompt, system_prompt=system_prompt_template)
+        answer = self.agent.predict(prompt=prompt, system_prompt=self.system_prompt)
         impacts[2] = answer["impacts"][2]
         impacts[0] += answer["impacts"][0]
         impacts[1] += answer["impacts"][1]
