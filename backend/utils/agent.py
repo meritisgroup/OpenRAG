@@ -5,6 +5,8 @@ from .agent_functions import (
     predict_json,
     predict_mistral,
     multiple_predict_mistral,
+    rerank,
+    RerankedChunk,
 )
 from openai import OpenAI
 from mistralai import Mistral
@@ -134,6 +136,9 @@ class Agent_ollama(Agent):
             "nb_tokens": embeddings.usage.total_tokens,
         }
 
+    def reranking(self, system_prompt, query, contexts, model):
+        scores = rerank(system_prompt, model, self.client, temperature=None)
+
     def release_memory(self):
         None
 
@@ -157,7 +162,7 @@ class Agent_Vllm(Agent):
         prompts: List[str],
         system_prompts: List[str],
         images: list[list[str]] = None,
-        json_format = None,
+        json_format=None,
         temperature=0,
     ) -> str:
         """
@@ -172,39 +177,40 @@ class Agent_Vllm(Agent):
             url=url,
             temperature=self.temperature,
             images=images,
-            json_format=json_format
+            json_format=json_format,
         )
 
         return answers
 
-
     def predict_json(
-        self, 
+        self,
         prompt: str,
         system_prompt: str,
         json_format: BaseModel,
         temperature=0,
-        images: list[str] = None
+        images: list[str] = None,
     ) -> BaseModel:
         """
         It formats the queries with good prompts, then gives these prompts to the LLM and return the cleaned outputs following the given BaseModel format
         """
-        answer = self.multiple_predict(prompts=[prompt],
-                                       system_prompts=[system_prompt],
-                                       temperature=temperature,
-                                       json_format=json_format,
-                                       images=[images])
+        answer = self.multiple_predict(
+            prompts=[prompt],
+            system_prompts=[system_prompt],
+            temperature=temperature,
+            json_format=json_format,
+            images=[images],
+        )
         answer = answer["texts"][0]
 
         if "json" in answer:
             cleaned = answer.split("json\n")[1].split("\n```")[0]
         elif "{" in answer:
             cleaned = answer.split("{")[1].split("}")[0]
-            cleaned = "{"+cleaned+"}"
-        elif "True" in answer and json_format.__name__=="StatementSupported":
+            cleaned = "{" + cleaned + "}"
+        elif "True" in answer and json_format.__name__ == "StatementSupported":
             cleaned = '{"supported": true}'
-            
-        elif "False" in answer and json_format.__name__=="StatementSupported":
+
+        elif "False" in answer and json_format.__name__ == "StatementSupported":
             cleaned = '{"supported": false}'
         else:
             """
@@ -220,7 +226,6 @@ class Agent_Vllm(Agent):
         answer = json.loads(cleaned)
         answer = json_format(**answer)
         return answer
-    
 
     def predict(
         self, prompt: str, system_prompt: str, images: list[str] = None, temperature=0
@@ -246,7 +251,6 @@ class Agent_Vllm(Agent):
         embeddings = embeddings["embeddings"]
         return {"embeddings": embeddings, "nb_tokens": nb_tokens}
 
-
     def embeddings_vlm(self, model, images=[], queries=[], mode="vlm"):
         if type(queries) == type("str"):
             queries = [queries]
@@ -270,7 +274,6 @@ class Agent_Vllm(Agent):
         nb_tokens = embeddings["nb_tokens"]
         embeddings = np.array(embeddings["embeddings"])
         return {"embeddings": embeddings, "nb_tokens": nb_tokens}
-
 
     def reranking(self, query, contexts, model):
         if type(contexts) is str:
@@ -315,7 +318,7 @@ class Agent_openai(Agent):
         """
         It formats the queries with good prompts, then gives these prompts to the LLM and return the cleaned outputs following the given BaseModel format
         """
-        temperature=self.temperature
+        temperature = self.temperature
         answer = predict_json(
             system_prompt,
             prompt,
@@ -350,7 +353,7 @@ class Agent_openai(Agent):
 
     def embeddings(self, texts, model):
         embeddings = self.client.embeddings.create(input=texts, model=model)
-    
+
         if type(texts) is type([]):
             vector_embeddings = [
                 embeddings.data[k].embedding for k in range(len(texts))
@@ -384,10 +387,12 @@ class Agent_mistral(Agent_openai):
             language : Language of prompts
             max_attempts : Maximal number of attempts the LLM will try to give you a correct format for the answer
         """
-        super().__init__(model=model,
-                         key_or_url=key_or_url,
-                         language=language,
-                         max_attempts=max_attempts)
+        super().__init__(
+            model=model,
+            key_or_url=key_or_url,
+            language=language,
+            max_attempts=max_attempts,
+        )
 
         self.client = Mistral(api_key=key_or_url)
 
@@ -414,21 +419,21 @@ class Agent_mistral(Agent_openai):
     def predict_json(
         self, prompt: str, system_prompt: str, json_format: BaseModel, temperature=0
     ) -> BaseModel:
-            """
-            It formats the queries with good prompts, then gives these prompts to the LLM and return the cleaned outputs following the given BaseModel format
-            """
-            temperature=self.temperature
-            time.sleep(5)
-            answer = predict_json(
-                system_prompt,
-                prompt,
-                self.model,
-                self.client,
-                json_format,
-                temperature,
-            )
-            return answer
-    
+        """
+        It formats the queries with good prompts, then gives these prompts to the LLM and return the cleaned outputs following the given BaseModel format
+        """
+        temperature = self.temperature
+        time.sleep(5)
+        answer = predict_json(
+            system_prompt,
+            prompt,
+            self.model,
+            self.client,
+            json_format,
+            temperature,
+        )
+        return answer
+
     def predict(self, prompt: str, system_prompt: str, temperature: float = 0) -> str:
         """
         It formats the query with the good prompt, then gives this prompt to the LLM and return the cleaned output
