@@ -1,8 +1,8 @@
 {
     "storage_path": "./storage",
     "params_host_llm": {
-        "url": null,
-        "type": "openai",
+        "url": "http://ollama:11434/v1",
+        "type": "ollama",
         "api_key": null
     },
     "params_vectorbase": {
@@ -15,8 +15,8 @@
         ]
     },
     "device": "cpu",
-    "model": "gpt-4o-mini",
-    "embedding_model": "text-embedding-3-small",
+    "model": "gemma2:9b",
+    "embedding_model": "mxbai-embed-large:latest",
     "language": "FR",
     "type_retrieval": "hybrid",
     "TextSplitter": "Semantic_TextSplitter",

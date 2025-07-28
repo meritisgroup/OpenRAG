@@ -11,6 +11,10 @@ from ecologits import EcoLogits
 from .progress import ProgressBar
 
 
+class RerankedChunk(BaseModel):
+    score: float
+
+
 def np_array_to_file(image_np: np.ndarray, format: str = "jpeg"):
     success, encoded_image = cv2.imencode(f".{format}", image_np)
     if not success:
@@ -335,3 +339,39 @@ def get_system_prompt(config_server: dict, prompts: dict) -> str:
             system_prompt = prompts["smooth_generation"]["SYSTEM_PROMPT"]
 
     return system_prompt
+
+
+def rerank(
+    system_prompt: str,
+    prompt: str,
+    model: str,
+    client: Union[OpenAI, Mistral],
+    temperature: float = None,
+) -> str:
+    try:
+        params = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt},
+            ],
+            "response_format": RerankedChunk,
+        }
+        # Only add temperature if not None
+        if temperature is not None:
+            params["temperature"] = temperature
+        if type(client) is OpenAI:
+            scores = client.beta.chat.completions.parse(**params)
+
+        if type(client) is Mistral:
+            scores = client.chat.parse(**params)
+
+        json_response = scores.choices[0].message
+        if json_response.parsed:
+
+            return json_response.parsed
+        else:
+            print("refusal ", json_response.refusal)
+
+    except Exception as e:
+        print(f"Error: {e}")
