@@ -53,7 +53,7 @@ class SemanticChunkingRagAgent(RagAgent):
         self.vb = get_vectorbase(
             vb_name=self.vb_name, config_server=config_server, agent=self.agent
         )
-        self.prompts = prompts[self.language]["smooth_generation"]
+        self.prompts = prompts[self.language]
         self.system_prompt = get_system_prompt(config_server, self.prompts)
 
         self.chunk_size = config_server["chunk_length"]
@@ -147,7 +147,9 @@ class SemanticChunkingRagAgent(RagAgent):
         agent = self.agent
         context, _ = self.get_rag_context(query=query, nb_chunks=nb_chunks)
 
-        prompt = self.prompts["QUERY_TEMPLATE"].format(context=context, query=query)
+        prompt = self.prompts["smooth_generation"]["QUERY_TEMPLATE"].format(
+            context=context, query=query
+        )
 
         answer = agent.predict(prompt=prompt, system_prompt=self.system_prompt)
         nb_input_tokens += np.sum(answer["nb_input_tokens"])
