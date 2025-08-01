@@ -21,7 +21,7 @@
     "type_retrieval": "hybrid",
     "TextSplitter": "Semantic_TextSplitter",
     "reformulate_query": false,
-    "reranker_model": "BAAI/bge-reranker-v2-m3",
+    "reranker_model": "gemma3:1b",
     "max_attempts": 5,
     "nb_chunks": 15,
     "ProcessorChunks": [

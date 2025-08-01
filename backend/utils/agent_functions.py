@@ -347,7 +347,7 @@ def rerank(
     model: str,
     client: Union[OpenAI, Mistral],
     temperature: float = None,
-) -> str:
+) -> tuple[RerankedChunk, int]:
     try:
         params = {
             "model": model,
@@ -367,11 +367,15 @@ def rerank(
             scores = client.chat.parse(**params)
 
         json_response = scores.choices[0].message
+        nb_input_tokens = scores.usage.prompt_tokens
+
         if json_response.parsed:
 
-            return json_response.parsed
+            return json_response.parsed, nb_input_tokens
         else:
             print("refusal ", json_response.refusal)
+            return None
 
     except Exception as e:
         print(f"Error: {e}")
+        return None
