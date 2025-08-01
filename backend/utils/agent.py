@@ -136,8 +136,28 @@ class Agent_ollama(Agent):
             "nb_tokens": embeddings.usage.total_tokens,
         }
 
-    def reranking(self, system_prompt, query, contexts, model):
-        scores = rerank(system_prompt, model, self.client, temperature=None)
+    def reranking(self, query: str, contexts: list[str], model: str = "gemma3:1b"):
+        scores = []
+        input_tokens = []
+        system_prompt = """You are a highly accurate reranking model. Given a user query and a retrieved document chunk, your job is to assign a numerical relevance score from 0 to 1, where:
+
+                            1.0 means "perfectly relevant",
+                            0.0 means "completely irrelevant".
+
+                            Evaluate the document chunk solely based on its relevance to answering or supporting the query. Do not hallucinate or infer information not present in the chunk."""
+        for context in contexts:
+            prompt = f" Context : {context}\n Query : {query}"
+            json_response, nb_input_tokens = rerank(
+                system_prompt, prompt, model, self.client, temperature=None
+            )
+
+            scores.append(json_response.score)
+            input_tokens.append(nb_input_tokens)
+
+        return {
+            "scores": scores,
+            "nb_input_tokens": input_tokens,
+        }
 
     def release_memory(self):
         None
@@ -367,6 +387,30 @@ class Agent_openai(Agent):
             "nb_tokens": embeddings.usage.total_tokens,
         }
 
+    def reranking(self, query: str, contexts: list[str], model: str = "gemma3:1b"):
+        scores = []
+        input_tokens = []
+        system_prompt = """You are a highly accurate reranking model. Given a user query and a retrieved document chunk, your job is to assign a numerical relevance score from 0 to 1, where:
+
+                            1.0 means "perfectly relevant",
+                            0.0 means "completely irrelevant".
+
+                            Evaluate the document chunk solely based on its relevance to answering or supporting the query. Do not hallucinate or infer information not present in the chunk."""
+
+        for context in contexts:
+            prompt = f" Context : {context}\n Query : {query}"
+            json_response, nb_input_tokens = rerank(
+                system_prompt, prompt, model, self.client, temperature=None
+            )
+
+            scores.append(json_response.score)
+            input_tokens.append(nb_input_tokens)
+
+        return {
+            "scores": scores,
+            "nb_input_tokens": input_tokens,
+        }
+
     def release_memory(self):
         None
 
@@ -454,3 +498,26 @@ class Agent_mistral(Agent_openai):
             system_prompts, prompts, self.model, self.client, temperature=temperature
         )
         return answers
+
+    def reranking(self, query: str, contexts: list[str], model: str = "gemma3:1b"):
+        scores = []
+        input_tokens = []
+        system_prompt = """You are a highly accurate reranking model. Given a user query and a retrieved document chunk, your job is to assign a numerical relevance score from 0 to 1, where:
+
+                            1.0 means "perfectly relevant",
+                            0.0 means "completely irrelevant".
+
+                            Evaluate the document chunk solely based on its relevance to answering or supporting the query. Do not hallucinate or infer information not present in the chunk."""
+        for context in contexts:
+            prompt = f" Context : {context}\n Query : {query}"
+            json_response, nb_input_tokens = rerank(
+                system_prompt, prompt, model, self.client, temperature=None
+            )
+
+            scores.append(json_response.score)
+            input_tokens.append(nb_input_tokens)
+
+        return {
+            "scores": scores,
+            "nb_input_tokens": input_tokens,
+        }

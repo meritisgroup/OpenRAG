@@ -27,16 +27,19 @@ def change_config_server(rag_name, config_server):
     elif config_server["params_host_llm"]["type"] == "ollama":
         config_server["model"] = "gemma2:9b"
         config_server["embedding_model"] = "mxbai-embed-large:latest"
-
+        config_server["reranker_model"] = "gemma3:1b"
     elif config_server["params_host_llm"]["type"] == "vllm":
         config_server["model"] = "google/gemma-2-9b-it"
         config_server["embedding_model"] = "BAAI/bge-m3"
+        config_server["reranker_model"] = "BAAI/bge-reranker-v2-m3"
     elif config_server["params_host_llm"]["type"] == "openai":
         config_server["model"] = "gpt-4o-mini"
         config_server["embedding_model"] = "text-embedding-3-small"
+        config_server["reranker_model"] = "gpt-4.1-nano-2025-04-14"
     elif config_server["params_host_llm"]["type"] == "mistral":
         config_server["model"] = "mistral-small-latest"
         config_server["embedding_model"] = "mistral-embed"
+        config_server["reranker_model"] = "mistral-small-latest"
 
     if rag_name != "copali" and rag_name != "vlm":
         if config_server["type_retrieval"] not in ["embeddings", "bm25", "hybrid"]:

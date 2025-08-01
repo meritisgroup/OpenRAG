@@ -10,5 +10,7 @@ while [ "$(ollama list | grep 'NAME')" == "" ]; do
 done
 
 ollama create -f gemma9b_Modelfile gemma2:9b
+ollama pull gemma3:1b
 ollama pull mxbai-embed-large:latest
+
 wait $SERVE_PID
