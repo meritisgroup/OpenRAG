@@ -4,6 +4,7 @@ from .crawler import web_search
 from ...utils.splitter import get_splitter
 from tqdm import tqdm
 import numpy as np
+from .prompts import prompts
 from ..query_reformulation.query_reformulation import query_reformulation
 
 
@@ -12,15 +13,15 @@ class CragAgent(NaiveRagAgent):
     def __init__(
         self,
         config_server: dict,
-        db_name: str = "db_naive_rag",
-        vb_name: str = "vb_naive_rag",
+        dbs_name,
+        data_folders_name,
         max_web_requests=2,
     ) -> None:
 
         super().__init__(
             config_server=config_server,
-            db_name=db_name,
-            vb_name=vb_name,
+            dbs_name=dbs_name,
+            data_folders_name=data_folders_name
         )
         self.language = config_server["language"]
         self.type_text_splitter = config_server["TextSplitter"]
@@ -38,14 +39,17 @@ class CragAgent(NaiveRagAgent):
                 agent=self.agent, language=self.language
             )
 
+        self.prompts = prompts[self.language]
+
+
     def get_nb_token_embeddings(self):
-        return self.vb.get_nb_token_embeddings()
+        return self.data_manager.get_nb_token_embeddings()
 
     def get_rag_context(self, query: str, nb_chunks: int = 5) -> list[str]:
         """ """
-        ns = NaiveSearch(vector_base=self.vb, nb_chunks=nb_chunks)
-        context = ns.get_context(query=query)
-        return context
+        ns = NaiveSearch(data_manager=self.data_manager, nb_chunks=nb_chunks)
+        context, docs_name = ns.get_context(query=query)
+        return context, docs_name
 
     def web_results_refinement(
         self, web_results, query, model=None, batch: bool = True
@@ -155,14 +159,13 @@ class CragAgent(NaiveRagAgent):
             nb_input_tokens += input_t
             nb_output_tokens += output_t
         context = ""
-        contexts = self.get_rag_context(query=query, nb_chunks=nb_chunks)
+        contexts, docs_name = self.get_rag_context(query=query, nb_chunks=nb_chunks)
         useful_contexts = []
         ambiguous_contexts = []
         if batch:
             prompts = []
             system_prompts = []
             for j in range(len(contexts)):
-
                 prompt = self.prompts["document_relevance2"]["QUERY_TEMPLATE"].format(
                     context=contexts[j], query=query
                 )
@@ -294,7 +297,8 @@ class CragAgent(NaiveRagAgent):
             context=context, query=query
         )
         system_prompt = self.prompts["smooth_generation"]["SYSTEM_PROMPT"]
-        answer = agent.predict(prompt=prompt, system_prompt=system_prompt)
+        answer = agent.predict(prompt=prompt, system_prompt=system_prompt,
+                               options_generation=self.config_server["options_generation"])
         nb_input_tokens += (
             answer["nb_input_tokens"]
             if type(answer["nb_input_tokens"]) is type(0)
@@ -317,6 +321,7 @@ class CragAgent(NaiveRagAgent):
             "nb_input_tokens": nb_input_tokens,
             "nb_output_tokens": nb_output_tokens,
             "context": context,
+            "doc_names": [],
             "impacts": impacts,
             "energy": energies,
         }

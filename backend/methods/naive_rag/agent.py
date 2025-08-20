@@ -9,7 +9,7 @@ from .query import NaiveSearch
 from ...base_classes import RagAgent
 from ...utils.factory_vectorbase import get_vectorbase
 from ...utils.agent_functions import get_system_prompt
-from ...database.database_class import get_database
+from ...database.database_class import get_management_data
 from ...utils.agent import get_Agent
 from .prompts import prompts
 import numpy as np
@@ -22,9 +22,10 @@ class NaiveRagAgent(RagAgent):
     def __init__(
         self,
         config_server: dict,
-        db_name: str = "db_naive_rag",
-        vb_name: str = "vb_naive_rag",
+        dbs_name: list[str],
+        data_folders_name: list[str]
     ) -> None:
+        
         """
         Args:
             model (str): model used to generate answer, to be set in backend/methods/naive_rag/config.json file
@@ -46,20 +47,24 @@ class NaiveRagAgent(RagAgent):
         self.type_text_splitter = config_server["TextSplitter"]
         self.type_retrieval = config_server["type_retrieval"]
 
-        self.db_name = db_name
-        self.vb_name = vb_name
+        self.dbs_name = dbs_name
+        self.data_folders_name = data_folders_name
 
         self.params_vectorbase = config_server["params_vectorbase"]
-        self.db = get_database(db_name=self.db_name, storage_path=self.storage_path)
 
         self.agent = get_Agent(config_server)
+        self.data_manager = get_management_data(dbs_name=self.dbs_name,
+                                                data_folders_name=self.data_folders_name,
+                                                storage_path=self.storage_path,
+                                                config_server=config_server,
+                                                agent=self.agent)
+
+        
         self.config_server = config_server
 
-        self.vb = get_vectorbase(
-            vb_name=self.vb_name, config_server=config_server, agent=self.agent
-        )
         self.prompts = prompts[self.language]
-        self.system_prompt = get_system_prompt(self.config_server, self.prompts)
+        self.system_prompt = get_system_prompt(self.config_server,
+                                               self.prompts)
         self.chunk_size = config_server["chunk_length"]
         self.reformulate_query = config_server["reformulate_query"]
 
@@ -69,11 +74,10 @@ class NaiveRagAgent(RagAgent):
             )
 
     def get_nb_token_embeddings(self):
-        return self.vb.get_nb_token_embeddings()
+        return self.data_manager.get_nb_token_embeddings()
 
     def indexation_phase(
         self,
-        path_input: str,
         reset_index: bool = False,
         overlap: bool = True,
     ) -> None:
@@ -86,13 +90,11 @@ class NaiveRagAgent(RagAgent):
         """
 
         if reset_index:
-            self.vb.delete_collection()
-            self.db.clean_database()
+            self.data_manager.delete_collection()
+            self.data_manager.clean_database()
 
         index = NaiveRagIndexation(
-            data_path=path_input,
-            db=self.db,
-            vb=self.vb,
+            data_manager=self.data_manager,
             type_text_splitter=self.type_text_splitter,
             agent=self.agent,
             embedding_model=self.embedding_model,
@@ -116,7 +118,8 @@ class NaiveRagAgent(RagAgent):
         Output:
             context (list[str]) : All retrieved chunks
         """
-        ns = NaiveSearch(vector_base=self.vb, nb_chunks=nb_chunks)
+        ns = NaiveSearch(data_manager=self.data_manager, 
+                         nb_chunks=nb_chunks)
         context, docs_name = ns.get_context(query=query)
         return context, docs_name
 
@@ -147,12 +150,16 @@ class NaiveRagAgent(RagAgent):
             nb_input_tokens += input_t
             nb_output_tokens = output_t
 
-        context, _ = self.get_rag_context(query=query, nb_chunks=nb_chunks)
+        context, docs_name = self.get_rag_context(query=query,
+                                          nb_chunks=nb_chunks)
+        
         prompt = self.prompts["smooth_generation"]["QUERY_TEMPLATE"].format(
             context=context, query=query
         )
 
-        answer = agent.predict(prompt=prompt, system_prompt=self.system_prompt)
+        answer = agent.predict(prompt=prompt,
+                               system_prompt=self.system_prompt,
+                               options_generation=self.config_server["options_generation"])
         nb_input_tokens += np.sum(answer["nb_input_tokens"])
         nb_output_tokens += np.sum(answer["nb_output_tokens"])
         impacts[2] = answer["impacts"][2]
@@ -167,6 +174,7 @@ class NaiveRagAgent(RagAgent):
             "nb_input_tokens": nb_input_tokens,
             "nb_output_tokens": nb_output_tokens,
             "context": context,
+            "docs_name": docs_name,
             "impacts": impacts,
             "energy": energies,
         }

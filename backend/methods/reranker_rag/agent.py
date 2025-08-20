@@ -12,8 +12,8 @@ class RerankerRag(AdvancedRag):
     def __init__(
         self,
         config_server: dict,
-        db_name: str = "db_naive_rag",
-        vb_name: str = "vb_naive_rag",
+        dbs_name: list[str],
+        data_folders_name: list[str],
         type_processor_chunks: list[str] = [],
     ) -> None:
         """
@@ -33,8 +33,8 @@ class RerankerRag(AdvancedRag):
         config_server["reformulate_query"] = False
         super().__init__(
             config_server=config_server,
-            db_name=db_name,
-            vb_name=vb_name,
+            dbs_name = dbs_name,
+            data_folders_name = data_folders_name
         )
         self.nb_chunks = config_server["nb_chunks"]
 
@@ -50,27 +50,19 @@ class RerankerRag(AdvancedRag):
             context (str) : All retrieved chunks, seperated by a new line and '[...]'
         """
 
-        ns = NaiveSearch(vector_base=self.vb, nb_chunks=nb_chunks)
-        context = ns.get_context(query=query)
-        return context
+        ns = NaiveSearch(data_manager=self.data_manager, 
+                         nb_chunks=nb_chunks)
+        context, docs_name = ns.get_context(query=query)
+        return context, docs_name
 
-    def get_nb_token_embeddings(self):
-        return self.vb.get_nb_token_embeddings()
-
-    def contexts_to_prompts(self, contexts):
-        """
-        Takes a list of retrieved chunks and formats them into a single char
-        Args:
-            contexts (list[str]) : List of all retrieved chunks
-
-        Returns:
-            context (str): Concatenated chunks separated by new lines and '[...]'
-        """
+    def contexts_to_prompts(self, contexts, docs_name):
         context = ""
-        for chunk in contexts:
-            if chunk not in context:
-                context += chunk + "\n[...]\n"
-        return context
+        docs_context = []
+        for i in range(len(contexts)):
+            if contexts[i] not in context:
+                context += contexts[i] + "\n[...]\n"
+                docs_context.append(docs_name[i])
+        return context[:-7], docs_context
 
     def release_gpu_memory(self):
         self.agent.release_memory()
@@ -105,22 +97,32 @@ class RerankerRag(AdvancedRag):
         else:
             queries = [query]
 
-        contexts = [
+
+        results = [
             self.get_rag_context(query=query, nb_chunks=nb_chunks) for query in queries
         ]
-        contexts = list(chain(*contexts))
-        contexts = list(set(contexts))
+        contexts = []
+        docs_name = []
+        for result in results:
+            contexts+=result[0]
+            docs_name+=result[1]
+
         if len(contexts) > 0 and self.rerank:
-            contexts, _, input_tokens = self.reranker.rerank(
-                query=query, contexts=contexts, max_contexts=20
-            )
+            contexts, additional_data, input_tokens = self.reranker.rerank(
+                query=query, contexts=contexts, max_contexts=20,
+                additional_data={"docs_name": docs_name})
             nb_input_tokens += input_tokens
 
-        context = self.contexts_to_prompts(contexts=contexts)
+        docs_name = additional_data["docs_name"]
+
+        context, docs_name = self.contexts_to_prompts(contexts=contexts,
+                                                      docs_name=docs_name)
         prompt = self.prompts["smooth_generation"]["QUERY_TEMPLATE"].format(
             context=context, query=query
         )
-        answer = agent.predict(prompt=prompt, system_prompt=self.system_prompt)
+        answer = agent.predict(prompt=prompt, 
+                               system_prompt=self.system_prompt,
+                               options_generation=self.config_server["options_generation"])
         nb_input_tokens += np.sum(answer["nb_input_tokens"])
         nb_output_tokens += np.sum(answer["nb_output_tokens"])
         impacts[2] = answer["impacts"][2]
@@ -135,6 +137,7 @@ class RerankerRag(AdvancedRag):
             "nb_input_tokens": nb_input_tokens,
             "nb_output_tokens": nb_output_tokens,
             "context": context,
+            "docs_name": docs_name,
             "impacts": impacts,
             "energy": energies,
         }

@@ -39,6 +39,7 @@ class Document(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String())
+    path: Mapped[str] = mapped_column(String())
     embedding_tokens: Mapped[int] = mapped_column(Integer())
     input_tokens: Mapped[int] = mapped_column(Integer())
     output_tokens: Mapped[int] = mapped_column(Integer())
@@ -71,6 +72,7 @@ class DocumentText:
             print(f'Error "{e}" while trying to open doc {self.name_with_extension}')
 
         self.name = ".".join(self.name_with_extension.split(".")[:-1])
+        self.path = path
         self.extension = "." + self.name_with_extension.split(".")[-1]
         self.text_splitter = splitter
         self.embedding_tokens = 0
@@ -97,6 +99,7 @@ class DocumentText:
     def convert_in_base(self) -> Document:
         return Document(
             name=self.name_with_extension,
+            path=self.path,
             embedding_tokens=self.embedding_tokens,
             input_tokens=self.input_tokens,
             output_tokens=self.output_tokens,

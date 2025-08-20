@@ -9,25 +9,26 @@ class SelfRagAgent(NaiveRagAgent):
     def __init__(
         self,
         config_server: dict,
-        db_name: str = "db_naive_rag",
-        vb_name: str = "db_naive_rag",
+        dbs_name: list[str],
+        data_folders_name: list[str]
     ) -> None:
 
         super().__init__(
             config_server=config_server,
-            db_name=db_name,
-            vb_name=vb_name,
+            dbs_name=dbs_name,
+            data_folders_name=data_folders_name
         )
         self.language = config_server["language"]
         self.prompts = prompts[self.language]
         self.nb_chunks = config_server["nb_chunks"]
 
     def get_nb_token_embeddings(self):
-        return self.vb.get_nb_token_embeddings()
+        return self.data_manager.get_nb_token_embeddings()
 
     def get_rag_context(self, query: str, nb_chunks: int = 5) -> list[str]:
         """ """
-        ns = NaiveSearch(vector_base=self.vb, nb_chunks=nb_chunks)
+        ns = NaiveSearch(data_manager=self.data_manager,
+                         nb_chunks=nb_chunks)
         context = ns.get_context(query=query)
         return context
 
@@ -378,7 +379,9 @@ class SelfRagAgent(NaiveRagAgent):
             prompt = self.prompts["conversationnal"]["QUERY_TEMPLATE"].format(
                 query=query
             )
-            answer = agent.predict(prompt=prompt, system_prompt=self.system_prompt)
+            answer = agent.predict(prompt=prompt,
+                                   system_prompt=self.system_prompt,
+                                   options_generation=self.config_server["options_generation"])
 
             nb_input_tokens += np.sum(answer["nb_input_tokens"])
             nb_output_tokens += np.sum(answer["nb_output_tokens"])
@@ -399,6 +402,7 @@ class SelfRagAgent(NaiveRagAgent):
 
         return {
             "answer": answer["texts"],
+            "docs_name": [],
             "nb_input_tokens": nb_input_tokens,
             "nb_output_tokens": nb_output_tokens,
             "context": context,

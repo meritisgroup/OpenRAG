@@ -2,12 +2,12 @@ from ...base_classes import RagAgent
 from ...utils.agent import get_Agent
 from ...utils.factory_vectorbase import get_vectorbase
 from ...utils.agent_functions import get_system_prompt
-from ...database.database_class import get_database
 from .prompts import prompts
 from .indexation import ContextualRetrievalIndexation
 from ..naive_rag.query import NaiveSearch
 import numpy as np
 from ..query_reformulation.query_reformulation import query_reformulation
+from ...database.database_class import get_management_data
 
 
 class ContextualRetrievalRagAgent(RagAgent):
@@ -18,8 +18,8 @@ class ContextualRetrievalRagAgent(RagAgent):
     def __init__(
         self,
         config_server: dict,
-        db_name: str = "db_contextual_retrieval_rag",
-        vb_name: str = "vb_contextual_retrieval_rag",
+        dbs_name: list[str],
+        data_folders_name: list[str]
     ) -> None:
         """
         Args:
@@ -33,22 +33,21 @@ class ContextualRetrievalRagAgent(RagAgent):
             db_name (str) : Name given to the database that keeps track of already processed docs, if it already exists adds new documents to the existing database (stored in storage/ folder)
             vb_name (str) : Name given to the vectorbase, if it already exists adds new documents to the existing vectorbase (stored in milvus/elasticsearch docker)
         """
+        self.dbs_name = dbs_name
+        self.data_folders_name = data_folders_name
         self.config_server = config_server
         self.storage_path = config_server["storage_path"]
         self.language = config_server["language"]
         self.type_text_splitter = config_server["TextSplitter"]
         self.type_retrieval = config_server["type_retrieval"]
         self.embedding_model = config_server["embedding_model"]
-        self.db_name = vb_name
-        self.vb_name = db_name
         self.nb_chunks = config_server["nb_chunks"]
         self.agent = get_Agent(config_server)
-        self.db = get_database(db_name=self.db_name, storage_path=self.storage_path)
-        self.vb = get_vectorbase(
-            vb_name=self.vb_name,
-            config_server=config_server,
-            agent=self.agent,
-        )
+        self.data_manager = get_management_data(dbs_name=dbs_name,
+                                                data_folders_name=self.data_folders_name,
+                                                storage_path=self.storage_path,
+                                                config_server=config_server,
+                                                agent=self.agent)
 
         self.prompts = prompts[self.language]
         self.system_prompt = get_system_prompt(self.config_server, self.prompts)
@@ -60,11 +59,10 @@ class ContextualRetrievalRagAgent(RagAgent):
             )
 
     def get_nb_token_embeddings(self):
-        return self.vb.get_nb_token_embeddings()
+        return self.data_manager.get_nb_token_embeddings()
 
     def indexation_phase(
         self,
-        path_input: str,
         reset_index: bool = False,
         chunk_size: int = 500,
         overlap: bool = True,
@@ -77,13 +75,11 @@ class ContextualRetrievalRagAgent(RagAgent):
             overlap (bool) : Wether chunks overlap each other
         """
         if reset_index:
-            self.vb.delete_collection()
-            self.db.clean_database()
+            self.data_manager.delete_collection()
+            self.data_manager.clean_database()
 
         index = ContextualRetrievalIndexation(
-            data_path=path_input,
-            db=self.db,
-            vb=self.vb,
+            data_manager=self.data_manager,
             language=self.language,
             agent=self.agent,
             type_text_splitter=self.type_text_splitter,
@@ -105,7 +101,8 @@ class ContextualRetrievalRagAgent(RagAgent):
             context (str) : All retrieved chunks, seperated by a new line and '[...]'
             name_docs : Source document name for each retrieved chunk
         """
-        ns = NaiveSearch(vector_base=self.vb, nb_chunks=nb_chunks)
+        ns = NaiveSearch(data_manager=self.data_manager,
+                         nb_chunks=nb_chunks)
         context, name_docs = ns.get_context(query=query)
         return context, name_docs
 
@@ -144,7 +141,7 @@ class ContextualRetrievalRagAgent(RagAgent):
                 self.reformulater.reformulate(query=query, nb_reformulation=1)
             )
             query = query[0]
-        context, _ = self.get_rag_context(query=query, nb_chunks=nb_chunks)
+        context, docs_name = self.get_rag_context(query=query, nb_chunks=nb_chunks)
         prompt = self.prompts["smooth_generation"]["QUERY_TEMPLATE"].format(
             context=context, query=query
         )
@@ -152,6 +149,7 @@ class ContextualRetrievalRagAgent(RagAgent):
         answer = self.agent.predict(
             prompt=prompt,
             system_prompt=self.system_prompt,
+            options_generation=self.config_server["options_generation"]
         )
         nb_input_tokens = np.sum(answer["nb_input_tokens"]) + input_tokens
         nb_output_tokens = np.sum(answer["nb_output_tokens"]) + output_tokens
@@ -169,6 +167,7 @@ class ContextualRetrievalRagAgent(RagAgent):
             "nb_input_tokens": nb_input_tokens,
             "nb_output_tokens": nb_output_tokens,
             "context": context,
+            "docs_name": docs_name,
             "impacts": impacts,
             "energy": energies,
         }

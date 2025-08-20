@@ -8,3 +8,4 @@
 **/__pycache__/
 /docker/*
 venv
+.env

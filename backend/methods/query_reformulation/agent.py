@@ -10,14 +10,14 @@ class QueryReformulationRag(NaiveRagAgent):
     def __init__(
         self,
         config_server: dict,
-        db_name: str = "db_naive_rag",
-        vb_name: str = "vb_naive_rag",
+        dbs_name: list[str],
+        data_folders_name: list[str]
     ) -> None:
 
         super().__init__(
             config_server=config_server,
-            db_name=db_name,
-            vb_name=vb_name,
+            dbs_name=dbs_name,
+            data_folders_name=data_folders_name
         )
         self.nb_chunks = config_server["nb_chunks"]
         self.prompts = prompts[self.language]
@@ -26,21 +26,24 @@ class QueryReformulationRag(NaiveRagAgent):
         )
 
     def get_nb_token_embeddings(self):
-        return self.vb.get_nb_token_embeddings()
+        return self.data_manager.get_nb_token_embeddings()
 
     def get_rag_context(
         self, query: str, nb_chunks: int = 5
     ) -> list[str]:
-        ns = NaiveSearch(vector_base=self.vb, nb_chunks=nb_chunks)
-        context = ns.get_context(query=query)
-        return context
+        ns = NaiveSearch(data_manager=self.data_manager,
+                         nb_chunks=nb_chunks)
+        context, docs_name = ns.get_context(query=query)
+        return context, docs_name
 
-    def contexts_to_prompts(self, contexts):
+    def contexts_to_prompts(self, contexts, docs_name):
         context = ""
-        for chunk in contexts:
-            if chunk not in context:
-                context += chunk + "\n[...]\n"
-        return context
+        docs_context = []
+        for i in range(len(contexts)):
+            if contexts[i] not in context:
+                context += contexts[i] + "\n[...]\n"
+                docs_context.append(docs_name[i])
+        return context[:-7], docs_context
 
     def generate_answer(
         self,
@@ -54,18 +57,24 @@ class QueryReformulationRag(NaiveRagAgent):
         queries, nb_input_tokens, nb_output_tokens, impact, energy = self.reformulater.reformulate(
             query=query, nb_reformulation=nb_reformulation
         )
-        contexts = [
-            self.get_rag_context(query=query, nb_chunks=nb_chunks)
-            for query in queries
+
+        results = [
+            self.get_rag_context(query=query, nb_chunks=nb_chunks) for query in queries
         ]
-        contexts = list(chain(*contexts))
-        contexts = list(set(contexts))
-        context = self.contexts_to_prompts(contexts=contexts)
+        contexts = []
+        docs_name = []
+        for result in results:
+            contexts+=result[0]
+            docs_name+=result[1]
+
+        context, docs_name = self.contexts_to_prompts(contexts=contexts,
+                                                      docs_name=docs_name)
         prompt = self.prompts["smooth_generation"]["QUERY_TEMPLATE"].format(
             context=context, query=query
         )
         system_prompt = self.prompts["smooth_generation"]["SYSTEM_PROMPT"]
-        answer = agent.predict(prompt=prompt, system_prompt=system_prompt)
+        answer = agent.predict(prompt=prompt, system_prompt=system_prompt,
+                               options_generation=self.config_server["options_generation"])
         nb_input_tokens += np.sum(answer["nb_input_tokens"])
         nb_output_tokens += np.sum(answer["nb_output_tokens"])
 
@@ -82,6 +91,7 @@ class QueryReformulationRag(NaiveRagAgent):
             "nb_input_tokens": np.sum(nb_input_tokens),
             "nb_output_tokens": np.sum(nb_output_tokens),
             "context": context,
+            "docs_name": docs_name,
             "impacts": impacts,
             "energy" : energies
         }
@@ -93,14 +103,14 @@ class QueryReformulationRag(NaiveRagAgent):
         self, queries: list[str], nb_chunks: int = 5
     ):
         contexts = []
-        names_docs = []
+        docs_name = []
         for query in queries:
-            context, name_docs = self.get_rag_context(
+            context, doc_name = self.get_rag_context(
                 query=query, nb_chunks=nb_chunks
             )
             contexts.append(context)
-            names_docs.append(name_docs)
-        return contexts, names_docs
+            docs_name.append(docs_name)
+        return contexts, docs_name
 
     def generate_answers(self, queries: list[str], nb_chunks: int = 2):
         answers = []

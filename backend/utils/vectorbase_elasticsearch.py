@@ -6,6 +6,12 @@ from .utils_vlm import load_element
 from .agent import Agent
 
 
+class Multiple_Vectorbase:
+
+    def __init__(self):
+        self.vectorbase = {}
+
+
 class VectorBase_embeddings_elasticsearch(VectorBase):
     def __init__(
         self,
@@ -216,6 +222,7 @@ class VectorBase_embeddings_elasticsearch(VectorBase):
                     "num_candidates": 500,  # Number of candidates to consider
                 },
             }
+            
             response = self.client.search(index=collection_name, body=body)
             res.append(response)
 
@@ -484,6 +491,7 @@ class VectorBase_hybrid_elasticsearch(VectorBase_embeddings_elasticsearch):
         results = []
         for l in range(len(res)):
             result = []
+            #print("res", res[l]["hits"]["hits"], len(res[l]["hits"]["hits"]))
             for i in range(np.min([len(res[l]["hits"]["hits"]), k])):
                 result.append(res[l]["hits"]["hits"][i]["_source"])
             results.append(result)

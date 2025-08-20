@@ -9,7 +9,7 @@ from ...utils.agent_functions import get_system_prompt
 from ...base_classes import RagAgent
 from .prompts import prompts
 import numpy as np
-from ...database.database_class import get_database
+from ...database.database_class import DataBase
 
 
 class NaiveChatbot(RagAgent):
@@ -23,14 +23,15 @@ class NaiveChatbot(RagAgent):
         self.system_prompt = get_system_prompt(config_server, self.prompts)
 
         self.nb_chunks = 0
-        self.db = get_database("chatbot_dummy_db", storage_path="./storage")
+        self.db = DataBase(db_name="chatbot_dummy_db", 
+                           path="./storage",
+                           path_data=".")
 
     def get_nb_token_embeddings(self):
         return 0
 
     def indexation_phase(
         self,
-        path_input: str,
         reset_index: bool = False,
         overlap: bool = True,
     ) -> None:
@@ -54,6 +55,7 @@ class NaiveChatbot(RagAgent):
             "nb_input_tokens": nb_input_tokens,
             "nb_output_tokens": nb_output_tokens,
             "context": "",
+            "doc_names": [],
             "impacts": answer["impacts"],
             "energy": answer["energy"],
         }

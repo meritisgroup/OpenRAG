@@ -63,12 +63,10 @@ if right.button(label="Delete DataBase", type="primary", use_container_width=Tru
     for index_name in es.indices.get_alias(index="*"):
         if database_name in index_name:
             es.indices.delete(index=index_name)
-            print(f"{index_name} successfully deleted")
-
+    
     for database in os.listdir("./storage"):
         if database_name in database:
             os.remove("./storage/" + database)
-            print(f"{database} successfully deleted")
 
     if st.session_state["chat_database_name"] == database_name:
         st.session_state["chat_database_name"] = None

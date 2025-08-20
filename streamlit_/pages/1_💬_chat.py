@@ -11,6 +11,7 @@ from streamlit_.utils.chat_funcs import (
     handle_click,
     reset_success_button,
     change_default_prompt,
+    prepare_show_context
 )
 
 st.markdown("# OpenRAG by Meritis")
@@ -26,6 +27,9 @@ with st.sidebar:
     ].copy()
 
     rag_list = rag_list.keys()
+
+    if st.session_state["rag_name"] not in rag_list:
+        st.session_state["rag_name"] = list(rag_list)[0]
     rag_method = st.selectbox(
         "**What RAG Method do you want to try ?**",
         options=rag_list,
@@ -40,16 +44,13 @@ with st.sidebar:
         on_change=reset_success_button,
     )
 
-    st.session_state["chat_database_name"] = st.selectbox(
-        label="**Choose Database for retrieval**",
+    if "chat_database_name" not in st.session_state:
+        st.session_state["chat_database_name"] = []
+
+    st.multiselect(
+        label="**Choose Database(s) for retrieval**",
         options=st.session_state["all_databases"],
-        index=(
-            st.session_state["all_databases"].index(
-                st.session_state["chat_database_name"]
-            )
-            if st.session_state["chat_database_name"] is not None
-            else None
-        ),
+        key="chat_database_name",
     )
 
     if "all_system_prompt" not in st.session_state:
@@ -96,7 +97,6 @@ with st.sidebar:
 
         with st.spinner("Indexation running", show_time=True):
             rag_agent.indexation_phase(
-                f"./data/databases/{st.session_state['chat_database_name']}",
                 reset_index=reset_index,
             )
             st.session_state["success"] = True
@@ -150,6 +150,33 @@ if prompt := st.chat_input(
                 else "Only measurable with Mistral and OpenAI LLM host"
             )
             end_time = time.time()
+
+
+        context = prepare_show_context(context=answer["context"],
+                                       docs_name=answer["docs_name"])
+
+        st.markdown(
+            """
+            <style>
+            /* Style de l'expander */
+            .streamlit-expanderHeader {
+                background-color: #4CAF50;  /* vert */
+                color: white !important;
+                font-weight: bold;
+                border-radius: 8px;
+                padding: 8px;
+            }
+            .streamlit-expanderHeader:hover {
+                background-color: #45a049; /* vert un peu plus foncé au hover */
+            }
+            </style>
+            """,
+            unsafe_allow_html=True
+        )
+
+        with st.expander("💡 Voir le contexte utilisé"):
+            st.write(context)
+
         formated_answer += (
             f"{answer['answer']} \n\n"
             f"**Input tokens:** {answer['nb_input_tokens']}  \n"

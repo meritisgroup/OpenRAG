@@ -1,6 +1,5 @@
 from ...utils.factory_vectorbase import get_vectorbase
 from ...utils.agent_functions import get_system_prompt
-from ...database.database_class import get_database
 from ...base_classes import RagAgent
 from .indexation import QbRagIndexation
 from .query import QbSearch
@@ -9,6 +8,7 @@ from ...database.rag_classes import Question, Document, Chunk
 from .prompts import prompts
 import numpy as np
 from ..query_reformulation.query_reformulation import query_reformulation
+from ...database.database_class import get_management_data
 
 
 class QueryBasedRagAgent(RagAgent):
@@ -20,11 +20,12 @@ class QueryBasedRagAgent(RagAgent):
     def __init__(
         self,
         config_server: dict,
-        db_name: str = "db_qb_rag",
-        vb_name: str = "vb_qb_rag",
+        dbs_name: list[str],
+        data_folders_name: list[str]
     ) -> None:
         """ """
-
+        self.dbs_name = dbs_name
+        self.data_folders_name = data_folders_name
         self.embedding_model = config_server["embedding_model"]
 
         self.language = config_server["language"]
@@ -37,21 +38,16 @@ class QueryBasedRagAgent(RagAgent):
         self.type_retrieval = config_server["type_retrieval"]
         self.nb_chunks = config_server["nb_chunks"]
         self.storage_path = config_server["storage_path"]
-
-        self.db_name = db_name
-        self.vb_name = vb_name
-        self.params_vectorbase = config_server["params_vectorbase"]
-
-        self.db = get_database(db_name=self.db_name, storage_path=self.storage_path)
-        self.db.add_table(Question)
-        self.db.add_table(Document)
-        self.db.add_table(Chunk)
-
         self.agent = get_Agent(config_server)
+        self.data_manager = get_management_data(dbs_name=self.dbs_name,
+                                                data_folders_name=self.data_folders_name,
+                                                storage_path=self.storage_path,
+                                                config_server=config_server,
+                                                agent=self.agent)
+        self.data_manager.add_table(Question)
+        self.data_manager.add_table(Chunk)
 
-        self.vb = get_vectorbase(
-            vb_name=self.vb_name, config_server=config_server, agent=self.agent
-        )
+        self.params_vectorbase = config_server["params_vectorbase"]
         self.reformulate_query = config_server["reformulate_query"]
         if self.reformulate_query:
             self.reformulater = query_reformulation(
@@ -60,21 +56,18 @@ class QueryBasedRagAgent(RagAgent):
 
     def indexation_phase(
         self,
-        path_input: str,
         reset_index: bool = False,
         model: str = None,
     ) -> None:
         """Indexation phase for QB Rag"""
         if reset_index:
-            self.vb.delete_collection()
-            self.db.clean_database()
+            self.data_manager.delete_collection()
+            self.data_manager.clean_database()
 
         qb_index = QbRagIndexation(
-            data_path=path_input,
             language=self.language,
             agent=self.agent,
-            db=self.db,
-            vb=self.vb,
+            data_manager=self.data_manager,
             type_text_splitter=self.type_text_splitter,
             embedding_model=self.embedding_model,
         )
@@ -92,15 +85,14 @@ class QueryBasedRagAgent(RagAgent):
 
         qs = QbSearch(
             agent=agent,
-            data_base=self.db,
-            vector_base=self.vb,
+            data_manager=self.data_manager,
             nb_questions=method_parameter,
             language=self.language,
         )
 
-        context = qs.get_context(query=query)
+        context, docs_name = qs.get_context(query=query)
 
-        return context
+        return context, docs_name
 
     def generate_answer(
         self,
@@ -121,14 +113,15 @@ class QueryBasedRagAgent(RagAgent):
             nb_input_tokens += input_t
             nb_output_tokens = output_t
 
-        context = self.get_rag_context(
+        context, docs_name = self.get_rag_context(
             query=query, method_parameter=nb_chunks, model=model
         )
         prompt = self.prompts["smooth_generation"]["QUERY_TEMPLATE"].format(
             context=context, query=query
         )
 
-        answer = agent.predict(prompt=prompt, system_prompt=self.system_prompt)
+        answer = agent.predict(prompt=prompt, system_prompt=self.system_prompt,
+                               options_generation=self.config_server["options_generation"])
         nb_input_tokens += np.sum(answer["nb_input_tokens"])
         nb_output_tokens += np.sum(answer["nb_output_tokens"])
 
@@ -143,6 +136,7 @@ class QueryBasedRagAgent(RagAgent):
             "answer": answer["texts"],
             "nb_input_tokens": nb_input_tokens,
             "nb_output_tokens": nb_output_tokens,
+            "docs_name": docs_name,
             "context": context,
             "impacts": impacts,
             "energy": energies,

@@ -5,7 +5,9 @@ import os
 from elasticsearch import Elasticsearch
 from pymilvus import utility, connections
 import pandas as pd
-from backend.utils.factory_name_dataser_vectorbase import get_name
+from backend.utils.factory_name_dataset_vectorbase import get_name
+from streamlit_.utils.params_func import get_possible_embeddings_model, get_default_embeddings_model
+
 
 config_new_rag = {}
 st.markdown("# Customize your RAG:")
@@ -58,6 +60,19 @@ config_new_rag["TextSplitter"] = st.selectbox(
     format_func=lambda x: splitter_dic[x],
 )
 
+possible_embeddings = get_possible_embeddings_model(provider=st.session_state["config_server"]["params_host_llm"]["type"])
+possible_embeddings.insert(0, "default")
+
+embeddings_dic = {m: m for m in possible_embeddings}
+config_new_rag["embedding_model"] = st.selectbox(
+    label="**Choose embedding model**",
+    options=embeddings_dic.keys(),
+    format_func=lambda x: embeddings_dic[x],
+)
+if config_new_rag["embedding_model"]!="default":
+    st.warning(f"⚠️ This RAG will be only available for '{st.session_state['config_server']['params_host_llm']['type']}' provider.")
+
+
 config_new_rag["nb_chunks"] = st.slider(
     label="**Choose number of chunks to retrieve per query**",
     min_value=0,
@@ -68,7 +83,6 @@ config_new_rag["nb_chunks"] = st.slider(
                                                            However a number of chunk too large might slow down the answer time and increase costs""",
 )
 
-st.markdown("## Chunk length")
 if "chunk_length" not in st.session_state:
     st.session_state["chunk_length"] = st.session_state["config_server"]["chunk_length"]
 
@@ -129,12 +143,12 @@ if st.button(
     help="Your RAG will only be visible in the LLM host at the moment of its creation, if you change LLM host, you must create your RAG again",
     use_container_width=True,
 ):
-
+    all_rags_name = []
+    for provider in st.session_state["all_rags"].keys():
+        all_rags_name+=st.session_state["all_rags"][provider]
     if (
         config_new_rag["name"]
-        in st.session_state["all_rags"][
-            st.session_state["config_server"]["params_host_llm"]["type"]
-        ]
+        in all_rags_name
     ):
         st.error(
             f"{config_new_rag['name']} already exists, please choose another name",
@@ -159,34 +173,36 @@ if st.button(
         saved_config["type_retrieval"] = config_new_rag["type_retrieval"]
         saved_config["nb_chunks"] = config_new_rag["nb_chunks"]
         saved_config["name"] = config_new_rag["name"]
+        saved_config["embedding_model"] = config_new_rag["embedding_model"]
         saved_config["params_vectorbase"] = config_new_rag["params_vectorbase"]
         saved_config["local_params"] = local_params
         saved_config["chunk_length"] = st.session_state["chunk_length"]
-        folder = (
-            "vllm"
-            if saved_config["params_host_llm"]["type"] == "vllm"
-            else "ollama_openai_mistral"
-        )
-        with open(
-            f"data/custom_rags/{folder}/{config_new_rag['name']}.json", "w"
-        ) as config:
-            json.dump(saved_config, config, ensure_ascii=False, indent=4)
-        if folder == "vllm":
-            st.session_state["all_rags"]["vllm"][config_new_rag["name"]] = (
-                config_new_rag["name"]
-            )
+
+
+        if config_new_rag["embedding_model"]!="default":
+            folders_save = [saved_config["params_host_llm"]["type"]]
         else:
-            st.session_state["all_rags"]["openai"][config_new_rag["name"]] = (
-                config_new_rag["name"]
+            folders_save = ["ollama", "mistral", "openai", "vllm"]
+
+        for folder_creation in folders_save:
+            os.makedirs(f"data/custom_rags/{folder_creation}", exist_ok=True)
+
+        for folder in folders_save:
+            with open(
+                f"data/custom_rags/{folder}/{config_new_rag['name']}.json", "w"
+            ) as config:
+                if config_new_rag["embedding_model"] == "default":
+                    saved_config["embedding_model"] = get_default_embeddings_model(provider=folder)
+
+                json.dump(saved_config, config, ensure_ascii=False, indent=4)
+
+            st.session_state["all_rags"][folder][config_new_rag["name"]] = (
+                    config_new_rag["name"]
             )
-            st.session_state["all_rags"]["ollama"][config_new_rag["name"]] = (
-                config_new_rag["name"]
-            )
-            st.session_state["all_rags"]["mistral"][config_new_rag["name"]] = (
-                config_new_rag["name"]
-            )
+        
         with open("streamlit_/utils/all_rags.json", "w") as file:
             json.dump(st.session_state["all_rags"], file, ensure_ascii=False, indent=4)
+
         st.session_state["benchmark"]["rags"][config_new_rag["name"]] = False
         st.success("RAG successfully created")
 
@@ -199,35 +215,23 @@ rag_to_del = left.selectbox(
     options=st.session_state["custom_rags"],
     label_visibility="collapsed",
 )
+
+
+
 if right.button(label="Delete RAG", type="primary", use_container_width=True):
-    # Updating list of custom rag in streamlit and ./data/custom_rags folder
     st.session_state["custom_rags"].remove(rag_to_del)
 
-    if (
-        rag_to_del in st.session_state["all_rags"]["ollama"].keys()
-        or rag_to_del in st.session_state["all_rags"]["openai"].keys()
-        or rag_to_del in st.session_state["all_rags"]["mistral"].keys()
-    ):
-        del st.session_state["all_rags"]["ollama"][rag_to_del]
-        del st.session_state["all_rags"]["openai"][rag_to_del]
-        del st.session_state["all_rags"]["mistral"][rag_to_del]
+    for provider in ["ollama", "mistral", "openai", "vllm"]:
+        if (rag_to_del in st.session_state["all_rags"][provider].keys()):
+            del st.session_state["all_rags"][provider][rag_to_del]
+    
+        path = f"./data/custom_rags/{provider}/" + rag_to_del + ".json"
+        if os.path.exists(path):
+            os.remove(path)
 
-    path = "./data/custom_rags/ollama_openai_mistral/" + rag_to_del + ".json"
-    if os.path.exists(path):
-        os.remove(path)
-
-    if rag_to_del in st.session_state["all_rags"]["vllm"].keys():
-        del st.session_state["all_rags"]["vllm"][rag_to_del]
-
-    path = "./data/custom_rags/vllm/" + rag_to_del + ".json"
-    if os.path.exists(path):
-        os.remove(path)
-
-    # Saving modified list of RAGs
     with open("streamlit_/utils/all_rags.json", "w") as file:
         json.dump(st.session_state["all_rags"], file, indent=4)
 
-    # Deleting all indexation done with this RAG
     es = Elasticsearch(
         [st.session_state["config_server"]["params_vectorbase"]["url"]],
         basic_auth=(
@@ -238,29 +242,27 @@ if right.button(label="Delete RAG", type="primary", use_container_width=True):
     for index_name in es.indices.get_alias(index="*"):
         if index_name.startswith(rag_to_del):
             es.indices.delete(index=index_name)
-            print(f"{index_name} successfully deleted")
 
+
+current_provider = st.session_state["config_server"]["params_host_llm"]["type"]
 if rag_to_del in st.session_state["custom_rags"]:
-    if rag_to_del in st.session_state["all_rags"]["vllm"]:
-        path_folder = "vllm"
-        folder = "vllm"
-    else:
-        path_folder = "ollama_openai_mistral"
-        folder = "ollama"
-
-    with open(f"data/custom_rags/{path_folder}/{rag_to_del}.json", "r") as file:
+    with open(f"data/custom_rags/{current_provider}/{rag_to_del}.json", "r") as file:
         config = json.load(file)
+
     retrieval_methods = {"embeddings": "Embeddings", "bm25": "BM25", "hybrid": "Hybrid"}
     display_config = {
-        "Base RAG": [st.session_state["all_rags"][folder][config["base"]]],
+        "Base RAG": [st.session_state["all_rags"][current_provider][config["base"]]],
         "Vectorbase Type": [backend_vectorbase[config["params_vectorbase"]["backend"]]],
         "Retrieval Method": [retrieval_methods[config["type_retrieval"]]],
         "Splitter": [splitter_dic[config["TextSplitter"]]],
-        "Nb chunks retrieved": [str(config["nb_chunks"])],
+        "Embedding model": [embeddings_dic[config["embedding_model"]]],
+        "Nb chunks": [str(config["nb_chunks"])],
+        "Chunk length": [str(config["chunk_length"])]
     }
 
     st.write(pd.DataFrame(display_config))
     st.markdown("# Manage Indexations:")
+
 if "rerun_managed_rag" not in st.session_state:
     st.session_state["rerun_managed_rag"] = False
 
@@ -301,6 +303,7 @@ else:
     base = rag_method
 list_indexation = []
 
+
 es = Elasticsearch(
     [st.session_state["config_server"]["params_vectorbase"]["url"]],
     basic_auth=(
@@ -318,9 +321,7 @@ st.session_state["indexation"] = left.selectbox(
 )
 
 if right.button(label="Delete indexation", use_container_width=True, type="primary"):
-
     if base == "graph":
-
         if "_local" in st.session_state.indexation:
             pointer = st.session_state.indexation.find("_local")
             suffix = "_global_search"
@@ -328,24 +329,18 @@ if right.button(label="Delete indexation", use_container_width=True, type="prima
             pointer = st.session_state.indexation.find("_global")
             suffix = "_local_search"
 
-        if "milvus" in st.session_state.indexation:
-            utility.drop_collection(st.session_state.indexation)
-            utility.drop_collection(st.session_state.indexation[:pointer] + suffix)
-        elif "elasticsearch" in st.session_state.indexation:
+        if "elasticsearch" in st.session_state.indexation:
             es.indices.delete(index=st.session_state.indexation)
             es.indices.delete(index=st.session_state.indexation[:pointer] + suffix)
 
         for db in os.listdir("./storage"):
             if st.session_state.indexation[:pointer] in db:
-                print("./storage/" + st.session_state.indexation[:pointer] + ".db")
                 os.remove("./storage/" + st.session_state.indexation[:pointer] + ".db")
                 st.session_state.indexation = None
                 st.rerun()
 
     else:
-        if "milvus" in st.session_state.indexation:
-            utility.drop_collection(st.session_state.indexation)
-        elif "elasticsearch" in st.session_state.indexation:
+        if "elasticsearch" in st.session_state.indexation:
             es.indices.delete(index=st.session_state.indexation)
 
         for db in os.listdir("./storage"):
