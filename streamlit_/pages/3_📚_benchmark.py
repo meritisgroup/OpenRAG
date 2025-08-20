@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import os
 from backend.factory_RagAgent import (
-    get_rag_agent,
     get_custom_rag_agent,
     change_config_server,
     change_local_parameters,

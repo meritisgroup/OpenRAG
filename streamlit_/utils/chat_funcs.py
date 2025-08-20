@@ -12,23 +12,18 @@ def get_chat_agent(rag_method):
         "custom_rags" in st.session_state.keys()
         and rag_method in st.session_state["custom_rags"]
     ):
-        if st.session_state["config_server"]["params_host_llm"]["type"] == "vllm":
-            folder = "vllm"
-        else:
-            folder = "ollama_openai_mistral"
-
+        folder = st.session_state["config_server"]["params_host_llm"]["type"]
         with open(f"data/custom_rags/{folder}/{rag_method}.json", "r") as file:
             custom_config = json.load(file)
+
         custom_config["params_host_llm"] = st.session_state["config_server"][
             "params_host_llm"
         ]
-        custom_config = change_config_server(
-            rag_name=rag_method, config_server=custom_config
-        )
+
         rag_agent = get_custom_rag_agent(
             custom_config["base"],
             config_server=custom_config,
-            database_name=st.session_state["chat_database_name"],
+            databases_name=st.session_state["chat_database_name"],
         )
     else:
         st.session_state["config_server"] = change_config_server(
@@ -37,7 +32,7 @@ def get_chat_agent(rag_method):
         rag_agent = get_rag_agent(
             rag_method,
             config_server=st.session_state["config_server"],
-            database_name=st.session_state["chat_database_name"],
+            databases_name=st.session_state["chat_database_name"],
         )
 
     return rag_agent
@@ -61,3 +56,26 @@ def handle_click():
 def reset_success_button():
     "Deletes success button if a second indexation is started"
     st.session_state["success"] = False
+
+
+
+def prepare_show_context(context, docs_name):
+    context = context.split("\n[...]\n")
+    if len(docs_name)!=len(context):
+        blocks = []
+        for i in range(len(docs_name)):
+            cleaned_context = context[i].lstrip("\n")  
+            block = f"{cleaned_context}"
+            blocks.append(block)
+            
+        output = "\n\n---\n\n".join(blocks)
+        return output
+    else:
+        blocks = []
+        for i in range(len(docs_name)):
+            cleaned_context = context[i].lstrip("\n")  
+            block = f"source : {docs_name[i]}\n\n{cleaned_context}"
+            blocks.append(block)
+            
+        output = "\n\n---\n\n".join(blocks)
+        return output

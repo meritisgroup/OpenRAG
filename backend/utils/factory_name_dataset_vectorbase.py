@@ -60,5 +60,9 @@ def get_name(rag_name, config_server, additionnal_name=""):
         name += "_openai"  # In order for the indexation to be done with the openai embedding model
     elif config_server["params_host_llm"]["type"] == "mistral":
         name += "_mistral"  # In order for the indexation to be done with the openai embedding model
+    elif config_server["params_host_llm"]["type"] == "vllm":
+        name += "_vllm"
+    elif config_server["params_host_llm"]["type"] == "ollama":
+        name += "_ollama"
     name = name.lower()
     return name

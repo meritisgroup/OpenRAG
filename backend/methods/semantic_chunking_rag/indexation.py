@@ -2,6 +2,7 @@ from ...database.rag_classes import DocumentText, Document
 from tqdm.auto import tqdm
 import os
 from ...utils.agent import get_Agent
+from pathlib import Path
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -9,10 +10,10 @@ from sklearn.metrics.pairwise import cosine_similarity
 class SemanticChunkingRagIndexation:
     def __init__(
         self,
-        data_path: str,
+        data_manager,
         config_server: dict,
-        db,
-        vb,
+        dbs_name: list[str],
+        data_folders_name: list[str],
         breakpoint_method: str = "percentile",
         threshold: int = 98,
     ) -> None:
@@ -28,15 +29,9 @@ class SemanticChunkingRagIndexation:
         Returns:
             None
         """
-        if data_path[-1] != "/":
-            data_path += "/"
-
-        self.data_path = data_path
-
-        self.db = db
-        self.vb = vb
         self.embedding_model = config_server["embedding_model"]
         self.agent = get_Agent(config_server)
+        self.data_manager = data_manager
         self.breakpoint_method = breakpoint_method
         self.threshold = threshold
 
@@ -101,7 +96,7 @@ class SemanticChunkingRagIndexation:
                 embeddings["nb_tokens"]+=np.sum(results["nb_tokens"])
         return embeddings
     
-    def __batch_indexation__(self, doc_chunks, name_docs):
+    def __batch_indexation__(self, doc_chunks, name_docs, path_docs):
         """
         Adds a batch of chunks from doc_chunks to the indexation verctorbase
         Args:
@@ -118,14 +113,15 @@ class SemanticChunkingRagIndexation:
         tokens = 0
         taille_batch = 500
         for i in range(0, len(elements), taille_batch):
-            tokens += np.sum(self.vb.add_str_batch_elements(
-                    elements=elements[i:i + taille_batch],
-                    docs_name=name_docs[i:i + taille_batch], 
-                    display_message=False
+            tokens += np.sum(self.data_manager.add_str_batch_elements(
+                                                                    elements=elements[i:i + taille_batch],
+                                                                    docs_name=name_docs[i : i + taille_batch],
+                                                                    path_docs=path_docs[i : i + taille_batch],
+                                                                    display_message=False
             ))
         return tokens
 
-    def __serial_indexation__(self, doc_chunks, name_docs):
+    def __serial_indexation__(self, doc_chunks, name_docs, path_docs):
         """
         Adds a batch of chunks from doc_chunks to the indexation verctorbase
         Args:
@@ -138,9 +134,10 @@ class SemanticChunkingRagIndexation:
         tokens = 0
         for k, chunk in enumerate(doc_chunks):
             try:
-                tokens += self.vb.add_str_elements(
+                tokens += self.data_manager.add_str_elements(
                     elements=[chunk.replace("\n", "").replace("'", "")],
                     docs_name=[name_docs[k]],
+                    path_docs=[path_docs[k]],
                     display_message=False,
                 )
             except Exception:
@@ -161,21 +158,24 @@ class SemanticChunkingRagIndexation:
         Returns:
             None
         """
-        docs_already_processed = [res[0] for res in self.db.query(Document.name).all()]
+        docs_already_processed = [res[0] for res in self.data_manager.query(Document.path)]
+        to_process_norm = [Path(p).resolve().as_posix() for p in self.data_manager.get_list_path_documents()]
+        docs_already_norm = [Path(p).resolve().as_posix() for p in docs_already_processed]
+
         docs_to_process = [
             doc
-            for doc in os.listdir(self.data_path)
-            if doc not in docs_already_processed
+            for doc in to_process_norm
+            if doc not in docs_already_norm
         ]
 
-        self.vb.create_collection()
+        self.data_manager.create_collection()
         with tqdm(docs_to_process) as progress_bar:
 
-            for i, name_doc in enumerate(progress_bar):
+            for i, path_doc in enumerate(progress_bar):
                 embedding_tokens, input_tokens, output_tokens = 0, 0, 0
-                progress_bar.set_description(f"Embedding chunks - {name_doc}")
+                progress_bar.set_description(f"Embedding chunks - {path_doc}")
 
-                doc = DocumentText(path=self.data_path + name_doc)
+                doc = DocumentText(path=path_doc)
                 text = doc.content
                 res = []
                 for i in range(0, len(text), chunk_size - overlap_size):
@@ -210,21 +210,26 @@ class SemanticChunkingRagIndexation:
                     doc_chunks.append(". ".join(sentences[left:bp]) + ".")
                     left = bp
                 doc_chunks.append(". ".join(sentences[left:]) + ".")
-                name_docs = [name_doc for i in range(len(doc_chunks))]
+                name_docs = [str(Path(path_doc).name) for i in range(len(doc_chunks))]
+                path_docs = [str(Path(path_doc).parent) for i in range(len(doc_chunks))]
 
                 if batch:
-                    embedding_tokens += self.__batch_indexation__(
-                        doc_chunks=doc_chunks, name_docs=name_docs
+                    embedding_tokens += self.__batch_indexation__(doc_chunks=doc_chunks, 
+                                                                  name_docs=name_docs,
+                                                                  path_docs=path_docs
                     )
 
                 else:
-                    embedding_tokens += self.__serial_indexation__(
-                        doc_chunks=doc_chunks, name_doc=name_docs
+                    embedding_tokens += self.__serial_indexation__(doc_chunks=doc_chunks, 
+                                                                   name_docs=name_docs,
+                                                                   path_docs=path_docs
                     )
 
                 if i == len(progress_bar) - 1:
                     progress_bar.set_description("Embedding chunks - ✅")
-                new_doc = Document(name=name_doc, 
+                new_doc = Document(name=str(Path(path_doc).name),
+                                path=str(Path(path_doc)), 
                                    embedding_tokens=int(embedding_tokens),
                                 input_tokens=int(input_tokens), output_tokens=int(output_tokens))
-                self.db.add_instance(new_doc)
+                self.data_manager.add_instance(instance=new_doc,
+                                               path=str(Path(path_doc).parent))

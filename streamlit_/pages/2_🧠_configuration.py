@@ -2,6 +2,7 @@ import streamlit as st
 import os
 from backend.factory_RagAgent import get_rag_agent, change_config_server
 from backend.utils.utils_vlm import set_vllm_HF_key
+from streamlit_.utils.params_func import get_custom_rags
 import json
 
 
@@ -78,11 +79,11 @@ if st.session_state["config_server"]["params_host_llm"]["type"] == "ollama":
     st.session_state["config_server"]["embedding_model"] = "mxbai-embed-large:latest"
 
 elif st.session_state["config_server"]["params_host_llm"]["type"] == "vllm":
-    st.session_state["config_server"]["model"] = "google/gemma-2-9b-it"
+    st.session_state["config_server"]["model"] = "google/gemma-2-2b-it"
     st.session_state["config_server"]["embedding_model"] = "BAAI/bge-m3"
 
 elif st.session_state["config_server"]["params_host_llm"]["type"] == "openai":
-    st.session_state["config_server"]["model"] = "o4-mini-2025-04-16"
+    st.session_state["config_server"]["model"] = "gpt-4o-mini"
     st.session_state["config_server"]["embedding_model"] = "text-embedding-3-small"
 elif st.session_state["config_server"]["params_host_llm"]["type"] == "mistral":
     st.session_state["config_server"]["model"] = "mistral-small-latest"
@@ -179,6 +180,7 @@ st.slider(
 st.session_state["config_server"]["nb_chunks"] = st.session_state["chunk"]
 
 if st.button("Save Configuration", type="primary", use_container_width=True):
+    st.session_state["custom_rags"] = get_custom_rags(provider=st.session_state["config_server"]["params_host_llm"]["type"])
     rag_method = st.session_state["rag_name"]
     if (
         "custom_rags" in st.session_state.keys()
@@ -192,12 +194,14 @@ if st.button("Save Configuration", type="primary", use_container_width=True):
         rag = get_rag_agent(
             st.session_state["custom_rags"][rag_method]["base"],
             config_server=custom_config,
+            databases_name=st.session_state["chat_database_name"]
         )
     else:
         st.session_state["config_server"] = change_config_server(rag_name=rag_method,
                                                                  config_server=st.session_state["config_server"])
         rag = get_rag_agent(
-            rag_name=rag_method, config_server=st.session_state["config_server"]
+            rag_name=rag_method, config_server=st.session_state["config_server"],
+            databases_name=st.session_state["chat_database_name"]
         )
         st.session_state["rag"] = rag
     

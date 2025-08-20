@@ -1,5 +1,6 @@
 import streamlit as st
-from backend.factory_RagAgent import get_rag_agent, change_config_server
+from backend.factory_RagAgent import change_config_server
+from streamlit_.utils.params_func import get_custom_rags
 import json
 import pandas as pd
 import os
@@ -119,23 +120,11 @@ if "benchmark" not in st.session_state:
     )
     st.session_state["benchmark"]["load"] = False
 
-if "custom_rags" not in st.session_state:
-    if not os.path.exists("data/custom_rags/vllm"):
-        os.makedirs("data/custom_rags/vllm")
-    if not os.path.exists("data/custom_rags/ollama_openai_mistral"):
-        os.makedirs("data/custom_rags/ollama_openai_mistral")
 
-    custom_rags = os.listdir("data/custom_rags/vllm")
-    custom_rags += os.listdir("data/custom_rags/ollama_openai_mistral")
+st.session_state["custom_rags"] = get_custom_rags(provider=st.session_state["config_server"]["params_host_llm"]["type"])
+if ".gitkeep" in st.session_state["custom_rags"]:
+    st.session_state["custom_rags"].remove(".gitkeep")
 
-    custom_rags = [
-        custom_rag[:-5] for custom_rag in custom_rags if custom_rag != ".gitkeep"
-    ]
-
-    st.session_state["custom_rags"] = custom_rags
-
-    if ".gitkeep" in st.session_state["custom_rags"]:
-        st.session_state["custom_rags"].remove(".gitkeep")
 if "databases" not in st.session_state:
     st.session_state["databases"] = {}
 

@@ -9,6 +9,8 @@ from ...utils.agent import get_Agent
 from ...utils.agent_functions import get_system_prompt
 from .prompts import PROMPTS
 from ..query_reformulation.query_reformulation import query_reformulation
+from ...database.database_class import get_management_data
+from ...database.rag_classes import Chunk, Entity, Relation, Tokens
 
 
 class GraphRagAgent(RagAgent):
@@ -20,30 +22,34 @@ class GraphRagAgent(RagAgent):
     def __init__(
         self,
         config_server: dict,
-        db_name: str = "db_graph_rag",
-        vb_name: str = "vb_graph_rag",
+        dbs_name: list[str],
+        data_folders_name: list[str]
     ) -> None:
         """
         Be careful the folder associated with storage path has to contain both the data base and the vector base
         """
+
+        self.dbs_name = dbs_name
+        self.data_folders_name = data_folders_name
 
         self.language = config_server["language"]
         self.params_vectorbase = config_server["params_vectorbase"]
         self.nb_chunks = config_server["nb_chunks"]
         self.storage_path = config_server["storage_path"]
         self.embedding_model = config_server["embedding_model"]
-        self.db_name = db_name
-        self.vb_name = vb_name
         self.type_text_splitter = config_server["TextSplitter"]
-        self.db = get_graph_database(db_name=db_name, storage_path=self.storage_path)
 
         self.agent = get_Agent(config_server)
+        self.data_manager = get_management_data(dbs_name=self.dbs_name,
+                                                data_folders_name=self.data_folders_name,
+                                                storage_path=self.storage_path,
+                                                config_server=config_server,
+                                                agent=self.agent)
+        self.data_manager.add_table(Chunk)
+        self.data_manager.add_table(Entity)
+        self.data_manager.add_table(Relation)
+        self.data_manager.add_table(Tokens)
 
-        self.vb = get_vectorbase(
-            vb_name=vb_name,
-            config_server=config_server,
-            agent=self.agent,
-        )
         self.reformulate_query = config_server["reformulate_query"]
         if self.reformulate_query:
             self.reformulater = query_reformulation(
@@ -57,24 +63,21 @@ class GraphRagAgent(RagAgent):
 
     def indexation_phase(
         self,
-        path_input: str,
         reset_index: bool = False,
         overlap: bool = True,
     ) -> None:
 
         if reset_index:
-            self.vb.delete_collection()
-            self.db.clean_database()
+            self.data_manager.delete_collection()
+            self.data_manager.clean_database()
 
         index = GraphRagIndexation(
-            data_path=path_input,
+            data_manager=self.data_manager,
             storage_path=self.storage_path,
             language=self.language,
             agent=self.agent,
             type_text_splitter=self.type_text_splitter,
-            embedding_model=self.embedding_model,
-            db=self.db,
-            vb=self.vb,
+            embedding_model=self.embedding_model
         )
 
         index.run_pipeline(chunk_size=self.chunk_size, overlap=overlap)
@@ -90,8 +93,7 @@ class GraphRagAgent(RagAgent):
         if method == "global":
             search = GlobalSearch(
                 agent=self.agent,
-                data_base=self.db,
-                vector_base=self.vb,
+                data_manager = self.data_manager,
                 pre_filter_size=nb_chunks,
                 language=self.language,
             )
@@ -99,8 +101,7 @@ class GraphRagAgent(RagAgent):
         else:
             search = LocalSearch(
                 agent=self.agent,
-                data_base=self.db,
-                vector_base=self.vb,
+                data_manager = self.data_manager,
                 start_node=nb_chunks,
                 language=self.language,
             )
@@ -133,7 +134,8 @@ class GraphRagAgent(RagAgent):
 
         prompt = prompt_template.format(**context_base)
 
-        answer = self.agent.predict(prompt=prompt, system_prompt=self.system_prompt)
+        answer = self.agent.predict(prompt=prompt, system_prompt=self.system_prompt,
+                                    options_generation=self.config_server["options_generation"])
         impacts[2] = answer["impacts"][2]
         impacts[0] += answer["impacts"][0]
         impacts[1] += answer["impacts"][1]
@@ -147,6 +149,7 @@ class GraphRagAgent(RagAgent):
             "nb_input_tokens": np.sum(answer["nb_input_tokens"] + input_t),
             "nb_output_tokens": np.sum(answer["nb_output_tokens"] + output_t),
             "context": context,
+            "docs_names": [],
             "impacts": impacts,
             "energy": energies,
         }

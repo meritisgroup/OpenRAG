@@ -1,5 +1,4 @@
 from .base_classes import Agent
-
 from .vectorbase_elasticsearch import (
     VectorBase_BM25_elasticsearch,
     VectorBase_embeddings_elasticsearch,
@@ -7,12 +6,11 @@ from .vectorbase_elasticsearch import (
     VectorBaseVlm_elasticsearch,
 )
 
-def get_vectorbase(
-    vb_name: str,
-    config_server: dict,
-    agent: Agent = None,
-    embbeding_tokenizer=None,
-):
+
+def get_vectorbase(vb_name: str,
+                   config_server: dict,
+                   agent: Agent = None):
+    
     params_vectorbase = config_server["params_vectorbase"]
     embedding_model = config_server["embedding_model"]
     type_retrieval = config_server["type_retrieval"]
@@ -50,3 +48,4 @@ def get_vectorbase(
             )
 
     return vb
+

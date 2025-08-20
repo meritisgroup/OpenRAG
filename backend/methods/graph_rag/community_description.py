@@ -22,14 +22,14 @@ class CommunityDescription:
     This is the class built to describe communities of a graph and save it in a database
     """
 
-    def __init__(self, agent: Agent, graph: Graph, database: DataBase) -> None:
+    def __init__(self, agent: Agent, graph: Graph, db) -> None:
         """ """
         if graph.communities == []:
             graph.create_communities()
 
         self.graph = graph
         self.agent = agent
-        self.db = database
+        self.db = db
 
     def get_context_for_community(
         self, ids: list[int], overall=True, language="EN", community_as_entity=False
@@ -42,56 +42,49 @@ class CommunityDescription:
 
         if overall:
             entities: list[Entity] = (
-                self.db.query(MergeEntityOverall)
-                .filter(MergeEntityOverall.id.in_(ids))
-                .all()
+                self.db.query_filter(table_class=MergeEntityOverall, 
+                                               filter=MergeEntityOverall.id.in_(ids))
             )
             doc_name = "all"
             entities_names = [entity.name for entity in entities]
             relations = (
-                self.db.query(Relation)
-                .filter(
-                    Relation.source.in_(entities_names)
-                    & Relation.target.in_(entities_names)
-                )
-                .all()
+                self.db.query_filter(table_class=Relation,
+                                                filter=(Relation.source.in_(entities_names) & Relation.target.in_(entities_names)))
+
             )
 
         elif not overall and not community_as_entity:
             entities = (
-                self.db.query(MergeEntityDocument)
-                .filter(MergeEntityDocument.id.in_(ids))
-                .all()
-            )
+                self.db.query_filter(table_class=MergeEntityDocument,
+                                               filter=MergeEntityDocument.id.in_(ids))
+                    )
             doc_name = entities[0].doc_name
             entities_names = [entity.name for entity in entities]
             relations = (
-                self.db.query(Relation)
-                .filter(
-                    Relation.source.in_(entities_names)
-                    & Relation.target.in_(entities_names)
-                    & Relation.doc_name
-                    == doc_name
-                )
-                .all()
-            )
+                self.db.query_filter(table_class=Relation,
+                                               filter=(Relation.source.in_(entities_names)
+                                                       & Relation.target.in_(entities_names)
+                                                       & Relation.doc_name
+                                                        == doc_name)
+                                              )
+                        )       
 
         else:
             entities = (
-                self.db.query(CommunityEntity).filter(CommunityEntity.id.in_(ids)).all()
-            )
+                self.db.query_filter(table_class=CommunityEntity,
+                                               filter=CommunityEntity.id.in_(ids)))
             doc_name = "all"
             entities_names = [entity.name for entity in entities]
             relations = (
-                self.db.query(CommunityRelation)
-                .filter(
-                    CommunityRelation.source.in_(entities_names)
-                    & CommunityRelation.target.in_(entities_names)
-                )
-                .all()
-            )
+                self.db.query_filter(table_class=CommunityRelation, 
+                                               filter=(CommunityRelation.source.in_(entities_names)
+                                                       & CommunityRelation.target.in_(entities_names)
+                                                      ))
+                        )
 
-        sorted_entities = sorted(entities, key=lambda x: x.degree, reverse=True)
+        sorted_entities = sorted(entities,
+                                 key=lambda x: x.degree,
+                                 reverse=True)
 
         context = "Here are provided entities you have to create a consistent title and a consistent description :\n\n"
         for entity in sorted_entities:
@@ -124,9 +117,8 @@ class CommunityDescription:
 
             already_treated = (
                 len(
-                    self.db.query(Community)
-                    .filter(Community.entities_ids == community)
-                    .all()
+                    self.db.query_filter(table_class=Community, 
+                                                   filter=Community.entities_ids == community)
                 )
                 > 0
             )
@@ -151,7 +143,7 @@ class CommunityDescription:
         outputs = None
         for i in range(0, len(prompts_to_process), taille_batch):
             results = self.agent.multiple_predict(prompts=prompts_to_process[i:i + taille_batch],
-                                            system_prompts=system_prompts_to_process[i:i + taille_batch])
+                                                  system_prompts=system_prompts_to_process[i:i + taille_batch])
             if outputs is None:
                 outputs = results
             else:
@@ -216,3 +208,6 @@ class CommunityDescription:
                 new_communities.append(new_community)
 
         return new_communities
+    
+    def get_database(self):
+        return self.db

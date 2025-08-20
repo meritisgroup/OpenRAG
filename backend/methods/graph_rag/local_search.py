@@ -11,14 +11,12 @@ class LocalSearch:
     def __init__(
         self,
         agent: Agent,
-        data_base: DataBase,
-        vector_base,
+        data_manager,
         start_node: int = 5,
         language: str = "EN",
     ) -> None:
 
-        self.db = data_base
-        self.vb = vector_base
+        self.data_manager
         self.start_node = start_node
         self.language = language
         self.agent = agent
@@ -32,7 +30,8 @@ class LocalSearch:
 
         system_prompt, prompt = self._get_extraction_query_prompt(query)
 
-        answer = self.agent.predict(prompt=prompt, system_prompt=system_prompt)
+        answer = self.agent.predict(prompt=prompt,
+                                    system_prompt=system_prompt)
 
         self.tokens_counter["nb_input_tokens"] = answer["nb_input_tokens"]
         self.tokens_counter["nb_output_tokens"] = answer["nb_output_tokens"]
@@ -80,18 +79,17 @@ class LocalSearch:
         for entity in entities_in_query:
 
             if type(entity) is type("str") and entity is not None:
-                closest_entities = self.vb.k_search(
+                closest_entities = self.data_manager.k_search(
                     queries=entity,
-                    collection_name=self.db.name[:-3] + "_local_search",
+                    collection_name="local_search",
                     k=self.start_node,
                     output_fields=["text"],
                 )
 
                 for closest_entity in closest_entities[0]:
                     entity_in_db = (
-                        self.db.query(MergeEntityOverall)
-                        .filter(MergeEntityOverall.name == closest_entity["text"])
-                        .all()[0]
+                        self.data_manager.query_filter(table_class=MergeEntityOverall,
+                                                      filter=MergeEntityOverall.name == closest_entity["text"])[0]
                     )
 
                     if entity_in_db not in entities:
@@ -101,7 +99,7 @@ class LocalSearch:
         # For each entity, we retrieve its relations
         both_relations, single_relations = [], []
 
-        for relation in self.db.query(Relation).all():
+        for relation in self.data_manager.query(Relation):
             if relation.source in entities_names and relation.target in entities_names:
                 both_relations.append(relation)
 

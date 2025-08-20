@@ -1,5 +1,6 @@
 {
     "storage_path": "./storage",
+    "storage_data_path": "./data/databases",
     "params_host_llm": {
         "url": "http://ollama:11434/v1",
         "type": "ollama",
@@ -8,7 +9,7 @@
     "params_vectorbase": {
         "backend": "elasticsearch",
         "batch": true,
-        "url": "http://elasticsearch:9200",
+        "url": "http://localhost:9200",
         "auth": [
             "elastic",
             "UDY9ydMS"
@@ -23,11 +24,11 @@
     "reformulate_query": false,
     "reranker_model": "gemma3:1b",
     "max_attempts": 5,
-    "nb_chunks": 15,
+    "nb_chunks": 10,
     "ProcessorChunks": [
         "Contextual"
     ],
-    "hf_token": null,
+    "hf_token": "",
     "local_params": {
         "forced_system_prompt": false,
         "generation_system_prompt_name": "default"
@@ -35,5 +36,8 @@
     "chunk_length": 730,
     "all_system_prompt": {
         "default": "You are an AI assistant, answer honestly to the user using your knowledge and the provided context. You must be exhaustive and concise. You must answer in English"
+    },
+    "options_generation": {
+        "type_generation": "no_generation"
     }
 }

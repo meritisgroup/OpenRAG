@@ -41,7 +41,10 @@ def predict_json(
     client: Union[OpenAI, Mistral],
     json_format: BaseModel,
     temperature: float = None,
+    options_generation = None
 ) -> str:
+    if options_generation is not None and options_generation["type_generation"] == "no_generation":
+        return ""
     try:
         params = {
             "model": model,
@@ -72,11 +75,22 @@ def predict_json(
 
 
 def predict(
-    system_prompt: str, prompt: str, model: str, client: OpenAI, temperature: float = 0
+    system_prompt: str, prompt: str, model: str, 
+    client: OpenAI, temperature: float = 0,
+    options_generation = None
 ) -> str:
     """
     Gives the prompt to the LLM and returns the output
     """
+    if options_generation is not None and options_generation["type_generation"] == "no_generation":
+        return {
+                "texts": "",
+                "nb_input_tokens": 0,
+                "nb_output_tokens": 0,
+                "impacts": [0, 0, ""],
+                "energy": [0, 0, ""],
+            }
+    
     EcoLogits.init()
     response = client.chat.completions.create(
         model=model,
@@ -138,11 +152,21 @@ def predict_vllm(
     temperature: float = 0,
     images: list[str] = None,
     json_format=None,
+    options_generation = None
 ) -> tuple[list[str], int, int]:
     """
     Gives the prompts to the LLM and returns the outputs
     """
 
+    if options_generation is not None and options_generation["type_generation"] == "no_generation":
+        return {
+                "texts": "",
+                "nb_input_tokens": 0,
+                "nb_output_tokens": 0,
+                "impacts": [0, 0, ""],
+                "energy": [0, 0, ""],
+            }
+    
     if type(prompts) is type("str"):
         prompts = [prompts]
 
@@ -181,10 +205,21 @@ def multiple_predict(
     model: str,
     client: OpenAI,
     temperature: float = 0,
+    options_generation = None
 ) -> tuple[list[str], int, int]:
     """
     Gives the prompts to the LLM and returns the outputs
     """
+
+    if options_generation is not None and options_generation["type_generation"] == "no_generation":
+        return {
+                "texts": ["" for k in range(len(prompts))],
+                "nb_input_tokens": 0,
+                "nb_output_tokens": 0,
+                "impacts": [0, 0, ""],
+                "energy": [0, 0, ""],
+            }
+
     answers, input_tokens, output_tokens, impacts, energy = (
         [],
         0,
@@ -221,11 +256,22 @@ def multiple_predict(
 
 
 def predict_mistral(
-    system_prompt: str, prompt: str, model: str, client: Mistral, temperature: float = 0
+    system_prompt: str, prompt: str, model: str,
+    client: Mistral, temperature: float = 0,
+    options_generation = None
 ) -> str:
     """
     Gives the prompt to the LLM and returns the output
     """
+    if options_generation is not None and options_generation["type_generation"] == "no_generation":
+        return {
+                "texts": "",
+                "nb_input_tokens": 0,
+                "nb_output_tokens": 0,
+                "impacts": [0, 0, ""],
+                "energy": [0, 0, ""],
+            }
+    
     EcoLogits.init()
     response = client.chat.complete(
         model=model,
@@ -285,10 +331,22 @@ def multiple_predict_mistral(
     model: str,
     client: OpenAI,
     temperature: float = 0,
+    options_generation = None
 ) -> tuple[list[str], int, int]:
     """
     Gives the prompts to the LLM and returns the outputs
     """
+
+    if options_generation is not None and options_generation["type_generation"] == "no_generation":
+        return {
+                "texts": ["" for k in range(len(prompts))],
+                "nb_input_tokens": 0,
+                "nb_output_tokens": 0,
+                "impacts": [0, 0, ""],
+                "energy": [0, 0, ""],
+            }
+    
+
     answers, input_tokens, output_tokens, impacts, energy = (
         [],
         0,

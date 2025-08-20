@@ -82,6 +82,7 @@ def loadmodel(model_name: str, gpu_memory_utilization=0.9, nb_try=0):
                 app.state.models[model_name]["model"] = LLM(model=model_name,
                                                             gpu_memory_utilization=gpu_memory_utilization)
                 app.state.models[model_name]["tokenizer"] = AutoTokenizer.from_pretrained(model_name)
+                
     except RuntimeError as e:
         if "CUDA out of memory" in str(e) and nb_try==0:
             releasememorymodels()
