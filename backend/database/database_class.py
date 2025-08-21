@@ -29,19 +29,10 @@ def get_management_data(dbs_name,
                                     config_server=config_server,
                                     storage_path=storage_path)
     for i in range(len(dbs_name)):
+        print("dbs", dbs_name)
         db.add_database(db_name=dbs_name[i],
                         data_folder_name=data_folders_name[i])
 
-    return db
-
-def get_graph_database(db_name, storage_path):
-    db = DataBase(db_name=db_name,
-                  path=storage_path)
-    db.add_table(Document)
-    db.add_table(Chunk)
-    db.add_table(Entity)
-    db.add_table(Relation)
-    db.add_table(Tokens)
     return db
 
 
@@ -100,7 +91,6 @@ class Merger_Database_Vectorbase:
     def add_table(self, table_class: Base, db_name: str = None, path: str = None):
         if db_name is None and path is not None:
             db_name = self.find_db_name_path(path)
-
         if db_name is not None:
             return self.databases[db_name]["database"].add_table(table_class)
         else:
@@ -178,7 +168,7 @@ class Merger_Database_Vectorbase:
         self.vectorbases[vb_name] = {}
         self.vectorbases[vb_name]["vectorbase"] = get_vectorbase(vb_name = vb_name,
                                                                  config_server = self.config_server,
-                                                                  agent=self.agent)
+                                                                 agent=self.agent)
     def set_vectorbase(self, vb_name, vb):
         self.vectorbases[vb_name]["vectorbase"] = vb
 
@@ -206,6 +196,7 @@ class Merger_Database_Vectorbase:
         
     def create_collection(self, vb_name: str = None, name=None, add_fields=[]) -> None:
         if vb_name is not None:
+            name = vb_name+"_"+name
             self.vectorbases[vb_name]["vectorbase"].create_collection(name=name,
                                                                       add_fields=add_fields)
         else:
@@ -223,6 +214,9 @@ class Merger_Database_Vectorbase:
                         vb_name: str = None) -> None:
         if vb_name is None:
             vb_name = self.find_vb_name(path_docs)
+        elif collection_name is not None and vb_name is not None:
+            collection_name = vb_name+"_"+collection_name
+
         if vb_name is not None:
             return self.vectorbases[vb_name]['vectorbase'].add_str_elements(elements=elements,
                                                                             docs_name=docs_name,
@@ -240,6 +234,9 @@ class Merger_Database_Vectorbase:
                                vb_name: str = None) -> None:
         if vb_name is None:
             vb_name = self.find_vb_name(path_docs)
+        elif collection_name is not None and vb_name is not None:
+            collection_name = vb_name+"_"+collection_name
+
         if vb_name is not None:
             return self.vectorbases[vb_name]['vectorbase'].add_str_batch_elements(elements=elements,
                                                                                   docs_name=docs_name,
@@ -256,6 +253,8 @@ class Merger_Database_Vectorbase:
                  collection_name=None,
                  vb_name: str = None) -> None:
         if vb_name is not None:
+            if collection_name is not None:
+                collection_name = vb_name+"_"+collection_name
             return self.vectorbases[vb_name]['vectorbase'].k_search(queries=queries,
                                                                     k=k,
                                                                     output_fields=output_fields,
@@ -273,10 +272,13 @@ class Merger_Database_Vectorbase:
             chunks = []
             for i in range(len(self.vectorbases)):
                 vb_name = list(self.vectorbases.keys())[i]
+                if collection_name is not None:
+                    collection_name_search = vb_name+"_"+collection_name
+                    
                 result = self.vectorbases[vb_name]['vectorbase'].k_search(queries=queries,
                                                                           k=k_per_db_list[i],
                                                                           output_fields=output_fields,
-                                                                          collection_name=collection_name)
+                                                                          collection_name=collection_name_search)
                 if len(chunks)==0:
                     chunks = result
                 else:

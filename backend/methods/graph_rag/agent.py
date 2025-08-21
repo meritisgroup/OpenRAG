@@ -4,7 +4,6 @@ from .local_search import LocalSearch
 from .global_search import GlobalSearch
 from ...base_classes import RagAgent
 from ...utils.factory_vectorbase import get_vectorbase
-from ...database.database_class import get_graph_database
 from ...utils.agent import get_Agent
 from ...utils.agent_functions import get_system_prompt
 from .prompts import PROMPTS
@@ -38,6 +37,7 @@ class GraphRagAgent(RagAgent):
         self.storage_path = config_server["storage_path"]
         self.embedding_model = config_server["embedding_model"]
         self.type_text_splitter = config_server["TextSplitter"]
+        self.config_server = config_server
 
         self.agent = get_Agent(config_server)
         self.data_manager = get_management_data(dbs_name=self.dbs_name,
@@ -134,6 +134,7 @@ class GraphRagAgent(RagAgent):
 
         prompt = prompt_template.format(**context_base)
 
+        print(context)
         answer = self.agent.predict(prompt=prompt, system_prompt=self.system_prompt,
                                     options_generation=self.config_server["options_generation"])
         impacts[2] = answer["impacts"][2]
@@ -149,7 +150,7 @@ class GraphRagAgent(RagAgent):
             "nb_input_tokens": np.sum(answer["nb_input_tokens"] + input_t),
             "nb_output_tokens": np.sum(answer["nb_output_tokens"] + output_t),
             "context": context,
-            "docs_names": [],
+            "docs_name": [],
             "impacts": impacts,
             "energy": energies,
         }
