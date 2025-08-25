@@ -1,3 +1,10 @@
+# OpenRAG All Services Configuration (CPU version)
+# 
+# Usage:
+#   CPU only:  docker compose -f docker-compose-all.yml up -d
+#   With GPU:  docker compose -f docker-compose-all.yml -f docker-compose-all.gpu.yml up -d
+#   Auto-detect: ./launch.sh all up -d
+
 services:  
   ollama:
     restart: always
@@ -8,20 +15,12 @@ services:
       dockerfile: Dockerfile
     image: openrag_ollama
     container_name: ${ollama_LOCAL_CONTAINER_NAME}
-    pull_policy: always
     tty: true
     environment:
       OLLAMA_MAX_LOADED_MODELS: 5
       OLLAMA_NUM_PARALLEL: 10
       OLLAMA_ORIGINS: "*"
       OLLAMA_KEEP_ALIVE: "60m"
-    deploy:
-        resources:
-          reservations:
-            devices:
-              - driver: nvidia
-                count: 1
-                capabilities: [gpu]
     networks:
       - app-network
 
@@ -60,20 +59,9 @@ services:
   vllm:
     build:
       context: ../infrastructure/vllm
-      dockerfile: Dockerfile
+      dockerfile: dockerfile_cpu
     image: openrag_vllm
     container_name: ${VLLM_LOCAL_CONTAINER_NAME}
-    runtime: nvidia 
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-    environment:
-      - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
     volumes:
       - ../volumes/HF:/root/.cache/huggingface
     networks:
