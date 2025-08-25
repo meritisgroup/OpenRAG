@@ -115,7 +115,7 @@ chmod +x start_services/*.sh
 Create a `.env` file in the root directory for custom configurations:
 ```bash
 # Example .env file
-FRONT_LOCAL_PORT=8501
+FRONT_LOCAL_PORT=8506
 ES_LOCAL_PORT=9200
 ES_LOCAL_PASSWORD=changeme
 ollama_LOCAL_CONTAINER_NAME=openrag_ollama
@@ -256,7 +256,7 @@ OpenRAG automatically detects your system configuration:
 
 ## 📱 Using the Application
 
-Once OpenRAG is running, access it at **[http://localhost:8501](http://localhost:8501)**
+Once OpenRAG is running, access it at **[http://localhost:8506](http://localhost:8506)**
 
 ### 📂 1. Upload Your Data
 ![Database Interface](streamlit_/images/screen_db.png)
@@ -305,10 +305,10 @@ chmod +x docker/launch.sh
 chmod +x start_services/*.sh
 ```
 
-#### 🚨 Port already in use (8501)
+#### 🚨 Port already in use (8506)
 ```bash
 # Check what's using the port
-lsof -i :8501
+lsof -i :8506
 
 # Kill the process or change port in docker-compose files
 # Edit the FRONT_LOCAL_PORT in your .env file
