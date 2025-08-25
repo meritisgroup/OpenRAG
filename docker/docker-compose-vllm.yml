@@ -1,21 +1,17 @@
+# OpenRAG VLLM Configuration (CPU version - WARNING: VLLM requires GPU)
+# 
+# Usage:
+#   CPU only:  docker compose -f docker-compose-vllm.yml up -d  (may not work)
+#   With GPU:  docker compose -f docker-compose-vllm.yml -f docker-compose-vllm.gpu.yml up -d
+#   Auto-detect: ./launch.sh vllm up -d
+
 services:  
   vllm:
     build:
       context: ../infrastructure/vllm
-      dockerfile: Dockerfile
+      dockerfile: dockerfile_cpu
     image: openrag_vllm
     container_name: ${VLLM_LOCAL_CONTAINER_NAME}
-    runtime: nvidia 
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-    environment:
-      - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
     volumes:
       - ../volumes/HF:/root/.cache/huggingface
     networks:

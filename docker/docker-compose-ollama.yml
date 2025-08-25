@@ -1,4 +1,11 @@
 
+# OpenRAG Ollama Configuration (CPU version)
+# 
+# Usage:
+#   CPU only:  docker compose -f docker-compose-ollama.yml up -d
+#   With GPU:  docker compose -f docker-compose-ollama.yml -f docker-compose-ollama.gpu.yml up -d
+#   Auto-detect: ./launch.sh ollama up -d
+
 services:  
   ollama:
     restart: always
@@ -9,20 +16,12 @@ services:
       dockerfile: Dockerfile
     image: openrag_ollama
     container_name: ${ollama_LOCAL_CONTAINER_NAME}
-    pull_policy: always
     tty: true
     environment:
       OLLAMA_MAX_LOADED_MODELS: 5
       OLLAMA_NUM_PARALLEL: 10
       OLLAMA_ORIGINS: "*"
       OLLAMA_KEEP_ALIVE: "60m"
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
     networks:
       - app-network
     
