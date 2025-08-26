@@ -87,7 +87,7 @@ class NaiveRagIndexation:
     
 
     def run_pipeline(
-        self, chunk_size: int = 500, chunk_overlap: bool = True, batch: bool = True
+        self, chunk_size: int = 500, chunk_overlap: bool = True, batch: bool = True, config_server={}
     ) -> None:
         """
         Split texts from self.data_path, embed them and save them in a vector base.
@@ -114,9 +114,9 @@ class NaiveRagIndexation:
             for i, path_doc in enumerate(progress_bar):
                 doc_indexation_tokens = 0
                 progress_bar.set_description(f"Embbeding chunks - {path_doc}")
-                doc = DocumentText(path=path_doc, 
-                                   splitter=self.splitter
-                )
+                doc = DocumentText(path=path_doc, doc_index=i,
+                                   config_server=config_server, splitter=self.splitter)
+                
                 doc_chunks = doc.chunks(chunk_size=chunk_size,
                                         chunk_overlap=chunk_overlap)
                 name_docs = [str(Path(path_doc).name) for i in range(len(doc_chunks))]

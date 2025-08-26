@@ -2,7 +2,7 @@
     "storage_path": "./storage",
     "storage_data_path": "./data/databases",
     "params_host_llm": {
-        "url": "http://ollama:11434/v1",
+        "url": "http://srv-ironman.meritisnet.fr:11436/v1",
         "type": "ollama",
         "api_key": null
     },
@@ -17,10 +17,11 @@
     },
     "device": "cpu",
     "model": "gemma2:9b",
+    "model_for_image": "gemma3:12b",
     "embedding_model": "mxbai-embed-large:latest",
     "language": "FR",
     "type_retrieval": "hybrid",
-    "TextSplitter": "Semantic_TextSplitter",
+    "TextSplitter": "TextSplitter",
     "reformulate_query": false,
     "reranker_model": "gemma3:1b",
     "max_attempts": 5,
@@ -28,7 +29,13 @@
     "ProcessorChunks": [
         "Contextual"
     ],
-    "hf_token": "",
+    "hf_token": null,
+    "params_llm_dockling": {
+        "url": "http://srv-ironman.meritisnet.fr:11436/v1",
+        "type": "ollama",
+        "api_key": null
+    },
+    "data_preprocessing": "md_without_images",
     "local_params": {
         "forced_system_prompt": false,
         "generation_system_prompt_name": "default"
