@@ -128,6 +128,42 @@ if ".gitkeep" in st.session_state["custom_rags"]:
 if "databases" not in st.session_state:
     st.session_state["databases"] = {}
 
+if "merge" not in st.session_state:
+    if not os.path.exists("data/merge/vllm"):
+        os.makedirs("data/merge/vllm")
+    if not os.path.exists("data/merge/ollama_openai_mistral"):
+        os.makedirs("data/merge/ollama_openai_mistral")
+
+    merge_rags = os.listdir("data/merge/vllm")
+    merge_rags += os.listdir("data/merge/ollama_openai_mistral")
+
+    
+    merge = [merge_rag[:-5] for merge_rag in merge_rags if merge_rag.endswith(".json")]
+    
+    st.session_state["merge"] = merge
+
+
+
+
+if "rags_to_merge" not in st.session_state:
+    st.session_state["rags_to_merge"] = {}
+    list_rags = list(st.session_state["all_rags"]["vllm"].keys())
+    list_rags += list(st.session_state["all_rags"]["ollama"].keys())
+    list_rags += list(st.session_state["all_rags"]["openai"].keys())
+    list_rags += list(st.session_state["all_rags"]["mistral"].keys())
+    list_rags = set(list_rags)
+    st.session_state["rags_to_merge"]["rags"] = dict(
+        zip(
+            list_rags,
+            [False for i in range(len(list_rags))],
+        )
+    )
+    st.session_state["rags_to_merge"]["queries"] = pd.DataFrame(
+        data={"query": [], "answer": []}
+    )
+    st.session_state["rags_to_merge"]["load"] = False
+
+
 if "success" not in st.session_state:
     st.session_state["success"] = False
 

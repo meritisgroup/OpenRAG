@@ -5,6 +5,7 @@ class DescriptionClean:
     def __init__(self, descriptions: list[str]):
         self.descriptions = descriptions
 
+
     def clean_description(self, agent: Agent) -> str:
 
         # if len(self.descriptions) == 1:

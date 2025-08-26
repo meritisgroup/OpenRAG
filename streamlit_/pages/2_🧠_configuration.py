@@ -1,6 +1,7 @@
 import streamlit as st
 import os
 from backend.factory_RagAgent import get_rag_agent, change_config_server
+from streamlit_.utils.chat_funcs import get_chat_agent
 from backend.utils.utils_vlm import set_vllm_HF_key
 from streamlit_.utils.params_func import get_custom_rags
 import json
@@ -67,6 +68,24 @@ st.text_input(
     key="hf_token")
 st.session_state["config_server"]["hf_token"] = st.session_state.hf_token
 
+# setting type of data preparation
+data_preparation = { "pdf_text_extraction":"PDF text extraction", "md_without_images": "PDF conversion into markdown",
+                     "md_with_images" : "PDF conversion into markdown with image description" }
+
+
+selected_data_prep = st.selectbox(
+    label="**Choose data preparation method:**",
+    options=list(data_preparation.keys()),
+    format_func=lambda x:data_preparation[x],
+    on_change=set_false,
+    index= 0,
+    key="data_prep",
+)
+
+st.session_state["config_server"]["data_preprocessing"] = st.session_state["data_prep"]
+
+
+
 
 # Setting params_vectorbase
 def reset_retrieval():
@@ -76,6 +95,7 @@ st.session_state["config_server"]["device"] = "cpu"
 
 if st.session_state["config_server"]["params_host_llm"]["type"] == "ollama":
     st.session_state["config_server"]["model"] = "gemma2:9b"
+    st.session_state["config_server"]["model_for_image"] = "gemma3:12b"
     st.session_state["config_server"]["embedding_model"] = "mxbai-embed-large:latest"
 
 elif st.session_state["config_server"]["params_host_llm"]["type"] == "vllm":
@@ -85,6 +105,7 @@ elif st.session_state["config_server"]["params_host_llm"]["type"] == "vllm":
 elif st.session_state["config_server"]["params_host_llm"]["type"] == "openai":
     st.session_state["config_server"]["model"] = "gpt-4o-mini"
     st.session_state["config_server"]["embedding_model"] = "text-embedding-3-small"
+
 elif st.session_state["config_server"]["params_host_llm"]["type"] == "mistral":
     st.session_state["config_server"]["model"] = "mistral-small-latest"
     st.session_state["config_server"]["embedding_model"] = "mistral-embed"
@@ -182,28 +203,9 @@ st.session_state["config_server"]["nb_chunks"] = st.session_state["chunk"]
 if st.button("Save Configuration", type="primary", use_container_width=True):
     st.session_state["custom_rags"] = get_custom_rags(provider=st.session_state["config_server"]["params_host_llm"]["type"])
     rag_method = st.session_state["rag_name"]
-    if (
-        "custom_rags" in st.session_state.keys()
-        and rag_method in st.session_state["custom_rags"]
-    ):
-        custom_config = st.session_state["config_server"].copy()
-        custom_config["TextSplitter"] = st.session_state["custom_rags"][rag_method]["TextSplitter"]
-        custom_config["type_retrieval"] = st.session_state["custom_rags"][rag_method]["type_retrieval"]
-        custom_config = change_config_server(rag_name=st.session_state["custom_rags"][rag_method]["base"],
-                                             config_server=custom_config)
-        rag = get_rag_agent(
-            st.session_state["custom_rags"][rag_method]["base"],
-            config_server=custom_config,
-            databases_name=st.session_state["chat_database_name"]
-        )
-    else:
-        st.session_state["config_server"] = change_config_server(rag_name=rag_method,
-                                                                 config_server=st.session_state["config_server"])
-        rag = get_rag_agent(
-            rag_name=rag_method, config_server=st.session_state["config_server"],
-            databases_name=st.session_state["chat_database_name"]
-        )
-        st.session_state["rag"] = rag
+    rag_agent = get_chat_agent(rag_method=rag_method)
+    st.session_state["success"] = True
+    st.session_state["rag"] = rag_agent
     
     if type(st.session_state["config_server"]["hf_token"]) is str and len(st.session_state["config_server"]["hf_token"])>0:
         if st.session_state["config_server"]["params_host_llm"]["type"]=="vllm":
