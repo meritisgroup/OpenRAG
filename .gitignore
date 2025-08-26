@@ -6,6 +6,7 @@
 /data/queries/*
 /backend/data/*
 **/__pycache__/
+/infrastructure/ollama/fine_tune
 /docker/*
 venv
 .env

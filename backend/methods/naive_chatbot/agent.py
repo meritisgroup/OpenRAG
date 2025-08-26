@@ -7,6 +7,7 @@ Created on Thu Feb  6 16:37:47 2025
 from ...utils.agent import get_Agent
 from ...utils.agent_functions import get_system_prompt
 from ...base_classes import RagAgent
+from ...database.database_class import get_management_data
 from .prompts import prompts
 import numpy as np
 from ...database.database_class import DataBase
@@ -18,6 +19,7 @@ class NaiveChatbot(RagAgent):
 
         self.language = config_server["language"]
         self.agent = get_Agent(config_server)
+        self.config_server = config_server
 
         self.prompts = prompts[self.language]
         self.system_prompt = get_system_prompt(config_server, self.prompts)
@@ -26,6 +28,12 @@ class NaiveChatbot(RagAgent):
         self.db = DataBase(db_name="chatbot_dummy_db", 
                            path="./storage",
                            path_data=".")
+        
+        self.data_manager = get_management_data(dbs_name=["chatbot_dummy_db"],
+                                                data_folders_name=['./storage'],
+                                                storage_path=config_server["storage_path"],
+                                                config_server=config_server,
+                                                agent=self.agent)
 
     def get_nb_token_embeddings(self):
         return 0
@@ -40,14 +48,19 @@ class NaiveChatbot(RagAgent):
     def get_rag_context(self, query: str, nb_chunks: int = 0) -> list[str]:
         return ""
 
-    def generate_answer(self, query: str, nb_chunks: int = 0) -> str:
+    def generate_answer(self, query: str, nb_chunks: int = 0, options_generation = None) -> str:
 
         agent = self.agent
         nb_input_tokens = 0
         nb_output_tokens = 0
 
         prompt = self.prompts["smooth_generation"]["QUERY_TEMPLATE"].format(query=query)
-        answer = agent.predict(prompt=prompt, system_prompt=self.system_prompt)
+
+        if options_generation is None:
+            options_generation = self.config_server["options_generation"]
+
+        answer = agent.predict(prompt=prompt, system_prompt=self.system_prompt,
+                               options_generation=options_generation)
         nb_input_tokens += np.sum(answer["nb_input_tokens"])
         nb_output_tokens += np.sum(answer["nb_output_tokens"])
         return {
@@ -69,9 +82,11 @@ class NaiveChatbot(RagAgent):
             contexts.append("")
         return contexts
 
-    def generate_answers(self, queries: list[str], nb_chunks=0):
+    def generate_answers(self, queries: list[str], nb_chunks=0, options_generation = None):
         answers = []
         for query in queries:
-            answer = self.generate_answer(query=query)
+            answer = self.generate_answer(query=query,
+                                          nb_chunks=nb_chunks,
+                                          options_generation=options_generation)
             answers.append(answer)
         return answers

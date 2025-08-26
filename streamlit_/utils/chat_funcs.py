@@ -7,7 +7,7 @@ from backend.factory_RagAgent import (
 import json
 
 
-def get_chat_agent(rag_method):
+def get_chat_agent(rag_method, databases_name):
     if (
         "custom_rags" in st.session_state.keys()
         and rag_method in st.session_state["custom_rags"]
@@ -23,7 +23,7 @@ def get_chat_agent(rag_method):
         rag_agent = get_custom_rag_agent(
             custom_config["base"],
             config_server=custom_config,
-            databases_name=st.session_state["chat_database_name"],
+            databases_name=databases_name,
         )
     else:
         st.session_state["config_server"] = change_config_server(
@@ -32,7 +32,7 @@ def get_chat_agent(rag_method):
         rag_agent = get_rag_agent(
             rag_method,
             config_server=st.session_state["config_server"],
-            databases_name=st.session_state["chat_database_name"],
+            databases_name=databases_name,
         )
 
     return rag_agent

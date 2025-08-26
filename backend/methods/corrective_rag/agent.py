@@ -28,6 +28,7 @@ class CragAgent(NaiveRagAgent):
         self.nb_chunks = config_server["nb_chunks"]
         self.max_web_requests = max_web_requests
         self.websearch = web_search(max_requests=self.max_web_requests)
+        self.prompts = prompts[self.language]
         self.websplitter = get_splitter(
             type_text_splitter=self.type_text_splitter,
             agent=self.agent,
@@ -142,6 +143,7 @@ class CragAgent(NaiveRagAgent):
         query: str,
         nb_chunks: str = 5,
         batch: bool = True,
+        options_generation = None
     ) -> str:
         """Generate an answer to the query"""
 
@@ -296,9 +298,14 @@ class CragAgent(NaiveRagAgent):
         prompt = self.prompts["smooth_generation"]["QUERY_TEMPLATE"].format(
             context=context, query=query
         )
+
+
+        if options_generation is None:
+            options_generation = self.config_server["options_generation"]
+
         system_prompt = self.prompts["smooth_generation"]["SYSTEM_PROMPT"]
         answer = agent.predict(prompt=prompt, system_prompt=system_prompt,
-                               options_generation=self.config_server["options_generation"])
+                               options_generation=options_generation)
         nb_input_tokens += (
             answer["nb_input_tokens"]
             if type(answer["nb_input_tokens"]) is type(0)
@@ -338,9 +345,10 @@ class CragAgent(NaiveRagAgent):
             names_docs.append(name_docs)
         return contexts, names_docs
 
-    def generate_answers(self, queries: list[str], nb_chunks: int = 2):
+    def generate_answers(self, queries: list[str], nb_chunks: int = 2, options_generation = None):
         answers = []
         for query in queries:
-            answer = self.generate_answer(query=query, nb_chunks=nb_chunks)
+            answer = self.generate_answer(query=query, nb_chunks=nb_chunks,
+                                          options_generation=options_generation)
             answers.append(answer)
         return answers
