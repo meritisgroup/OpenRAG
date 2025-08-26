@@ -1,6 +1,7 @@
 from .methods.graph_rag.agent import GraphRagAgent
 from .methods.naive_rag.agent import NaiveRagAgent
-
+from .methods.agentic_rag.agent import AgenticRagAgent
+from .methods.merger_rag.agent import MergerRagAgent
 from .methods.query_based_rag.agent import QueryBasedRagAgent
 from .methods.self_rag.agent import SelfRagAgent
 from .methods.corrective_rag.agent import CragAgent
@@ -85,6 +86,16 @@ def get_rag_agent(rag_name, config_server, databases_name=""):
         agent = NaiveRagAgent(config_server=config_server,
                              dbs_name=names,
                              data_folders_name=databases_name)
+        
+    elif rag_name == "agentic":
+        agent = AgenticRagAgent(config_server=config_server,
+                              vb_name=name,
+                              db_name=name)
+        
+
+    elif rag_name == "merger":
+        agent = MergerRagAgent(config_server=config_server)
+        
     elif rag_name == "naive_chatbot":
         agent = NaiveChatbot(config_server=config_server)
     elif rag_name == "reranker_rag":
