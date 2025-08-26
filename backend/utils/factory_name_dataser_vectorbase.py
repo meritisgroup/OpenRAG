@@ -46,6 +46,19 @@ def get_name(rag_name, config_server, additionnal_name=""):
             config_server["params_vectorbase"]["backend"],
             config_server["TextSplitter"],
         )
+    elif rag_name == "agentic":
+        name = "agentic_rag_{}_{}_{}".format(
+            config_server["type_retrieval"],
+            config_server["params_vectorbase"]["backend"],
+            config_server["TextSplitter"],
+        )
+    elif rag_name == "merger":
+        name = "merger_rag_{}_{}_{}".format(
+            config_server["type_retrieval"],
+            config_server["params_vectorbase"]["backend"],
+            config_server["TextSplitter"],
+        )
+
     elif rag_name == "audio":
         name = "audio_rag_{}".format(config_server["type_retrieval"])
     elif rag_name == "vlm":

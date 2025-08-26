@@ -5,7 +5,7 @@ from tqdm.auto import tqdm
 import os
 import numpy as np
 
-class NaiveRagIndexation:
+class AgenticRagIndexation:
     def __init__(
         self,
         data_path: str,
@@ -89,7 +89,7 @@ class NaiveRagIndexation:
         return tokens
 
     def run_pipeline(
-        self, chunk_size: int = 500, chunk_overlap: bool = True, batch: bool = True, config_server={}
+        self, chunk_size: int = 500, chunk_overlap: bool = True, batch: bool = True
     ) -> None:
         """
         Split texts from self.data_path, embed them and save them in a vector base.
@@ -114,9 +114,9 @@ class NaiveRagIndexation:
             for i, name_doc in enumerate(progress_bar):
                 doc_indexation_tokens = 0
                 progress_bar.set_description(f"Embbeding chunks - {name_doc}")
-                doc = DocumentText(doc_index=i,
-                    path=self.data_path + name_doc, config_server=config_server, splitter=self.splitter)
-                
+                doc = DocumentText(
+                    path=self.data_path + name_doc,config_server={"data_preprocessing" : "pdf_text_extraction"}, splitter=self.splitter
+                )
                 doc_chunks = doc.chunks(
                     chunk_size=chunk_size, 
                     chunk_overlap=chunk_overlap

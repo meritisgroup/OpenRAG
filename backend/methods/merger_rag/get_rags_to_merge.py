@@ -1,20 +1,17 @@
-from .methods.graph_rag.agent import GraphRagAgent
+from ..graph_rag.agent import GraphRagAgent
 
-from .methods.naive_rag.agent import NaiveRagAgent
-from .methods.agentic_rag.agent import AgenticRagAgent
-from .methods.merger_rag.agent import MergerRagAgent
-from .methods.query_based_rag.agent import QueryBasedRagAgent
-from .methods.self_rag.agent import SelfRagAgent
-from .methods.corrective_rag.agent import CragAgent
-from .methods.query_reformulation.agent import QueryReformulationRag
+from ..naive_rag.agent import NaiveRagAgent
+from ..agentic_rag.agent import AgenticRagAgent
+from ..query_based_rag.agent import QueryBasedRagAgent
+from ..self_rag.agent import SelfRagAgent
+from ..corrective_rag.agent import CragAgent
+from ..query_reformulation.agent import QueryReformulationRag
 from backend.methods.reranker_rag.agent import RerankerRag
-from .methods.semantic_chunking_rag.agent import SemanticChunkingRagAgent
-from .methods.contextual_retrieval_rag.agent import ContextualRetrievalRagAgent
-from .methods.advanced_rag.agent import AdvancedRag
-from .methods.naive_chatbot.agent import NaiveChatbot
-from .utils.factory_name_dataser_vectorbase import get_name
-
-
+from ..semantic_chunking_rag.agent import SemanticChunkingRagAgent
+from ..contextual_retrieval_rag.agent import ContextualRetrievalRagAgent
+from ..advanced_rag.agent import AdvancedRag
+from ..naive_chatbot.agent import NaiveChatbot
+from ...utils.factory_name_dataser_vectorbase import get_name
 
 
 def change_config_server(rag_name, config_server):
@@ -46,7 +43,7 @@ def change_config_server(rag_name, config_server):
     return config_server
 
 
-def get_rag_agent(rag_name, config_server, database_name=""):
+def get_rag_to_merge(rag_name, config_server, database_name=""):
     name = get_name(
         rag_name=rag_name,
         config_server=config_server,
@@ -56,15 +53,12 @@ def get_rag_agent(rag_name, config_server, database_name=""):
         agent = NaiveRagAgent(config_server=config_server,
                               vb_name=name,
                               db_name=name)
-        
     elif rag_name == "agentic":
         agent = AgenticRagAgent(config_server=config_server,
                               vb_name=name,
                               db_name=name)
         
-
-    elif rag_name == "merger":
-        agent = MergerRagAgent(config_server=config_server)
+    
         
     elif rag_name == "naive_chatbot":
         agent = NaiveChatbot(config_server=config_server)
@@ -101,7 +95,6 @@ def get_rag_agent(rag_name, config_server, database_name=""):
         agent = ContextualRetrievalRagAgent(
             config_server=config_server, vb_name=name, db_name=name
         )
-    
     return agent
 
 

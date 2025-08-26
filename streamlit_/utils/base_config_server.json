@@ -1,25 +1,26 @@
 {
     "storage_path": "./storage",
     "params_host_llm": {
-        "url": null,
-        "type": "openai",
+        "url": "http://srv-ironman.meritisnet.fr:11436/v1",
+        "type": "ollama",
         "api_key": null
     },
     "params_vectorbase": {
         "backend": "elasticsearch",
         "batch": true,
-        "url": "http://elasticsearch:9200",
+        "url": "http://localhost:9200",
         "auth": [
             "elastic",
             "UDY9ydMS"
         ]
     },
     "device": "cpu",
-    "model": "gpt-4o-mini",
-    "embedding_model": "text-embedding-3-small",
+    "model": "gemma2:9b",
+    "model_for_image": "gemma3:12b",
+    "embedding_model": "mxbai-embed-large:latest",
     "language": "FR",
     "type_retrieval": "hybrid",
-    "TextSplitter": "Semantic_TextSplitter",
+    "TextSplitter": "TextSplitter",
     "reformulate_query": false,
     "reranker_model": "BAAI/bge-reranker-v2-m3",
     "max_attempts": 5,
@@ -27,5 +28,11 @@
     "ProcessorChunks": [
         "Contextual"
     ],
-    "hf_token": null
+    "hf_token": null,
+    "params_llm_dockling": {
+        "url": "http://srv-ironman.meritisnet.fr:11436/v1",
+        "type": "ollama",
+        "api_key": null
+    },
+    "data_preprocessing": "md_without_images"
 }
