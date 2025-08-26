@@ -6,6 +6,7 @@ import json
 
 def get_chat_agent(rag_method):
     if ("custom_rags" in st.session_state.keys() and rag_method in st.session_state["custom_rags"]):
+        
         if st.session_state["config_server"]["params_host_llm"]["type"] == "vllm":
             folder = "vllm"
         else:
@@ -15,14 +16,35 @@ def get_chat_agent(rag_method):
             custom_config = json.load(file)
         custom_config["params_host_llm"] = st.session_state["config_server"]["params_host_llm"]
         custom_config = change_config_server(rag_name=rag_method, 
-                                             config_server= custom_config)
+                                             config_server=custom_config)
         rag_agent = get_custom_rag_agent(custom_config["base"],
                                          config_server=custom_config,
                                          database_name=st.session_state["chat_database_name"])
+        
+
+
+    elif ("merge" in st.session_state.keys() and rag_method in st.session_state["merge"]):
+        
+        if st.session_state["config_server"]["params_host_llm"]["type"] == "vllm":
+            folder = "vllm"
+        else:
+            folder = "ollama_openai_mistral"
+
+        with open(f"data/merge/{folder}/{rag_method}.json","r") as file:
+            merge_config = json.load(file)
+        merge_config["params_host_llm"] = st.session_state["config_server"]["params_host_llm"]
+        merge_config = change_config_server(rag_name=rag_method, 
+                                             config_server= merge_config)
+        rag_agent=get_rag_agent("merger", config_server=merge_config)
+
+
+                                         
     else:
+        
         st.session_state["config_server"] = change_config_server(rag_name=rag_method, config_server=st.session_state["config_server"])
         rag_agent = get_rag_agent(rag_method,
-                                   config_server=st.session_state["config_server"], database_name=st.session_state["chat_database_name"])
+                                   config_server=st.session_state["config_server"], 
+                                   database_name=st.session_state["chat_database_name"])
 
     return rag_agent
 

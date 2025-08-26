@@ -67,6 +67,50 @@ def predict_json(
         print(f"Error: {e}")
 
 
+
+def predict_image(
+    prompt: str,
+    model: str,
+    data_url,
+    client: Union[OpenAI, Mistral],
+    json_format: BaseModel,
+    temperature: float = None,
+) -> str:
+    
+    try:
+        params = {
+            "model": model,
+            "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "image_url", "image_url": {"url": data_url}},
+                    {"type": "text", "text": prompt},
+                ],
+            }
+        ],
+            "response_format": json_format,
+        }
+        # Only add temperature if not None
+        if temperature is not None:
+            params["temperature"] = temperature
+        if type(client) is OpenAI:
+            response = client.beta.chat.completions.parse(**params)
+
+        if type(client) is Mistral:
+            response = client.chat.parse(**params)
+
+        json_response = response.choices[0].message
+        if json_response.parsed:
+
+            return json_response.parsed
+        else:
+            print("refusal ", json_response.refusal)
+
+    except Exception as e:
+        print(f"Error: {e}")
+
+
 def predict(
     system_prompt: str, prompt: str, model: str, client: OpenAI, temperature: float = 0
 ) -> str:
