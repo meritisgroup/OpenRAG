@@ -103,8 +103,7 @@ class NaiveRagAgent(RagAgent):
         index.run_pipeline(
             chunk_size=self.chunk_size,
             chunk_overlap=overlap,
-            batch=self.params_vectorbase["batch"],
-        )
+            batch=self.params_vectorbase["batch"], config_server=self.config_server)
 
         return None
 
@@ -171,6 +170,8 @@ class NaiveRagAgent(RagAgent):
         energies[2] = answer["energy"][2]
         energies[0] += answer["energy"][0]
         energies[1] += answer["energy"][1]
+        
+        
 
         return {
             "answer": answer["texts"],

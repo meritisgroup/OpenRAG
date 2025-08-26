@@ -204,6 +204,7 @@ if st.button(
             json.dump(st.session_state["all_rags"], file, ensure_ascii=False, indent=4)
 
         st.session_state["benchmark"]["rags"][config_new_rag["name"]] = False
+        st.session_state["rags_to_merge"]["rags"][config_new_rag["name"]] = False
         st.success("RAG successfully created")
 
 
@@ -349,3 +350,155 @@ if right.button(label="Delete indexation", use_container_width=True, type="prima
                 st.session_state["rerun_managed_run"] = False
                 st.session_state.indexation = None
                 st.rerun()
+
+
+
+st.markdown("# Combine Responses from Different RAGs")
+st.markdown("## Pick the RAGs You Want to Merge:")
+config_merge_rag = {}
+rags_to_merge_list=[]
+
+col1, col2, col3 = st.columns(3)
+
+
+all_rags = list(
+    st.session_state["all_rags"][
+        st.session_state["config_server"]["params_host_llm"]["type"]
+    ].keys()
+)
+nb_rags = len(all_rags)
+rags_per_column = nb_rags // 3 if nb_rags % 3 == 0 else nb_rags // 3 + 1
+
+with col1:
+    for i in range(rags_per_column):
+        if all_rags[i] == "main" and st.session_state.hf_token in [None, ""]:
+            disable = True
+        else:
+            disable = False
+        st.session_state["rags_to_merge"]["rags"][all_rags[i]] = st.checkbox(
+            label=st.session_state["all_rags"][
+                st.session_state["config_server"]["params_host_llm"]["type"]
+            ][all_rags[i]],
+            value=st.session_state["rags_to_merge"]["rags"][all_rags[i]],
+            disabled=disable,
+        )
+
+        if st.session_state["rags_to_merge"]["rags"][all_rags[i]]:
+            rags_to_merge_list.append(all_rags[i])
+
+with col2:
+    for i in range(rags_per_column, 2 * rags_per_column):
+        if all_rags[i] == "main" and st.session_state.hf_token in [None, ""]:
+            disable = True
+        else:
+            disable = False
+        st.session_state["rags_to_merge"]["rags"][all_rags[i]] = st.checkbox(
+            label=st.session_state["all_rags"][
+                st.session_state["config_server"]["params_host_llm"]["type"]
+            ][all_rags[i]],
+            value=st.session_state["rags_to_merge"]["rags"][all_rags[i]],
+            disabled=disable,
+        )
+        if st.session_state["rags_to_merge"]["rags"][all_rags[i]]:
+            rags_to_merge_list.append(all_rags[i])
+
+with col3:
+    for i in range(2 * rags_per_column, nb_rags):
+        if all_rags[i] == "main" and st.session_state.hf_token in [None, ""]:
+            disable = True
+        else:
+            disable = False
+        st.session_state["rags_to_merge"]["rags"][all_rags[i]] = st.checkbox(
+            label=st.session_state["all_rags"][
+                st.session_state["config_server"]["params_host_llm"]["type"]
+            ][all_rags[i]],
+            value=st.session_state["rags_to_merge"]["rags"][all_rags[i]],
+            disabled=disable,
+        )
+        if st.session_state["rags_to_merge"]["rags"][all_rags[i]]:
+            rags_to_merge_list.append(all_rags[i])
+
+
+
+
+config_merge_rag["name"] = st.text_input(
+    label="**Give your merge a name:**",
+    placeholder="Enter name",
+)
+
+if st.button(
+    "**Create merge**",
+    type="primary",
+    help="Your merge will only be visible in the LLM host at the moment of its creation, if you change LLM host, you must create your merge again",
+    use_container_width=True):
+
+    if (config_merge_rag["name"] in st.session_state["all_rags"][st.session_state["config_server"]["params_host_llm"]["type"]]):
+        st.error(f"{config_merge_rag['name']} already exists, please choose another name", icon="🚨")
+
+    elif not bool(re.fullmatch(r'^[a-z0-9_-]+$',config_merge_rag["name"])):
+        st.error("Invalid RAG name, only alphanumeric characters, underscores, lowercase letters and hyphens are allowed", icon="🚨")
+    else:
+        
+        st.session_state["merge"].append(config_merge_rag["name"])
+        
+        saved_config = st.session_state["config_server"].copy()
+        saved_config["name"] = config_merge_rag["name"]
+        saved_config["rag_list"]=rags_to_merge_list
+        folder = "vllm" if saved_config["params_host_llm"]["type"] == "vllm" else "ollama_openai_mistral"
+        with open(f"data/merge/{folder}/{config_merge_rag['name']}.json", "w") as config:
+            json.dump(saved_config, config,ensure_ascii=False, indent=4)
+        if folder == "vllm":
+            st.session_state["all_rags"]["vllm"][config_merge_rag["name"]] = config_merge_rag["name"]
+        else:
+            st.session_state["all_rags"]["openai"][config_merge_rag["name"]] = config_merge_rag["name"]
+            st.session_state["all_rags"]["ollama"][config_merge_rag["name"]] = config_merge_rag["name"]
+            st.session_state["all_rags"]["mistral"][config_merge_rag["name"]] = config_merge_rag["name"]
+        with open("streamlit_/utils/all_rags.json", "w") as file:
+            json.dump(st.session_state["all_rags"],file,ensure_ascii=False, indent=4)
+        st.session_state["rags_to_merge"]["rags"][config_merge_rag["name"]] = False
+        st.session_state["benchmark"]["rags"][config_merge_rag["name"]] = False
+        st.success("RAG successfully created")
+
+
+
+
+
+
+
+st.markdown("## Manage Merged RAGs")
+
+left, right = st.columns([0.85, 0.15], vertical_alignment="bottom")
+
+# Select the RAG to delete
+rag_to_del = left.selectbox(
+    label="List of merged RAGs",
+    options=st.session_state.get("merge", []),
+    label_visibility="collapsed",
+    key="rag_to_delete_selectbox"
+)
+
+# Create a unique key for the button
+delete_btn_key = f"delete_button_{rag_to_del}"
+
+# Delete button
+if right.button(label="Delete merge", type="primary", use_container_width=True):
+    # Remove from "merge" list
+    if rag_to_del in st.session_state["merge"]:
+        st.session_state["merge"].remove(rag_to_del)
+
+    # Remove from all_rags categories if present
+    for backend in ["ollama", "openai", "mistral", "vllm"]:
+        if rag_to_del in st.session_state["all_rags"].get(backend, {}):
+            del st.session_state["all_rags"][backend][rag_to_del]
+
+    # Remove corresponding JSON config file
+    for folder in ["vllm", "ollama_openai_mistral"]:
+        path = f"./data/merge/{folder}/{rag_to_del}.json"
+        if os.path.exists(path):
+            os.remove(path)
+
+    # Persist the updated all_rags list
+    with open("streamlit_/utils/all_rags.json", "w") as f:
+        json.dump(st.session_state["all_rags"], f, indent=4, ensure_ascii=False)
+
+    st.success(f"✅ '{rag_to_del}' has been deleted.")

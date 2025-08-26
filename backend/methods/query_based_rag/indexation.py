@@ -200,7 +200,7 @@ class QbRagIndexation:
             progress_bar.update(
                 i - 1, f"Creating question cache for document : {path_doc}"
             )
-            doc = DocumentText(path=path_doc, splitter=self.splitter)
+            doc = DocumentText(path=path_doc,config_server={"data_preprocessing" : "pdf_text_extraction"}, splitter=self.splitter)
             doc_chunks = doc.chunks(chunk_size=chunk_size, 
                                     chunk_overlap=False)
             name_docs = [str(Path(path_doc).name) for i in range(len(doc_chunks))]

@@ -3,6 +3,7 @@ from .agent_functions import (
     multiple_predict,
     predict_vllm,
     predict_json,
+    predict_image,
     predict_mistral,
     multiple_predict_mistral,
     rerank,
@@ -21,41 +22,40 @@ from pydantic import BaseModel
 
 
 def get_Agent(
-    config_server: dict,
+    config_server: dict,image_description= False
 ):
     params_host_llm = config_server["params_host_llm"]
+    
+    if image_description==False:
+        choix_model="model"
+    elif image_description==True:
+        choix_model="model_for_image"
+
     if params_host_llm["type"] == "ollama":
 
         agent = Agent_ollama(
-            model=config_server["model"],
+            model=config_server[choix_model],
             key_or_url=params_host_llm["url"],
             language=config_server["language"],
             max_attempts=config_server["max_attempts"],
         )
     if params_host_llm["type"] == "vllm":
         agent = Agent_Vllm(
-            model=config_server["model"],
+            model=config_server[choix_model],
             key_or_url=params_host_llm["url"],
             language=config_server["language"],
             max_attempts=config_server["max_attempts"],
         )
     elif params_host_llm["type"] == "openai":
         agent = Agent_openai(
-            model=config_server["model"],
+            model=config_server[choix_model],
             key_or_url=params_host_llm["api_key"],
             language=config_server["language"],
             max_attempts=config_server["max_attempts"],
         )
     elif params_host_llm["type"] == "mistral":
         agent = Agent_mistral(
-            model=config_server["model"],
-            key_or_url=params_host_llm["api_key"],
-            language=config_server["language"],
-            max_attempts=config_server["max_attempts"],
-        )
-    elif params_host_llm["type"] == "mistral":
-        agent = Agent_mistral(
-            model=config_server["model"],
+            model=config_server[choix_model],
             key_or_url=params_host_llm["api_key"],
             language=config_server["language"],
             max_attempts=config_server["max_attempts"],
@@ -108,6 +108,22 @@ class Agent_ollama(Agent):
             json_format,
             temperature,
             options_generation=options_generation
+        )
+        return answer
+    
+    def predict_image(
+        self, prompt: str, data_url, json_format: BaseModel, temperature=0
+    ) -> BaseModel:
+        """
+        It formats the queries with good prompts, then gives these prompts to the LLM and return the cleaned outputs following the given BaseModel format
+        """
+        answer = predict_image(
+            prompt,
+            self.model,
+            data_url,
+            self.client,
+            json_format,
+            temperature,
         )
         return answer
 
@@ -354,6 +370,22 @@ class Agent_openai(Agent):
             json_format,
             temperature,
             options_generation=options_generation
+        )
+        return answer
+    
+    def predict_image(
+        self, prompt: str, data_url, json_format: BaseModel, temperature=0
+    ) -> BaseModel:
+        """
+        It formats the queries with good prompts, then gives these prompts to the LLM and return the cleaned outputs following the given BaseModel format
+        """
+        answer = predict_image(
+            prompt,
+            self.model,
+            data_url,
+            self.client,
+            json_format,
+            temperature,
         )
         return answer
 
