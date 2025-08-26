@@ -114,7 +114,6 @@ class SemanticChunkingRagAgent(RagAgent):
         Output:
             context (str) : All retrieved chunks, seperated by a new line and '[...]'
         """
-
         ns = NaiveSearch(data_manager=self.data_manager,
                          nb_chunks=nb_chunks)
         context, docs_name = ns.get_context(query=query)
@@ -124,6 +123,7 @@ class SemanticChunkingRagAgent(RagAgent):
         self,
         query: str,
         nb_chunks: str = 5,
+        options_generation = None
     ) -> str:
         """
         Takes a query, retrieves appropriated context and generates an answer
@@ -145,13 +145,18 @@ class SemanticChunkingRagAgent(RagAgent):
             nb_output_tokens += output_t
 
         agent = self.agent
-        context, docs_name = self.get_rag_context(query=query, nb_chunks=nb_chunks)
+        context, docs_name = self.get_rag_context(query=query,
+                                                  nb_chunks=nb_chunks)
         
-        prompt = self.prompts["smooth_generation"]["QUERY_TEMPLATE"].format(context=context, query=query)
+        prompt = self.prompts["smooth_generation"]["QUERY_TEMPLATE"].format(context=context, 
+                                                                            query=query)
+
+        if options_generation is None:
+            options_generation = self.config_server["options_generation"]
 
         answer = agent.predict(prompt=prompt, 
                                system_prompt=self.system_prompt,
-                               options_generation=self.config_server["options_generation"])
+                               options_generation=options_generation)
         nb_input_tokens += np.sum(answer["nb_input_tokens"])
         nb_output_tokens += np.sum(answer["nb_output_tokens"])
         impacts[2] = answer["impacts"][2]
@@ -182,9 +187,11 @@ class SemanticChunkingRagAgent(RagAgent):
             names_docs.append(name_docs)
         return contexts, names_docs
 
-    def generate_answers(self, queries: list[str], nb_chunks: int = 2):
+    def generate_answers(self, queries: list[str], nb_chunks: int = 2, options_generation = None):
         answers = []
         for query in queries:
-            answer = self.generate_answer(query=query, nb_chunks=nb_chunks)
+            answer = self.generate_answer(query=query,
+                                          nb_chunks=nb_chunks,
+                                          options_generation=options_generation)
             answers.append(answer)
         return answers

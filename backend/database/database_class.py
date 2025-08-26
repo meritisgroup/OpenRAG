@@ -29,7 +29,6 @@ def get_management_data(dbs_name,
                                     config_server=config_server,
                                     storage_path=storage_path)
     for i in range(len(dbs_name)):
-        print("dbs", dbs_name)
         db.add_database(db_name=dbs_name[i],
                         data_folder_name=data_folders_name[i])
 
@@ -274,6 +273,8 @@ class Merger_Database_Vectorbase:
                 vb_name = list(self.vectorbases.keys())[i]
                 if collection_name is not None:
                     collection_name_search = vb_name+"_"+collection_name
+                else:
+                    collection_name_search = collection_name
                     
                 result = self.vectorbases[vb_name]['vectorbase'].k_search(queries=queries,
                                                                           k=k_per_db_list[i],

@@ -119,7 +119,8 @@ class Agent_ollama(Agent):
         It formats the queries with good prompts, then gives these prompts to the LLM and return the cleaned outputs
         """
         answers = multiple_predict(
-            system_prompts, prompts, self.model, self.client, temperature, options_generation=options_generation
+            system_prompts, prompts, self.model, self.client, 
+            temperature, options_generation=options_generation
         )
         return answers
 

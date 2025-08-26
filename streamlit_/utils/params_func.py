@@ -2,13 +2,16 @@ import os
 
 def get_possible_embeddings_model(provider):
     if provider=="ollama":
-        return ["mxbai-embed-large:latest", "bge-m3:latest"]
+        return ["mxbai-embed-large:latest", "bge-m3:latest", 
+                "bge-m3-fine-tune:latest", "all-minilm:22m"]
     elif provider=="openai":
-        return ["text-embedding-3-small", "text-embedding-3-large", "text-embedding-ada-002"]
+        return ["text-embedding-3-small", "text-embedding-3-large",
+                 "text-embedding-ada-002"]
     elif provider=="mistral":
         return ["mistral-embed"]
     elif provider=="vllm":
-        return ["mixedbread-ai/mxbai-embed-large-v1", "BAAI/bge-m3", "Qwen/Qwen3-Embedding-0.6B"]
+        return ["mixedbread-ai/mxbai-embed-large-v1", "BAAI/bge-m3",
+                 "Qwen/Qwen3-Embedding-0.6B", "sentence-transformers/all-MiniLM-L6-v2"]
     
 
 def get_default_embeddings_model(provider):

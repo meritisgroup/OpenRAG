@@ -113,6 +113,7 @@ class GraphRagAgent(RagAgent):
         query: str,
         method: str = "global",
         nb_chunks: str = 2,
+        options_generation = None
     ) -> str:
         context, tokens_counter = self.get_rag_context(
             query=query, method=method, nb_chunks=nb_chunks
@@ -134,9 +135,11 @@ class GraphRagAgent(RagAgent):
 
         prompt = prompt_template.format(**context_base)
 
-        print(context)
+        if options_generation is None:
+            options_generation = self.config_server["options_generation"]
+
         answer = self.agent.predict(prompt=prompt, system_prompt=self.system_prompt,
-                                    options_generation=self.config_server["options_generation"])
+                                    options_generation=options_generation)
         impacts[2] = answer["impacts"][2]
         impacts[0] += answer["impacts"][0]
         impacts[1] += answer["impacts"][1]
@@ -157,9 +160,9 @@ class GraphRagAgent(RagAgent):
 
         return answer_dict
 
-    def generate_answers(self, queries: list[str], nb_chunks: int = 2):
+    def generate_answers(self, queries: list[str], nb_chunks: int = 2, options_generation = None):
         answers = []
         for query in queries:
-            answer = self.generate_answer(query=query, nb_chunks=nb_chunks)
+            answer = self.generate_answer(query=query, nb_chunks=nb_chunks, options_generation=options_generation)
             answers.append(answer)
         return answers

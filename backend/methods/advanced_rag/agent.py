@@ -127,6 +127,7 @@ class AdvancedRag(NaiveRagAgent):
         query: str,
         nb_chunks: int = 7,
         nb_reformulation=5,
+        options_generation = None
     ) -> str:
         """
         Takes a query, retrieves appropriated context and generates an answer
@@ -172,9 +173,12 @@ class AdvancedRag(NaiveRagAgent):
             context=context, query=query
         )
 
+        if options_generation is None:
+            options_generation = self.config_server["options_generation"]
+            
         answer = agent.predict(prompt=prompt,
                                system_prompt=self.system_prompt,
-                               options_generation=self.config_server["options_generation"])
+                               options_generation=options_generation)
         self.nb_input_tokens += np.sum(answer["nb_input_tokens"])
         self.nb_output_tokens += np.sum(answer["nb_output_tokens"])
 
@@ -205,9 +209,10 @@ class AdvancedRag(NaiveRagAgent):
             names_docs.append(name_docs)
         return contexts, names_docs
 
-    def generate_answers(self, queries: list[str], nb_chunks: int = 2):
+    def generate_answers(self, queries: list[str], nb_chunks: int = 2, options_generation = None):
         answers = []
         for query in queries:
-            answer = self.generate_answer(query=query, nb_chunks=nb_chunks)
+            answer = self.generate_answer(query=query, nb_chunks=nb_chunks,
+                                          options_generation=options_generation)
             answers.append(answer)
         return answers

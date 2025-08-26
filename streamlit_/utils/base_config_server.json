@@ -2,7 +2,7 @@
     "storage_path": "./storage",
     "storage_data_path": "./data/databases",
     "params_host_llm": {
-        "url": "http://ollama:11434/v1",
+        "url": "http://srv-ironman.meritisnet.fr:11436/v1",
         "type": "ollama",
         "api_key": null
     },

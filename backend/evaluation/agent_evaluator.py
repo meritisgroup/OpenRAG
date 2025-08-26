@@ -5,6 +5,7 @@ from .comparators import (
     ContextRelevanceComparator,
 )
 from sqlalchemy import func
+import numpy as np
 from backend.database.rag_classes import Document, Tokens
 import time
 from ..utils.agent import get_Agent
@@ -71,17 +72,7 @@ class AgentEvaluator:
             context_relevance_evaluations,
         )
 
-    def create_plot_report(self, plots) -> str:
-
-        BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-        template_path = os.path.join(BASE_DIR, "plot_report_template.tex")
-
-        timestamp = datetime.now()
-        timestamp = timestamp.strftime("%m-%d_%H-%M-%S")
-        report_dir = os.path.normpath(
-            os.path.join(BASE_DIR, "..", "..", "data", "report", timestamp)
-        )
-        os.makedirs(report_dir, exist_ok=True)
+    def create_plot_report(self, plots, report_dir) -> str:
 
         plots["token_graph"].write_image(report_dir + "/tokens.png", format="png")
         plots["ground_truth_graph"].write_image(
@@ -198,7 +189,7 @@ class DataFramePreparator:
         }
         self.dataframe = pd.DataFrame(data, columns=self.column_names)
         self.indexation_tokens = {}
-        self.run_all_queries()
+        
 
     def get_dataframe(self) -> pd.DataFrame:
         return self.dataframe
@@ -214,7 +205,7 @@ class DataFramePreparator:
 
         return queries, ground_truths
 
-    def run_all_queries(self) -> None:
+    def run_all_queries(self, options_generation = None) -> None:
 
         progress_bar = ProgressBar(
             zip(self.rags_available, self.rag_agents),
@@ -231,26 +222,28 @@ class DataFramePreparator:
             indexation_tokens[rag_available] = {}
             if type(rag_agent) is GraphRagAgent:
                 indexation_tokens[rag_available]["embedding_tokens"] = (
-                    rag_agent.db.query(func.sum(Tokens.embedding_tokens)).scalar()
+                    np.sum(rag_agent.data_manager.query(func.sum(Tokens.embedding_tokens)))
                 )
-                indexation_tokens[rag_available]["input_tokens"] = rag_agent.db.query(
+                indexation_tokens[rag_available]["input_tokens"] = np.sum(rag_agent.data_manager.query(
                     func.sum(Tokens.input_tokens)
-                ).scalar()
-                indexation_tokens[rag_available]["output_tokens"] = rag_agent.db.query(
+                ))
+                indexation_tokens[rag_available]["output_tokens"] = np.sum(rag_agent.data_manager.query(
                     func.sum(Tokens.output_tokens)
-                ).scalar()
+                ))
             else:
                 indexation_tokens[rag_available]["embedding_tokens"] = (
-                    rag_agent.db.query(func.sum(Document.embedding_tokens)).scalar()
+                    np.sum(rag_agent.data_manager.query(func.sum(Document.embedding_tokens)))
                 )
-                indexation_tokens[rag_available]["input_tokens"] = rag_agent.db.query(
+                indexation_tokens[rag_available]["input_tokens"] = np.sum(rag_agent.data_manager.query(
                     func.sum(Document.input_tokens)
-                ).scalar()
-                indexation_tokens[rag_available]["output_tokens"] = rag_agent.db.query(
+                ))
+                indexation_tokens[rag_available]["output_tokens"] = np.sum(rag_agent.data_manager.query(
                     func.sum(Document.output_tokens)
-                ).scalar()
+                ))
             start_time = time.time()
-            rag_results = rag_agent.generate_answers(self.queries, rag_agent.nb_chunks)
+            rag_results = rag_agent.generate_answers(self.queries, 
+                                                     rag_agent.nb_chunks,
+                                                     options_generation=options_generation)
             end_time = time.time()
             answer_time = end_time - start_time
             answers = [rag_result["answer"] for rag_result in rag_results]
