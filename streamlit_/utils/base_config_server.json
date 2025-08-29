@@ -2,7 +2,7 @@
     "storage_path": "./storage",
     "storage_data_path": "./data/databases",
     "params_host_llm": {
-        "url": "http://srv-ironman.meritisnet.fr:11436/v1",
+        "url": "",
         "type": "ollama",
         "api_key": null
     },
@@ -20,22 +20,22 @@
     "model_for_image": "gemma3:12b",
     "embedding_model": "mxbai-embed-large:latest",
     "language": "FR",
-    "type_retrieval": "hybrid",
-    "TextSplitter": "TextSplitter",
+    "type_retrieval": "embeddings",
+    "TextSplitter": "Semantic_TextSplitter",
     "reformulate_query": false,
     "reranker_model": "gemma3:1b",
     "max_attempts": 5,
-    "nb_chunks": 10,
+    "nb_chunks": 20,
     "ProcessorChunks": [
         "Contextual"
     ],
     "hf_token": null,
     "params_llm_dockling": {
-        "url": "http://srv-ironman.meritisnet.fr:11436/v1",
+        "url": "",
         "type": "ollama",
         "api_key": null
     },
-    "data_preprocessing": "md_without_images",
+    "data_preprocessing": "pdf_text_extraction",
     "local_params": {
         "forced_system_prompt": false,
         "generation_system_prompt_name": "default"
@@ -45,6 +45,6 @@
         "default": "You are an AI assistant, answer honestly to the user using your knowledge and the provided context. You must be exhaustive and concise. You must answer in English"
     },
     "options_generation": {
-        "type_generation": "no_generation"
+        "type_generation": "simple_generation"
     }
 }

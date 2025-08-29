@@ -3,6 +3,7 @@ from ...utils.agent import get_Agent
 from ...utils.factory_vectorbase import get_vectorbase
 from ...utils.agent_functions import get_system_prompt
 from .prompts import prompts
+from ..naive_rag.agent import NaiveRagAgent
 from .indexation import ContextualRetrievalIndexation
 from ..naive_rag.query import NaiveSearch
 import numpy as np
@@ -10,7 +11,7 @@ from ..query_reformulation.query_reformulation import query_reformulation
 from ...database.database_class import get_management_data
 
 
-class ContextualRetrievalRagAgent(RagAgent):
+class ContextualRetrievalRagAgent(NaiveRagAgent):
     """
     For each chunk an LLM is asked to read the whole document and to generate in a short paragraph / sentence explaining the chunk given the context.
     """
@@ -61,6 +62,13 @@ class ContextualRetrievalRagAgent(RagAgent):
     def get_nb_token_embeddings(self):
         return self.data_manager.get_nb_token_embeddings()
 
+    def get_infos_embeddings(self):
+        infos = {}
+        infos["embedding_tokens"] = (np.sum(self.data_manager.query(func.sum(Document.embedding_tokens))))
+        infos["input_tokens"] = np.sum(self.data_manager.query(func.sum(Document.input_tokens)))
+        infos["output_tokens"] = np.sum(self.data_manager.query(func.sum(Document.output_tokens)))
+        return infos
+    
     def indexation_phase(
         self,
         reset_index: bool = False,

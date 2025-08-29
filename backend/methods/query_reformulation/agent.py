@@ -36,15 +36,6 @@ class QueryReformulationRag(NaiveRagAgent):
         context, docs_name = ns.get_context(query=query)
         return context, docs_name
 
-    def contexts_to_prompts(self, contexts, docs_name):
-        context = ""
-        docs_context = []
-        for i in range(len(contexts)):
-            if contexts[i] not in context:
-                context += contexts[i] + "\n[...]\n"
-                docs_context.append(docs_name[i])
-        return context[:-7], docs_context
-
     def generate_answer(
         self,
         query: str,

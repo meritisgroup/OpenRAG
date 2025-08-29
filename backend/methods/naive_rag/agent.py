@@ -13,6 +13,8 @@ from ...database.database_class import get_management_data
 from ...utils.agent import get_Agent
 from .prompts import prompts
 import numpy as np
+from sqlalchemy import func
+from backend.database.rag_classes import Document, Tokens
 from ..query_reformulation.query_reformulation import query_reformulation
 
 
@@ -58,7 +60,6 @@ class NaiveRagAgent(RagAgent):
                                                 storage_path=self.storage_path,
                                                 config_server=config_server,
                                                 agent=self.agent)
-
         
         self.config_server = config_server
 
@@ -75,7 +76,14 @@ class NaiveRagAgent(RagAgent):
 
     def get_nb_token_embeddings(self):
         return self.data_manager.get_nb_token_embeddings()
-
+    
+    def get_infos_embeddings(self):
+        infos = {}
+        infos["embedding_tokens"] = (np.sum(self.data_manager.query(func.sum(Document.embedding_tokens))))
+        infos["input_tokens"] = np.sum(self.data_manager.query(func.sum(Document.input_tokens)))
+        infos["output_tokens"] = np.sum(self.data_manager.query(func.sum(Document.output_tokens)))
+        return infos
+    
     def indexation_phase(
         self,
         reset_index: bool = False,
@@ -151,7 +159,7 @@ class NaiveRagAgent(RagAgent):
             nb_output_tokens = output_t
 
         context, docs_name = self.get_rag_context(query=query,
-                                          nb_chunks=nb_chunks)
+                                                  nb_chunks=nb_chunks)
         
         prompt = self.prompts["smooth_generation"]["QUERY_TEMPLATE"].format(
             context=context, query=query
@@ -170,8 +178,6 @@ class NaiveRagAgent(RagAgent):
         energies[2] = answer["energy"][2]
         energies[0] += answer["energy"][0]
         energies[1] += answer["energy"][1]
-        
-        
 
         return {
             "answer": answer["texts"],

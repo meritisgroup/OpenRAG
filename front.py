@@ -1,6 +1,6 @@
 import streamlit as st
 from backend.factory_RagAgent import change_config_server
-from streamlit_.utils.params_func import get_custom_rags
+from streamlit_.utils.params_func import get_custom_rags_name, get_merge_rags_name
 import json
 import pandas as pd
 import os
@@ -60,34 +60,20 @@ if "config_server" not in st.session_state:
         st.session_state["config_server"] = base_config_server
         st.session_state["hf_token"] = st.session_state["config_server"]["hf_token"]
 
-    for file in glob.glob("data/custom_rags/ollama_openai_mistral/*.json"):
-        with open(file, "r") as f:
-            config = json.load(f)
-        if config["params_vectorbase"]["backend"] == "elasticsearch":
-            config["params_vectorbase"]["url"] = (
-                os.getenv("ES_LOCAL_URL") + ":" + os.getenv("ES_LOCAL_PORT")
-            )
-            config["params_vectorbase"]["auth"] = [
-                "elastic",
-                os.getenv("ES_LOCAL_PASSWORD"),
-            ]
-        with open(file, "w") as f:
-            json.dump(config, f, indent=4)
-
-    for file in glob.glob("data/custom_rags/vllm/*.json"):
-        with open(file, "r") as f:
-            config = json.load(f)
-        if config["params_vectorbase"]["backend"] == "elasticsearch":
-            config["params_vectorbase"]["url"] = (
-                os.getenv("ES_LOCAL_URL") + ":" + os.getenv("ES_LOCAL_PORT")
-            )
-            config["params_vectorbase"]["auth"] = [
-                "elastic",
-                os.getenv("ES_LOCAL_PASSWORD"),
-            ]
-        with open(file, "w") as f:
-            json.dump(config, f, indent=4)
-
+    for folder in ["vllm", "ollama", "openai", "mistral"]:
+        for file in glob.glob(f"data/custom_rags/folder/*.json"):
+            with open(file, "r") as f:
+                config = json.load(f)
+            if config["params_vectorbase"]["backend"] == "elasticsearch":
+                config["params_vectorbase"]["url"] = (
+                    os.getenv("ES_LOCAL_URL") + ":" + os.getenv("ES_LOCAL_PORT")
+                )
+                config["params_vectorbase"]["auth"] = [
+                    "elastic",
+                    os.getenv("ES_LOCAL_PASSWORD"),
+                ]
+            with open(file, "w") as f:
+                json.dump(config, f, indent=4)
 
 if "rag" not in st.session_state:
     st.session_state["rag_name"] = "naive"
@@ -121,26 +107,19 @@ if "benchmark" not in st.session_state:
     st.session_state["benchmark"]["load"] = False
 
 
-st.session_state["custom_rags"] = get_custom_rags(provider=st.session_state["config_server"]["params_host_llm"]["type"])
+st.session_state["custom_rags"] = get_custom_rags_name(provider=st.session_state["config_server"]["params_host_llm"]["type"])
 if ".gitkeep" in st.session_state["custom_rags"]:
     st.session_state["custom_rags"].remove(".gitkeep")
 
 if "databases" not in st.session_state:
     st.session_state["databases"] = {}
 
-if "merge" not in st.session_state:
-    if not os.path.exists("data/merge/vllm"):
-        os.makedirs("data/merge/vllm")
-    if not os.path.exists("data/merge/ollama_openai_mistral"):
-        os.makedirs("data/merge/ollama_openai_mistral")
-
-    merge_rags = os.listdir("data/merge/vllm")
-    merge_rags += os.listdir("data/merge/ollama_openai_mistral")
-
+if "merge_rags" not in st.session_state:
+    for folder in ["vllm", "ollama", "openai", "mistral"]:
+        if not os.path.exists(f"data/merge/{folder}"):
+            os.makedirs(f"data/merge/{folder}")
     
-    merge = [merge_rag[:-5] for merge_rag in merge_rags if merge_rag.endswith(".json")]
-    
-    st.session_state["merge"] = merge
+    st.session_state["merge_rags"] = get_merge_rags_name(provider=st.session_state["config_server"]["params_host_llm"]["type"])
 
 
 

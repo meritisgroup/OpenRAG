@@ -73,43 +73,45 @@ class AgentEvaluator:
         )
 
     def create_plot_report(self, plots, report_dir) -> str:
-
-        plots["token_graph"].write_image(report_dir + "/tokens.png", format="png")
+        plots["token_graph"].write_image(os.path.join(report_dir, "tokens.png"), format="png")
         plots["ground_truth_graph"].write_image(
             report_dir + "/ground_truth.png", format="png"
         )
-        plots["context_graph"].write_image(report_dir + "/context.png", format="png")
-        plots["time_graph"].write_image(report_dir + "/time_graph.png", format="png")
+        plots["context_graph"].write_image(os.path.join(report_dir,"context.png"), format="png")
+        plots["time_graph"].write_image(os.path.join(report_dir, "time_graph.png"), format="png")
         for match, fig in plots["arena_graphs"].items():
-            fig.write_image(report_dir + f"/{match}.png", format="png")
+            fig.write_image(os.path.join(report_dir, f"{match}.png"), format="png")
         plots["report_arena_graph"].write_image(
-            report_dir + "/report_arena_graph.png", format="png"
+            os.path.join(report_dir,"report_arena_graph.png"), format="png"
         )
 
         for file in os.listdir(report_dir):
             if "_v_" in file:
                 example_arena = file
                 break
+        
+        BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+        template_path = os.path.join(BASE_DIR, "plot_report_template.tex")
 
         with open(template_path, "r", encoding="utf-8") as report_template:
             content = report_template.read()
             final_report = (
-                content.replace("{token_graph_path}", report_dir + "/tokens.png")
-                .replace("{gt_graph_path}", report_dir + "/ground_truth.png")
-                .replace("{context_graph_path}", report_dir + "/context.png")
-                .replace("{example_arena_graph}", report_dir + "/" + example_arena)
-                .replace("{report_arena_graph}", report_dir + "/report_arena_graph.png")
-                .replace("{time_graph}", report_dir + "/time_graph.png")
+                content.replace("{token_graph_path}", str(os.path.join(report_dir, "tokens.png")).replace("\\", "/"))
+                .replace("{gt_graph_path}", str(os.path.join(report_dir, "ground_truth.png")).replace("\\", "/"))
+                .replace("{context_graph_path}", str(os.path.join(report_dir, "context.png")).replace("\\", "/"))
+                .replace("{example_arena_graph}", str(os.path.join(report_dir, example_arena)).replace("\\", "/"))
+                .replace("{report_arena_graph}", str(os.path.join(report_dir, "report_arena_graph.png")).replace("\\", "/"))
+                .replace("{time_graph}", str(os.path.join(report_dir, "time_graph.png")).replace("\\", "/"))
             )
         if plots["impact_graph"] is not None:
             plots["impact_graph"].write_image(
-                report_dir + "/impact_graph.png", format="png"
+                os.path.join(report_dir, "impact_graph.png"), format="png"
             )
             final_report = self.add_impact_sequence(final_report)
 
         if plots["energy_graph"] is not None:
             plots["energy_graph"].write_image(
-                report_dir + "/energy_graph.png", format="png"
+                os.path.join(report_dir, "energy_graph.png"), format="png"
             )
             final_report = self.add_energy_sequence(final_report)
 
@@ -219,27 +221,7 @@ class DataFramePreparator:
                 i - 1,
                 text=f"Generating RAG Answers for {rag_available} rag ({i+1}/{n})",
             )
-            indexation_tokens[rag_available] = {}
-            if type(rag_agent) is GraphRagAgent:
-                indexation_tokens[rag_available]["embedding_tokens"] = (
-                    np.sum(rag_agent.data_manager.query(func.sum(Tokens.embedding_tokens)))
-                )
-                indexation_tokens[rag_available]["input_tokens"] = np.sum(rag_agent.data_manager.query(
-                    func.sum(Tokens.input_tokens)
-                ))
-                indexation_tokens[rag_available]["output_tokens"] = np.sum(rag_agent.data_manager.query(
-                    func.sum(Tokens.output_tokens)
-                ))
-            else:
-                indexation_tokens[rag_available]["embedding_tokens"] = (
-                    np.sum(rag_agent.data_manager.query(func.sum(Document.embedding_tokens)))
-                )
-                indexation_tokens[rag_available]["input_tokens"] = np.sum(rag_agent.data_manager.query(
-                    func.sum(Document.input_tokens)
-                ))
-                indexation_tokens[rag_available]["output_tokens"] = np.sum(rag_agent.data_manager.query(
-                    func.sum(Document.output_tokens)
-                ))
+            indexation_tokens[rag_available] = rag_agent.get_infos_embeddings()
             start_time = time.time()
             rag_results = rag_agent.generate_answers(self.queries, 
                                                      rag_agent.nb_chunks,

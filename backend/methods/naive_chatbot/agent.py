@@ -38,6 +38,13 @@ class NaiveChatbot(RagAgent):
     def get_nb_token_embeddings(self):
         return 0
 
+    def get_infos_embeddings(self):
+        infos = {}
+        infos["embedding_tokens"] = 0
+        infos["input_tokens"] = 0
+        infos["output_tokens"] = 0
+        return infos
+    
     def indexation_phase(
         self,
         reset_index: bool = False,
@@ -68,7 +75,7 @@ class NaiveChatbot(RagAgent):
             "nb_input_tokens": nb_input_tokens,
             "nb_output_tokens": nb_output_tokens,
             "context": "",
-            "doc_names": [],
+            "docs_name": [],
             "impacts": answer["impacts"],
             "energy": answer["energy"],
         }

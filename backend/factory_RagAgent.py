@@ -77,8 +77,7 @@ def put_default_local_parameters():
         json.dump(config, file, indent=4)
 
 
-def get_rag_agent(rag_name, config_server, databases_name=""):
-
+def get_rag_agent(rag_name, config_server, databases_name=[""]):
     names = [get_name(rag_name=rag_name,
                       config_server=config_server,
                       additionnal_name=databases_name[i]) for i in range(len(databases_name))]
@@ -89,10 +88,8 @@ def get_rag_agent(rag_name, config_server, databases_name=""):
         
     elif rag_name == "agentic":
         agent = AgenticRagAgent(config_server=config_server,
-                              vb_name=name,
-                              db_name=name)
-        
-
+                                dbs_name=names,
+                                data_folders_name=databases_name)
     elif rag_name == "merger":
         agent = MergerRagAgent(config_server=config_server)
         
@@ -140,7 +137,9 @@ def get_rag_agent(rag_name, config_server, databases_name=""):
     return agent
 
 
+
 def get_custom_rag_agent(base_rag_name, config_server, databases_name=[""]):
+    print(base_rag_name, "custom rag")
     names = [config_server["name"] + "_" + config_server["params_vectorbase"]["backend"] + "_" + re.sub(r"[^a-zA-Z0-9]", "_", config_server["embedding_model"]) + "_" + "_" + config_server["params_host_llm"]["type"] + "_" + database_name for database_name in databases_name]
     
     names = [name.lower() for name in names]
@@ -157,10 +156,14 @@ def get_custom_rag_agent(base_rag_name, config_server, databases_name=[""]):
         agent = AdvancedRag(
             config_server=config_server,
         )
+    elif base_rag_name == "merger":
+        agent = MergerRagAgent(config_server=config_server, 
+                              dbs_name=names,
+                              data_folders_name=databases_name)
     elif base_rag_name == "graph":
         agent = GraphRagAgent(config_server=config_server, 
                               dbs_name=names,
-                            data_folders_name=databases_name)
+                              data_folders_name=databases_name)
     # elif base_rag_name=="multigraph":
     #     agent = MultiGraphRagAgent(model=config_server["model"],
     #                                storage_path=config_server["storage_path"],

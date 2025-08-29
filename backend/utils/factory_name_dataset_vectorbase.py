@@ -1,3 +1,5 @@
+
+
 def get_name(rag_name, config_server, additionnal_name=""):
     name = ""
     if (
@@ -59,23 +61,10 @@ def get_name(rag_name, config_server, additionnal_name=""):
             config_server["TextSplitter"],
         )
 
-    elif rag_name == "audio":
-        name = "audio_rag_{}".format(config_server["type_retrieval"])
-    elif rag_name == "vlm":
-        name = "vlm_rag"
-    elif rag_name == "copali":
-        name = "colpali_rag"
+    #name += "_{}".format(config_server["params_host_llm"]["type"])
+    name += "_{}".format(config_server["data_preprocessing"])
 
     if additionnal_name != "":
         name += "_" + additionnal_name
-
-    if config_server["params_host_llm"]["type"] == "openai":
-        name += "_openai"  # In order for the indexation to be done with the openai embedding model
-    elif config_server["params_host_llm"]["type"] == "mistral":
-        name += "_mistral"  # In order for the indexation to be done with the openai embedding model
-    elif config_server["params_host_llm"]["type"] == "vllm":
-        name += "_vllm"
-    elif config_server["params_host_llm"]["type"] == "ollama":
-        name += "_ollama"
     name = name.lower()
     return name

@@ -6,8 +6,9 @@ class ProgressBar:
         self.iterable = iterable
         self.total = total or (len(iterable) if iterable is not None else None)
         self.desc = desc
-        self.progress_bar = st.progress(0, text=self.desc)
-        self.status_placeholder = st.empty()
+        self.placeholder = st.empty()
+        self.progress_bar = self.placeholder.progress(0, text=self.desc)
+        
 
     def update(self, index, text=None):
         try:
@@ -26,16 +27,16 @@ class ProgressBar:
         st.write(text)
 
     def success(self, value):
-        self.progress_bar.empty()
+        self.placeholder.empty()
         st.success(value)
 
     def error(self, value):
-        self.progress_bar.empty()
+        self.placeholder.empty()
         st.error(value)
 
     def info(self, value):
-        self.status_placeholder.info(value)
+        self.placeholder.info(value)
 
     def clear(self):
         self.progress_bar.empty()
-        self.status_placeholder.empty()
+        self.placeholder.empty()

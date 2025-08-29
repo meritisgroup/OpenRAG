@@ -62,8 +62,6 @@ def get_report_path():
 
     return report_dir
 
-
-
 def generate_answers(rag_names, rag_agents):
     dataframe_preparator = DataFramePreparator(
         rag_agents=rag_agents,
@@ -119,7 +117,6 @@ def generate_benchmark(rag_names, rag_agents):
     impact = extract_impact(df)
     energy = extract_energy(df)
     time = extract_time(df)
-
     st.session_state["benchmark"]["impacts"] = impact
     st.session_state["benchmark"]["energy"] = energy
     st.session_state["time"] = time

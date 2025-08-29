@@ -3,7 +3,7 @@ import os
 from backend.factory_RagAgent import get_rag_agent, change_config_server
 from streamlit_.utils.chat_funcs import get_chat_agent
 from backend.utils.utils_vlm import set_vllm_HF_key
-from streamlit_.utils.params_func import get_custom_rags
+from streamlit_.utils.params_func import get_custom_rags_name
 import json
 
 
@@ -69,7 +69,8 @@ st.text_input(
 st.session_state["config_server"]["hf_token"] = st.session_state.hf_token
 
 # setting type of data preparation
-data_preparation = { "pdf_text_extraction":"PDF text extraction", "md_without_images": "PDF conversion into markdown",
+data_preparation = { "pdf_text_extraction":"PDF text extraction", 
+                     "md_without_images": "PDF conversion into markdown",
                      "md_with_images" : "PDF conversion into markdown with image description" }
 
 
@@ -83,8 +84,6 @@ selected_data_prep = st.selectbox(
 )
 
 st.session_state["config_server"]["data_preprocessing"] = st.session_state["data_prep"]
-
-
 
 
 # Setting params_vectorbase
@@ -201,9 +200,10 @@ st.slider(
 st.session_state["config_server"]["nb_chunks"] = st.session_state["chunk"]
 
 if st.button("Save Configuration", type="primary", use_container_width=True):
-    st.session_state["custom_rags"] = get_custom_rags(provider=st.session_state["config_server"]["params_host_llm"]["type"])
+    st.session_state["custom_rags"] = get_custom_rags_name(provider=st.session_state["config_server"]["params_host_llm"]["type"])
     rag_method = st.session_state["rag_name"]
-    rag_agent = get_chat_agent(rag_method=rag_method)
+    rag_agent = get_chat_agent(rag_method=rag_method,
+                               databases_name=[])
     st.session_state["success"] = True
     st.session_state["rag"] = rag_agent
     
