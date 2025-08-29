@@ -126,7 +126,7 @@ class NaiveRagIndexation:
                 doc_tokens = 0
                 progress_bar.set_description(f"Embbeding chunks - {path_doc}")
                 doc = DocumentText(
-                    path=path_doc, splitter=self.splitter
+                    path=path_doc,config_server={"data_preprocessing" : "pdf_text_extraction"}, splitter=self.splitter
                 )
                 doc_chunks = doc.chunks(
                     chunk_size=chunk_size, chunk_overlap=chunk_overlap

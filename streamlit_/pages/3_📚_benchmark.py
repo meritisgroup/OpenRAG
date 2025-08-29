@@ -10,9 +10,12 @@ from backend.factory_RagAgent import (
 import json
 from streamlit_.utils.benchmark_funcs import (
     generate_benchmark,
+    generate_answers,
+    generate_contexts,
     display_plot,
     match_name_cleaner,
     clean_bench_df,
+    run_indexation_benchmark
 )
 from streamlit_.utils.chat_funcs import get_chat_agent, change_default_prompt
 
@@ -228,6 +231,45 @@ def handle_click():
 
 col1, col2, col3, col4 = st.columns([0.20, 0.20, 0.20, 0.40])
 if col1.button(
+    "Generate Contexts",
+    on_click=handle_click,
+    disabled=st.session_state["benchmark_clicked"],
+    use_container_width=True,
+    type="primary",
+):
+    if st.session_state["benchmark_database"] is None:
+        st.session_state["benchmark_clicked"] = False
+        st.error("Choose a database")
+    else:
+        rag_agents, rag_names = run_indexation_benchmark(reset_index=reset_index)
+        if len(rag_agents) > 1:
+            generate_contexts(rag_names=rag_names,
+                              rag_agents=rag_agents)
+            
+        st.session_state["benchmark_clicked"] = False
+        st.set_option("client.showSidebarNavigation", True)
+        st.rerun()
+
+if col2.button(
+    "Generate Answers",
+    on_click=handle_click,
+    disabled=st.session_state["benchmark_clicked"],
+    use_container_width=True,
+    type="primary",
+):
+    if st.session_state["benchmark_database"] is None:
+        st.session_state["benchmark_clicked"] = False
+        st.error("Choose a database")
+    else:
+        rag_agents, rag_names = run_indexation_benchmark(reset_index=reset_index)
+        if len(rag_agents) > 1:
+            generate_answers(rag_names, rag_agents)
+        st.session_state["benchmark_clicked"] = False
+        st.set_option("client.showSidebarNavigation", True)
+        st.rerun()
+        
+
+if col3.button(
     "Generate Benchmark",
     on_click=handle_click,
     disabled=st.session_state["benchmark_clicked"],
@@ -238,34 +280,12 @@ if col1.button(
         st.session_state["benchmark_clicked"] = False
         st.error("Choose a database")
     else:
-
-        rag_agents = []
-        rag_names = []
-        with st.spinner("**Indexation Running**", show_time=True):
-            progress_bar_iterable = [
-                rag
-                for rag in st.session_state["benchmark"]["rags"].keys()
-                if st.session_state["benchmark"]["rags"][rag]
-            ]
-            indexation_progress_bar = ProgressBar(progress_bar_iterable)
-            for i, rag in enumerate(indexation_progress_bar.iterable):
-                if st.session_state["benchmark"]["rags"][rag]:
-                    rag_agent = get_chat_agent(rag)
-
-                    rag_agent.indexation_phase(
-                        f"./data/databases/{st.session_state['benchmark_database']}",
-                        reset_index,
-                    )
-                    rag_agents.append(rag_agent)
-                    rag_names.append(rag)
-                    indexation_progress_bar.update(i)
-
+        rag_agents, rag_names = run_indexation_benchmark(reset_index=reset_index)
         if len(rag_agents) > 1:
             with st.spinner(
                 f"**Generating benchmark for the following RAGs:** {rag_names}",
                 show_time=True,
             ):
-                indexation_progress_bar.success("Indexation done")
                 generate_benchmark(rag_names, rag_agents)
                 st.session_state["benchmark_clicked"] = False
                 st.set_option("client.showSidebarNavigation", True)

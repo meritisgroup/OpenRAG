@@ -9,6 +9,7 @@
         "graph": "Graph RAG",
         "query_reformulation_rag": "Query Reformulation RAG",
         "naive_chatbot": "Naive Chatbot",
+        "agentic": "Agentic RAG",
         "reranker_rag": "Reranker RAG"
     },
     "vllm": {

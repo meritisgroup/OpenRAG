@@ -1,6 +1,7 @@
 from ...utils.agent import Agent
 from ...base_classes import Search
 from ...database.database_class import DataBase
+from ..naive_rag.indexation import contexts_to_prompts
 
 
 class QbSearch(Search):
@@ -29,15 +30,10 @@ class QbSearch(Search):
             [(res["doc_name"]) for res in search_res[0]],
             key=lambda x: x[0],
         )
-
+        chunks = [res["text"] for res in search_res[0]]
+        docs_name = [res["doc_name"] for res in search_res[0]]
         context = ""
-        docs_name = []
-        for i in range(len(search_res[0])):
-            if "chunk_text" in search_res[0][i].keys():
-                if search_res[0][i]["chunk_text"] not in context:
-                    context += search_res[0][i]["chunk_text"] + "\n[...]\n"
-                    docs_name.append(search_res[0]["docs_name"])
-
-        context = context[:-7]
+        context, docs_name = contexts_to_prompts(contexts=chunks,
+                                                 docs_name=docs_name)
 
         return context, docs_name

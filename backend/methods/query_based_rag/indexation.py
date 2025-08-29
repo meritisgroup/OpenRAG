@@ -171,7 +171,7 @@ class QbRagIndexation:
                     None
         return embedding_tokens, input_tokens, output_tokens
 
-    def run_pipeline(self, chunk_size, batch: bool = True):
+    def run_pipeline(self, chunk_size, chunk_overlap: bool = True, batch: bool = True):
         add_fields = [
             {
                 "field_name": "chunk_text",
@@ -200,9 +200,10 @@ class QbRagIndexation:
             progress_bar.update(
                 i - 1, f"Creating question cache for document : {path_doc}"
             )
-            doc = DocumentText(path=path_doc, splitter=self.splitter)
+            doc = DocumentText(path=path_doc, doc_index=i, config_server={"data_preprocessing" : "pdf_text_extraction"},
+                                splitter=self.splitter)
             doc_chunks = doc.chunks(chunk_size=chunk_size, 
-                                    chunk_overlap=False)
+                                    chunk_overlap=chunk_overlap)
             name_docs = [str(Path(path_doc).name) for i in range(len(doc_chunks))]
             path_docs = [str(Path(path_doc).parent) for i in range(len(doc_chunks))]
             if batch:

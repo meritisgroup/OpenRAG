@@ -1,6 +1,7 @@
 from .query import NaiveSearch
 from ..naive_rag.agent import NaiveRagAgent
 from .prompts import prompts
+from ..naive_rag.indexation import contexts_to_prompts
 import numpy as np
 
 
@@ -392,13 +393,8 @@ class SelfRagAgent(NaiveRagAgent):
         energies[2] = answer["energy"][2]
         energies[0] += answer["energy"][0]
         energies[1] += answer["energy"][1]
-        context = ""
 
-        for chunk in contexts:
-
-            context += chunk + "\n[...]\n"
-
-        context = context[:-7]
+        context = contexts_to_prompts(contexts=chunk)
 
         return {
             "answer": answer["texts"],
@@ -422,11 +418,13 @@ class SelfRagAgent(NaiveRagAgent):
             names_docs.append(name_docs)
         return contexts, names_docs
 
-    def generate_answers(self, queries: list[str], nb_chunks: int = 2):
+    def generate_answers(self, queries: list[str], nb_chunks: int = 2, options_generation = None):
         answers = []
         impact = 0
         for query in queries:
-            answer = self.generate_answer(query=query, nb_chunks=nb_chunks)
+            answer = self.generate_answer(query=query,
+                                          nb_chunks=nb_chunks,
+                                          options_generation=options_generation)
             answers.append(answer)
             impact += answer["impacts"][0]
 

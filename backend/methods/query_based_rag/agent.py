@@ -1,6 +1,6 @@
 from ...utils.factory_vectorbase import get_vectorbase
 from ...utils.agent_functions import get_system_prompt
-from ...base_classes import RagAgent
+from ..naive_rag.agent import NaiveRagAgent
 from .indexation import QbRagIndexation
 from .query import QbSearch
 from ...utils.agent import get_Agent
@@ -11,7 +11,7 @@ from ..query_reformulation.query_reformulation import query_reformulation
 from ...database.database_class import get_management_data
 
 
-class QueryBasedRagAgent(RagAgent):
+class QueryBasedRagAgent(NaiveRagAgent):
     """
     RAG Agent based on Query-Based principle meaning we pass to a LLM all our chunked documents for asking it to generate questions about chunks.
     Then we associate the generated questions with their related chunks and when a query match a question we give as context the relevant chunk.
@@ -38,6 +38,7 @@ class QueryBasedRagAgent(RagAgent):
         self.type_retrieval = config_server["type_retrieval"]
         self.nb_chunks = config_server["nb_chunks"]
         self.storage_path = config_server["storage_path"]
+        self.config_server = config_server
         self.agent = get_Agent(config_server)
         self.data_manager = get_management_data(dbs_name=self.dbs_name,
                                                 data_folders_name=self.data_folders_name,
@@ -57,7 +58,7 @@ class QueryBasedRagAgent(RagAgent):
     def indexation_phase(
         self,
         reset_index: bool = False,
-        model: str = None,
+        overlap: bool = True,
     ) -> None:
         """Indexation phase for QB Rag"""
         if reset_index:
@@ -72,7 +73,8 @@ class QueryBasedRagAgent(RagAgent):
             embedding_model=self.embedding_model,
         )
 
-        qb_index.run_pipeline(chunk_size=self.chunk_size)
+        qb_index.run_pipeline(chunk_size=self.chunk_size,
+                              chunk_overlap=overlap,)
 
     def get_rag_context(
         self,
@@ -99,6 +101,7 @@ class QueryBasedRagAgent(RagAgent):
         query: str,
         nb_chunks: str = 2,
         model: str = None,
+        options_generation = None
     ) -> str:
         """ """
         agent = self.agent
@@ -119,9 +122,11 @@ class QueryBasedRagAgent(RagAgent):
         prompt = self.prompts["smooth_generation"]["QUERY_TEMPLATE"].format(
             context=context, query=query
         )
+        if options_generation is None:
+            options_generation = self.config_server["options_generation"]
 
         answer = agent.predict(prompt=prompt, system_prompt=self.system_prompt,
-                               options_generation=self.config_server["options_generation"])
+                               options_generation=options_generation)
         nb_input_tokens += np.sum(answer["nb_input_tokens"])
         nb_output_tokens += np.sum(answer["nb_output_tokens"])
 
@@ -154,9 +159,11 @@ class QueryBasedRagAgent(RagAgent):
             names_docs.append(name_docs)
         return contexts, names_docs
 
-    def generate_answers(self, queries: list[str], nb_chunks: int = 2):
+    def generate_answers(self, queries: list[str], nb_chunks: int = 2, options_generation = None):
         answers = []
         for query in queries:
-            answer = self.generate_answer(query=query, nb_chunks=nb_chunks)
+            answer = self.generate_answer(query=query,
+                                          nb_chunks=nb_chunks,
+                                          options_generation=options_generation)
             answers.append(answer)
         return answers
