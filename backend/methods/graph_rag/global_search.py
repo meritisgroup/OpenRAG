@@ -34,7 +34,6 @@ class GlobalSearch(Search):
         tokens_counter = {}
         tokens_counter["nb_input_tokens"] = 0
         tokens_counter["nb_output_tokens"] = 0
-
         for title in top_k_communities[0]:
                 community = (
                     self.data_manager.query_filter(table_class=Community,

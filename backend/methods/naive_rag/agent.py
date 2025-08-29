@@ -13,6 +13,8 @@ from ...database.database_class import get_management_data
 from ...utils.agent import get_Agent
 from .prompts import prompts
 import numpy as np
+from sqlalchemy import func
+from backend.database.rag_classes import Document, Tokens
 from ..query_reformulation.query_reformulation import query_reformulation
 
 
@@ -58,7 +60,6 @@ class NaiveRagAgent(RagAgent):
                                                 storage_path=self.storage_path,
                                                 config_server=config_server,
                                                 agent=self.agent)
-
         
         self.config_server = config_server
 
@@ -75,7 +76,14 @@ class NaiveRagAgent(RagAgent):
 
     def get_nb_token_embeddings(self):
         return self.data_manager.get_nb_token_embeddings()
-
+    
+    def get_infos_embeddings(self):
+        infos = {}
+        infos["embedding_tokens"] = (np.sum(self.data_manager.query(func.sum(Document.embedding_tokens))))
+        infos["input_tokens"] = np.sum(self.data_manager.query(func.sum(Document.input_tokens)))
+        infos["output_tokens"] = np.sum(self.data_manager.query(func.sum(Document.output_tokens)))
+        return infos
+    
     def indexation_phase(
         self,
         reset_index: bool = False,
@@ -103,8 +111,7 @@ class NaiveRagAgent(RagAgent):
         index.run_pipeline(
             chunk_size=self.chunk_size,
             chunk_overlap=overlap,
-            batch=self.params_vectorbase["batch"],
-        )
+            batch=self.params_vectorbase["batch"], config_server=self.config_server)
 
         return None
 
@@ -127,6 +134,7 @@ class NaiveRagAgent(RagAgent):
         self,
         query: str,
         nb_chunks: int = 5,
+        options_generation = None
     ) -> str:
         """
         Takes a query, retrieves appropriated context and generates an answer
@@ -151,15 +159,17 @@ class NaiveRagAgent(RagAgent):
             nb_output_tokens = output_t
 
         context, docs_name = self.get_rag_context(query=query,
-                                          nb_chunks=nb_chunks)
+                                                  nb_chunks=nb_chunks)
         
         prompt = self.prompts["smooth_generation"]["QUERY_TEMPLATE"].format(
             context=context, query=query
         )
+        if options_generation is None:
+            options_generation = self.config_server["options_generation"]
 
         answer = agent.predict(prompt=prompt,
                                system_prompt=self.system_prompt,
-                               options_generation=self.config_server["options_generation"])
+                               options_generation=options_generation)
         nb_input_tokens += np.sum(answer["nb_input_tokens"])
         nb_output_tokens += np.sum(answer["nb_output_tokens"])
         impacts[2] = answer["impacts"][2]
@@ -191,9 +201,11 @@ class NaiveRagAgent(RagAgent):
             names_docs.append(name_docs)
         return contexts, names_docs
 
-    def generate_answers(self, queries: list[str], nb_chunks: int = 2):
+    def generate_answers(self, queries: list[str], nb_chunks: int = 2, options_generation = None):
         answers = []
         for query in queries:
-            answer = self.generate_answer(query=query, nb_chunks=nb_chunks)
+            answer = self.generate_answer(query=query,
+                                          nb_chunks=nb_chunks,
+                                          options_generation=options_generation)
             answers.append(answer)
         return answers

@@ -28,6 +28,7 @@ class CragAgent(NaiveRagAgent):
         self.nb_chunks = config_server["nb_chunks"]
         self.max_web_requests = max_web_requests
         self.websearch = web_search(max_requests=self.max_web_requests)
+        self.prompts = prompts[self.language]
         self.websplitter = get_splitter(
             type_text_splitter=self.type_text_splitter,
             agent=self.agent,
@@ -131,17 +132,12 @@ class CragAgent(NaiveRagAgent):
             results = []
         return results
 
-    def concat_documents(self, documents):
-        context = ""
-        for chunk in documents:
-            context += chunk + "\n[...]\n"
-        return context[:-7]
-
     def generate_answer(
         self,
         query: str,
         nb_chunks: str = 5,
         batch: bool = True,
+        options_generation = None
     ) -> str:
         """Generate an answer to the query"""
 
@@ -219,7 +215,7 @@ class CragAgent(NaiveRagAgent):
                     ambiguous_contexts.append(context)
 
         if len(useful_contexts) > 0:
-            context = self.concat_documents(documents=useful_contexts)
+            context = self.contexts_to_prompts(contexts=useful_contexts)
         elif len(ambiguous_contexts) > 0:
             prompt = self.prompts["rewrite_web_query"]["QUERY_TEMPLATE"].format(
                 query=query
@@ -251,7 +247,7 @@ class CragAgent(NaiveRagAgent):
 
                 web_results = web_results["texts"]
             ambiguous_contexts += web_results
-            context = self.concat_documents(documents=ambiguous_contexts)
+            context = self.contexts_to_prompts(contexts=ambiguous_contexts)
         else:
             prompt = self.prompts["rewrite_web_query"]["QUERY_TEMPLATE"].format(
                 query=query
@@ -291,14 +287,19 @@ class CragAgent(NaiveRagAgent):
                 impacts[0] += web_results["impacts"][0]
                 impacts[1] += web_results["impacts"][1]
                 web_results = web_results["texts"]
-                context = self.concat_documents(documents=web_results)
+                context = self.contexts_to_prompts(contexts=web_results)
 
         prompt = self.prompts["smooth_generation"]["QUERY_TEMPLATE"].format(
             context=context, query=query
         )
+
+
+        if options_generation is None:
+            options_generation = self.config_server["options_generation"]
+
         system_prompt = self.prompts["smooth_generation"]["SYSTEM_PROMPT"]
         answer = agent.predict(prompt=prompt, system_prompt=system_prompt,
-                               options_generation=self.config_server["options_generation"])
+                               options_generation=options_generation)
         nb_input_tokens += (
             answer["nb_input_tokens"]
             if type(answer["nb_input_tokens"]) is type(0)
@@ -338,9 +339,10 @@ class CragAgent(NaiveRagAgent):
             names_docs.append(name_docs)
         return contexts, names_docs
 
-    def generate_answers(self, queries: list[str], nb_chunks: int = 2):
+    def generate_answers(self, queries: list[str], nb_chunks: int = 2, options_generation = None):
         answers = []
         for query in queries:
-            answer = self.generate_answer(query=query, nb_chunks=nb_chunks)
+            answer = self.generate_answer(query=query, nb_chunks=nb_chunks,
+                                          options_generation=options_generation)
             answers.append(answer)
         return answers

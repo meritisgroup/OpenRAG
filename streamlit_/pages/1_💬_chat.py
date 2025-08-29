@@ -93,7 +93,8 @@ with st.sidebar:
         type="primary",
     ):
         with st.spinner("Setting up RAG agent", show_time=True):
-            rag_agent = get_chat_agent(rag_method=rag_method)
+            rag_agent = get_chat_agent(rag_method=rag_method,
+                                       databases_name=st.session_state["chat_database_name"])
 
         with st.spinner("Indexation running", show_time=True):
             rag_agent.indexation_phase(

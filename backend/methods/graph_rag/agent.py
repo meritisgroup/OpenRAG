@@ -1,16 +1,17 @@
 import numpy as np
+from sqlalchemy import func
 from .indexation import GraphRagIndexation
 from .local_search import LocalSearch
 from .global_search import GlobalSearch
 from ...base_classes import RagAgent
 from ...utils.factory_vectorbase import get_vectorbase
-from ...database.database_class import get_graph_database
 from ...utils.agent import get_Agent
 from ...utils.agent_functions import get_system_prompt
 from .prompts import PROMPTS
 from ..query_reformulation.query_reformulation import query_reformulation
 from ...database.database_class import get_management_data
 from ...database.rag_classes import Chunk, Entity, Relation, Tokens
+
 
 
 class GraphRagAgent(RagAgent):
@@ -38,6 +39,7 @@ class GraphRagAgent(RagAgent):
         self.storage_path = config_server["storage_path"]
         self.embedding_model = config_server["embedding_model"]
         self.type_text_splitter = config_server["TextSplitter"]
+        self.config_server = config_server
 
         self.agent = get_Agent(config_server)
         self.data_manager = get_management_data(dbs_name=self.dbs_name,
@@ -82,6 +84,13 @@ class GraphRagAgent(RagAgent):
 
         index.run_pipeline(chunk_size=self.chunk_size, overlap=overlap)
 
+    def get_infos_embeddings(self):
+        infos = {}
+        infos["embedding_tokens"] = np.sum(self.data_manager.query(func.sum(Tokens.embedding_tokens)))
+        infos["input_tokens"] = np.sum(self.data_manager.query(func.sum(Tokens.input_tokens)))
+        infos["output_tokens"] = np.sum(self.data_manager.query(func.sum(Tokens.output_tokens)))
+        return infos
+                                                                                                        
     def get_rag_context(
         self,
         query: str,
@@ -113,6 +122,7 @@ class GraphRagAgent(RagAgent):
         query: str,
         method: str = "global",
         nb_chunks: str = 2,
+        options_generation = None
     ) -> str:
         context, tokens_counter = self.get_rag_context(
             query=query, method=method, nb_chunks=nb_chunks
@@ -134,8 +144,11 @@ class GraphRagAgent(RagAgent):
 
         prompt = prompt_template.format(**context_base)
 
+        if options_generation is None:
+            options_generation = self.config_server["options_generation"]
+
         answer = self.agent.predict(prompt=prompt, system_prompt=self.system_prompt,
-                                    options_generation=self.config_server["options_generation"])
+                                    options_generation=options_generation)
         impacts[2] = answer["impacts"][2]
         impacts[0] += answer["impacts"][0]
         impacts[1] += answer["impacts"][1]
@@ -149,16 +162,16 @@ class GraphRagAgent(RagAgent):
             "nb_input_tokens": np.sum(answer["nb_input_tokens"] + input_t),
             "nb_output_tokens": np.sum(answer["nb_output_tokens"] + output_t),
             "context": context,
-            "docs_names": [],
+            "docs_name": [],
             "impacts": impacts,
             "energy": energies,
         }
 
         return answer_dict
 
-    def generate_answers(self, queries: list[str], nb_chunks: int = 2):
+    def generate_answers(self, queries: list[str], nb_chunks: int = 2, options_generation = None):
         answers = []
         for query in queries:
-            answer = self.generate_answer(query=query, nb_chunks=nb_chunks)
+            answer = self.generate_answer(query=query, nb_chunks=nb_chunks, options_generation=options_generation)
             answers.append(answer)
         return answers

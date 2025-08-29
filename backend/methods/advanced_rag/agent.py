@@ -5,6 +5,7 @@ Created on Thu Feb  6 16:37:47 2025
 @author: chardy
 """
 from .indexation import NaiveRagIndexation
+from ..naive_rag.indexation import contexts_to_prompts
 from .query import NaiveSearch
 from ..naive_rag.agent import NaiveRagAgent
 from .reranker import Reranker
@@ -110,15 +111,6 @@ class AdvancedRag(NaiveRagAgent):
     def get_nb_token_embeddings(self):
         return self.data_manager.get_nb_token_embeddings()
 
-    def contexts_to_prompts(self, contexts, docs_name):
-        context = ""
-        docs_context = []
-        for i in range(len(contexts)):
-            if contexts[i] not in context:
-                context += contexts[i] + "\n[...]\n"
-                docs_context.append(docs_name[i])
-        return context[:-7], docs_context
-
     def release_gpu_memory(self):
         self.agent.release_memory()
 
@@ -127,6 +119,7 @@ class AdvancedRag(NaiveRagAgent):
         query: str,
         nb_chunks: int = 7,
         nb_reformulation=5,
+        options_generation = None
     ) -> str:
         """
         Takes a query, retrieves appropriated context and generates an answer
@@ -165,16 +158,19 @@ class AdvancedRag(NaiveRagAgent):
             )
             self.nb_input_tokens += nb_input_tokens
         docs_name = additional_data["docs_name"]
-        context, docs_name = self.contexts_to_prompts(contexts=contexts,
-                                                      docs_name=docs_name)
+        context, docs_name = contexts_to_prompts(contexts=contexts,
+                                                 docs_name=docs_name)
 
         prompt = self.prompts["smooth_generation"]["QUERY_TEMPLATE"].format(
             context=context, query=query
         )
 
+        if options_generation is None:
+            options_generation = self.config_server["options_generation"]
+            
         answer = agent.predict(prompt=prompt,
                                system_prompt=self.system_prompt,
-                               options_generation=self.config_server["options_generation"])
+                               options_generation=options_generation)
         self.nb_input_tokens += np.sum(answer["nb_input_tokens"])
         self.nb_output_tokens += np.sum(answer["nb_output_tokens"])
 
@@ -205,9 +201,10 @@ class AdvancedRag(NaiveRagAgent):
             names_docs.append(name_docs)
         return contexts, names_docs
 
-    def generate_answers(self, queries: list[str], nb_chunks: int = 2):
+    def generate_answers(self, queries: list[str], nb_chunks: int = 2, options_generation = None):
         answers = []
         for query in queries:
-            answer = self.generate_answer(query=query, nb_chunks=nb_chunks)
+            answer = self.generate_answer(query=query, nb_chunks=nb_chunks,
+                                          options_generation=options_generation)
             answers.append(answer)
         return answers

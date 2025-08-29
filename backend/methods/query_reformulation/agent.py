@@ -36,20 +36,12 @@ class QueryReformulationRag(NaiveRagAgent):
         context, docs_name = ns.get_context(query=query)
         return context, docs_name
 
-    def contexts_to_prompts(self, contexts, docs_name):
-        context = ""
-        docs_context = []
-        for i in range(len(contexts)):
-            if contexts[i] not in context:
-                context += contexts[i] + "\n[...]\n"
-                docs_context.append(docs_name[i])
-        return context[:-7], docs_context
-
     def generate_answer(
         self,
         query: str,
         nb_chunks: int = 5,
-        nb_reformulation: int = 5
+        nb_reformulation: int = 5,
+        options_generation = None
     ) -> str:
         """Generate an answer to the query"""
         agent = self.agent
@@ -73,8 +65,12 @@ class QueryReformulationRag(NaiveRagAgent):
             context=context, query=query
         )
         system_prompt = self.prompts["smooth_generation"]["SYSTEM_PROMPT"]
+
+        if options_generation is None:
+            options_generation = self.config_server["options_generation"]
+
         answer = agent.predict(prompt=prompt, system_prompt=system_prompt,
-                               options_generation=self.config_server["options_generation"])
+                               options_generation=options_generation)
         nb_input_tokens += np.sum(answer["nb_input_tokens"])
         nb_output_tokens += np.sum(answer["nb_output_tokens"])
 
@@ -112,9 +108,11 @@ class QueryReformulationRag(NaiveRagAgent):
             docs_name.append(docs_name)
         return contexts, docs_name
 
-    def generate_answers(self, queries: list[str], nb_chunks: int = 2):
+    def generate_answers(self, queries: list[str], nb_chunks: int = 2, options_generation = None):
         answers = []
         for query in queries:
-            answer = self.generate_answer(query=query, nb_chunks=nb_chunks)
+            answer = self.generate_answer(query=query, 
+                                          nb_chunks=nb_chunks,
+                                          options_generation=options_generation)
             answers.append(answer)
         return answers

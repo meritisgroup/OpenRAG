@@ -8,6 +8,10 @@ prompts = {
             "SYSTEM_PROMPT": "You are an AI assistant who has to determine if the provided context is relevante to answer the query. Output only 'relevant', 'irrelevant' or 'ambiguous'.",
             "QUERY_TEMPLATE": "-- Context --\n\n{context} \n\n -- Query --\n\n{query}",
         },
+        "conversationnal": {
+            "SYSTEM_PROMPT": "You are an AI assistant. You always respond with accuracy and honesty. You must respond in French",
+            "QUERY_TEMPLATE": "Answer this question: {query}",
+        },
         "retrieval_necessary": {
             "SYSTEM_PROMPT": "You are an AI assistant who has to determine if retrieval of documents is necessary to answer the query. Output only 'Yes' or 'No'",
             "QUERY_TEMPLATE": "{query}",

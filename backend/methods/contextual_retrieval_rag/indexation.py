@@ -115,7 +115,7 @@ class ContextualRetrievalIndexation:
             embedding_tokens = 0
             input_tokens = 0
             output_tokens = 0
-            doc = DocumentText(path=path_doc,
+            doc = DocumentText(path=path_doc,config_server={"data_preprocessing" : "pdf_text_extraction"},
                                 splitter=self.splitter)
             doc_content = doc.content
             size_limit_doc = []

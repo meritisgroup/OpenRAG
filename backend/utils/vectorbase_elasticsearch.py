@@ -72,11 +72,16 @@ class VectorBase_embeddings_elasticsearch(VectorBase):
 
         if not self.check_collection_exist(collection_name=name):
             self.client.indices.create(index=name, body=mapping)
+
         else:
             print(f'The collection "{name}" already exists')
 
+    
     def check_collection_exist(self, collection_name):
+        print(f"[DEBUG] Checking collection: {collection_name}")
         return self.client.indices.exists(index=collection_name)
+        
+
 
     def check_element_exist(self, element, collection_name=None):
         if collection_name is None:

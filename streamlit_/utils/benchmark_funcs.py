@@ -5,10 +5,14 @@ from math import sqrt
 from backend.evaluation.agent_evaluator import DataFramePreparator, AgentEvaluator
 from backend.evaluation.prompts import PROMPTS
 import pandas as pd
+import os
+from datetime import datetime
 import json
 import numpy as np
 
+from streamlit_.utils.chat_funcs import get_chat_agent
 from backend.utils.progress import ProgressBar
+
 
 color_discrete_sequence = [
     "#636EFA",
@@ -23,15 +27,73 @@ color_discrete_sequence = [
     "#FECB52",
 ]
 
+def run_indexation_benchmark(reset_index):
+    rag_agents = []
+    rag_names = []
+    with st.spinner("**Indexation Running**", show_time=True):
+        progress_bar_iterable = [
+            rag
+            for rag in st.session_state["benchmark"]["rags"].keys()
+            if st.session_state["benchmark"]["rags"][rag]
+        ]
+        indexation_progress_bar = ProgressBar(progress_bar_iterable)
+        for i, rag in enumerate(indexation_progress_bar.iterable):
+            if st.session_state["benchmark"]["rags"][rag]:
+                rag_agent = get_chat_agent(rag,
+                                           databases_name=[st.session_state['benchmark_database']])
+                rag_agent.indexation_phase(reset_index=reset_index)
+                rag_agents.append(rag_agent)
+                rag_names.append(rag)
+                indexation_progress_bar.update(i)
+        indexation_progress_bar.success("Indexation done")
+    return rag_agents, rag_names
+
+
+def get_report_path():
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    template_path = os.path.join(BASE_DIR, "plot_report_template.tex")
+
+    timestamp = datetime.now()
+    timestamp = timestamp.strftime("%m-%d_%H-%M-%S")
+    report_dir = os.path.normpath(
+            os.path.join(BASE_DIR, "..", "..", "data", "report", timestamp)
+    )
+    os.makedirs(report_dir, exist_ok=True)
+
+    return report_dir
+
+def generate_answers(rag_names, rag_agents):
+    dataframe_preparator = DataFramePreparator(
+        rag_agents=rag_agents,
+        rags_available=rag_names,
+        input_path=os.path.join("data", "queries", 
+                                st.session_state["benchmark"]["queries_doc_name"]),
+    )
+    dataframe_preparator.run_all_queries(options_generation={"type_generation": "simple_generation"})
+    df = dataframe_preparator.get_dataframe()
+    df.to_csv(os.path.join(get_report_path(), "bench_df.csv"), index=False)
+       
+def generate_contexts(rag_names, rag_agents):
+    dataframe_preparator = DataFramePreparator(
+        rag_agents=rag_agents,
+        rags_available=rag_names,
+        input_path=os.path.join("data", "queries",
+                                st.session_state["benchmark"]["queries_doc_name"]),
+    )
+    dataframe_preparator.run_all_queries(options_generation={"type_generation": "no_generation"})
+    df = dataframe_preparator.get_dataframe()
+    df.to_csv(os.path.join(get_report_path(), "contexts_df.csv"), index=False)
+
 
 def generate_benchmark(rag_names, rag_agents):
 
     dataframe_preparator = DataFramePreparator(
         rag_agents=rag_agents,
         rags_available=rag_names,
-        input_path="./data/queries/"
-        + st.session_state["benchmark"]["queries_doc_name"],
+        input_path=os.path.join("data", "queries",
+                                 st.session_state["benchmark"]["queries_doc_name"])
     )
+    dataframe_preparator.run_all_queries(options_generation={"type_generation": "simple_generation"})
 
     df = dataframe_preparator.get_dataframe()
     evaluation_agent = AgentEvaluator(
@@ -41,7 +103,6 @@ def generate_benchmark(rag_names, rag_agents):
     )
 
     evals = evaluation_agent.get_evals()
-
     (
         st.session_state["benchmark"]["arena_matrix"],
         st.session_state["benchmark"]["ground_truth"],
@@ -56,7 +117,6 @@ def generate_benchmark(rag_names, rag_agents):
     impact = extract_impact(df)
     energy = extract_energy(df)
     time = extract_time(df)
-
     st.session_state["benchmark"]["impacts"] = impact
     st.session_state["benchmark"]["energy"] = energy
     st.session_state["time"] = time
@@ -81,11 +141,12 @@ def generate_benchmark(rag_names, rag_agents):
         "time_graph" : time_graph()
     }
     st.session_state["benchmark"]["plots"] = plots
-    st.session_state["benchmark"]["report_path"] = evaluation_agent.create_plot_report(plots=plots)
-    df.to_csv(st.session_state["benchmark"]["report_path"]+"/bench_df.csv", index=False)
-    with open(st.session_state["benchmark"]["report_path"]+"/impact.json", "w") as file:
+    st.session_state["benchmark"]["report_path"] = evaluation_agent.create_plot_report(plots=plots,
+                                                                                       report_dir=get_report_path())
+    df.to_csv(os.path.join(st.session_state["benchmark"]["report_path"], "bench_df.csv"), index=False)
+    with open(os.path.join(st.session_state["benchmark"]["report_path"], "impact.json"), "w") as file:
         json.dump(impact,file,indent=4)
-    with open(st.session_state["benchmark"]["report_path"]+"/energy.json", "w") as file:
+    with open(os.path.join(st.session_state["benchmark"]["report_path"], "energy.json"), "w") as file:
         json.dump(energy,file,indent=4)
 
 
