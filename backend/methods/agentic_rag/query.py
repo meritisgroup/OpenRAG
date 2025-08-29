@@ -1,5 +1,6 @@
 from ...utils.agent import Agent
 from ...base_classes import Search
+from ..naive_rag.indexation import contexts_to_prompts
 
 
 class NaiveSearch(Search):
@@ -32,11 +33,6 @@ class NaiveSearch(Search):
         chunks = [res["text"] for res in search_res[0]]
         docs_name = [res["doc_name"] for res in search_res[0]]
 
-        context = ""
-
-        for chunk in chunks:
-
-            context += chunk + "\n[...]\n"
-
-        context = context[:-7]
+        context = contexts_to_prompts(context=chunks,
+                                      docs_name=docs_name)
         return context, docs_name

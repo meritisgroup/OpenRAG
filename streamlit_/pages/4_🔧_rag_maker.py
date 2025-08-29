@@ -6,7 +6,7 @@ from elasticsearch import Elasticsearch
 from pymilvus import utility, connections
 import pandas as pd
 from backend.utils.factory_name_dataset_vectorbase import get_name
-from streamlit_.utils.params_func import get_possible_embeddings_model, get_default_embeddings_model
+from streamlit_.utils.params_func import get_possible_embeddings_model, get_default_embeddings_model, get_config_rag
 
 
 config_new_rag = {}
@@ -92,11 +92,9 @@ if "numeric" not in st.session_state:
 if "indexing" not in st.session_state:
     st.session_state["indexing"] = False
 
-
 def update_slider_from_num():
     st.session_state["chunk_length"] = st.session_state["numeric"]
     st.session_state["indexing"] = True
-
 
 def update_num_from_slider():
     st.session_state["numeric"] = st.session_state["chunk_length"]
@@ -288,13 +286,10 @@ if (
     "custom_rags" in st.session_state.keys()
     and rag_method in st.session_state["custom_rags"]
 ):
-    if st.session_state["config_server"]["params_host_llm"]["type"] == "vllm":
-        folder = "vllm"
-    else:
-        folder = "ollama_openai_mistral"
-
+    folder = st.session_state["config_server"]["params_host_llm"]["type"]
     with open(f"data/custom_rags/{folder}/{rag_method}.json", "r") as file:
         custom_config = json.load(file)
+
     name = custom_config["name"]
     base = custom_config["base"]
 else:
@@ -357,6 +352,7 @@ st.markdown("# Combine Responses from Different RAGs")
 st.markdown("## Pick the RAGs You Want to Merge:")
 config_merge_rag = {}
 rags_to_merge_list=[]
+rags_config_to_merge_list=[]
 
 col1, col2, col3 = st.columns(3)
 
@@ -385,6 +381,8 @@ with col1:
 
         if st.session_state["rags_to_merge"]["rags"][all_rags[i]]:
             rags_to_merge_list.append(all_rags[i])
+            rags_config_to_merge_list.append(get_config_rag(rag_name=all_rags[i],
+                                                             provider=st.session_state["config_server"]["params_host_llm"]["type"]))
 
 with col2:
     for i in range(rags_per_column, 2 * rags_per_column):
@@ -401,6 +399,8 @@ with col2:
         )
         if st.session_state["rags_to_merge"]["rags"][all_rags[i]]:
             rags_to_merge_list.append(all_rags[i])
+            rags_config_to_merge_list.append(get_config_rag(rag_name=all_rags[i],
+                                                             provider=st.session_state["config_server"]["params_host_llm"]["type"]))
 
 with col3:
     for i in range(2 * rags_per_column, nb_rags):
@@ -417,6 +417,8 @@ with col3:
         )
         if st.session_state["rags_to_merge"]["rags"][all_rags[i]]:
             rags_to_merge_list.append(all_rags[i])
+            rags_config_to_merge_list.append(get_config_rag(rag_name=all_rags[i],
+                                                             provider=st.session_state["config_server"]["params_host_llm"]["type"]))
 
 
 
@@ -439,22 +441,22 @@ if st.button(
         st.error("Invalid RAG name, only alphanumeric characters, underscores, lowercase letters and hyphens are allowed", icon="🚨")
     else:
         
-        st.session_state["merge"].append(config_merge_rag["name"])
+        st.session_state["merge_rags"].append(config_merge_rag["name"])
         
         saved_config = st.session_state["config_server"].copy()
         saved_config["name"] = config_merge_rag["name"]
-        saved_config["rag_list"]=rags_to_merge_list
-        folder = "vllm" if saved_config["params_host_llm"]["type"] == "vllm" else "ollama_openai_mistral"
+        saved_config["base"] = "merger"
+        saved_config["rag_list"] = rags_to_merge_list
+        saved_config["rag_config_list"] = rags_config_to_merge_list
+        folder = saved_config["params_host_llm"]["type"]
         with open(f"data/merge/{folder}/{config_merge_rag['name']}.json", "w") as config:
             json.dump(saved_config, config,ensure_ascii=False, indent=4)
-        if folder == "vllm":
-            st.session_state["all_rags"]["vllm"][config_merge_rag["name"]] = config_merge_rag["name"]
-        else:
-            st.session_state["all_rags"]["openai"][config_merge_rag["name"]] = config_merge_rag["name"]
-            st.session_state["all_rags"]["ollama"][config_merge_rag["name"]] = config_merge_rag["name"]
-            st.session_state["all_rags"]["mistral"][config_merge_rag["name"]] = config_merge_rag["name"]
+
+        st.session_state["all_rags"][folder][config_merge_rag["name"]] = config_merge_rag["name"]
+
         with open("streamlit_/utils/all_rags.json", "w") as file:
             json.dump(st.session_state["all_rags"],file,ensure_ascii=False, indent=4)
+
         st.session_state["rags_to_merge"]["rags"][config_merge_rag["name"]] = False
         st.session_state["benchmark"]["rags"][config_merge_rag["name"]] = False
         st.success("RAG successfully created")
@@ -472,7 +474,7 @@ left, right = st.columns([0.85, 0.15], vertical_alignment="bottom")
 # Select the RAG to delete
 rag_to_del = left.selectbox(
     label="List of merged RAGs",
-    options=st.session_state.get("merge", []),
+    options=st.session_state.get("merge_rags", []),
     label_visibility="collapsed",
     key="rag_to_delete_selectbox"
 )
@@ -483,8 +485,8 @@ delete_btn_key = f"delete_button_{rag_to_del}"
 # Delete button
 if right.button(label="Delete merge", type="primary", use_container_width=True):
     # Remove from "merge" list
-    if rag_to_del in st.session_state["merge"]:
-        st.session_state["merge"].remove(rag_to_del)
+    if rag_to_del in st.session_state["merge_rags"]:
+        st.session_state["merge_rags"].remove(rag_to_del)
 
     # Remove from all_rags categories if present
     for backend in ["ollama", "openai", "mistral", "vllm"]:
@@ -492,7 +494,7 @@ if right.button(label="Delete merge", type="primary", use_container_width=True):
             del st.session_state["all_rags"][backend][rag_to_del]
 
     # Remove corresponding JSON config file
-    for folder in ["vllm", "ollama_openai_mistral"]:
+    for folder in ["vllm", "ollama", "openai", "mistral"]:
         path = f"./data/merge/{folder}/{rag_to_del}.json"
         if os.path.exists(path):
             os.remove(path)

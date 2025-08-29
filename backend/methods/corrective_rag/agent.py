@@ -132,12 +132,6 @@ class CragAgent(NaiveRagAgent):
             results = []
         return results
 
-    def concat_documents(self, documents):
-        context = ""
-        for chunk in documents:
-            context += chunk + "\n[...]\n"
-        return context[:-7]
-
     def generate_answer(
         self,
         query: str,
@@ -221,7 +215,7 @@ class CragAgent(NaiveRagAgent):
                     ambiguous_contexts.append(context)
 
         if len(useful_contexts) > 0:
-            context = self.concat_documents(documents=useful_contexts)
+            context = self.contexts_to_prompts(contexts=useful_contexts)
         elif len(ambiguous_contexts) > 0:
             prompt = self.prompts["rewrite_web_query"]["QUERY_TEMPLATE"].format(
                 query=query
@@ -253,7 +247,7 @@ class CragAgent(NaiveRagAgent):
 
                 web_results = web_results["texts"]
             ambiguous_contexts += web_results
-            context = self.concat_documents(documents=ambiguous_contexts)
+            context = self.contexts_to_prompts(contexts=ambiguous_contexts)
         else:
             prompt = self.prompts["rewrite_web_query"]["QUERY_TEMPLATE"].format(
                 query=query
@@ -293,7 +287,7 @@ class CragAgent(NaiveRagAgent):
                 impacts[0] += web_results["impacts"][0]
                 impacts[1] += web_results["impacts"][1]
                 web_results = web_results["texts"]
-                context = self.concat_documents(documents=web_results)
+                context = self.contexts_to_prompts(contexts=web_results)
 
         prompt = self.prompts["smooth_generation"]["QUERY_TEMPLATE"].format(
             context=context, query=query

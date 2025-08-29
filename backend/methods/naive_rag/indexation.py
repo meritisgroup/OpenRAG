@@ -63,8 +63,7 @@ class NaiveRagIndexation:
                 self.data_manager.add_str_batch_elements(elements=elements[i : i + taille_batch],
                                                          docs_name=name_docs[i : i + taille_batch],
                                                          path_docs=path_docs[i : i + taille_batch],
-                                                         display_message=False)
-            )
+                                                         display_message=False))
             progress_bar_chunks.update(j)
             j+=1
         return tokens
@@ -108,13 +107,11 @@ class NaiveRagIndexation:
         docs_already_processed = [res[0] for res in self.data_manager.query(Document.path)]
         to_process_norm = [Path(p).resolve().as_posix() for p in self.data_manager.get_list_path_documents()]
         docs_already_norm = [Path(p).resolve().as_posix() for p in docs_already_processed]
-
         docs_to_process = [
             doc
             for doc in to_process_norm
             if doc not in docs_already_norm
         ]
-
         self.data_manager.create_collection()
         with tqdm(docs_to_process) as progress_bar:
             for i, path_doc in enumerate(progress_bar):
@@ -125,26 +122,43 @@ class NaiveRagIndexation:
                 
                 doc_chunks = doc.chunks(chunk_size=chunk_size,
                                         chunk_overlap=chunk_overlap)
-            name_docs = [str(Path(path_doc).name) for i in range(len(doc_chunks))]
-            path_docs = [str(Path(path_doc).parent) for i in range(len(doc_chunks))]
-            print(batch)
-            if batch:
-                doc_indexation_tokens += self.__batch_indexation__(doc_chunks=doc_chunks,
-                                                                           name_docs=name_docs,
-                                                                           path_docs=path_docs)
+    
+                name_docs = [str(Path(path_doc).name) for i in range(len(doc_chunks))]
+                path_docs = [str(Path(path_doc).parent) for i in range(len(doc_chunks))]
 
-            else:
-                doc_indexation_tokens += self.__serial_indexation__(doc_chunks=doc_chunks, 
+                if batch:
+                    doc_indexation_tokens += self.__batch_indexation__(doc_chunks=doc_chunks,
                                                                             name_docs=name_docs,
                                                                             path_docs=path_docs)
 
-            new_doc = Document(
-                                name=str(Path(path_doc).name),
-                                path=str(Path(path_doc)),
-                                embedding_tokens=int(doc_indexation_tokens),
-                                input_tokens=0,
-                                output_tokens=0,
-                            )
-            self.data_manager.add_instance(instance=new_doc,
-                                               path=str(Path(path_doc).parent))
-            progress_bar.update(i)
+                else:
+                    doc_indexation_tokens += self.__serial_indexation__(doc_chunks=doc_chunks, 
+                                                                                name_docs=name_docs,
+                                                                                path_docs=path_docs)
+
+                new_doc = Document(
+                                    name=str(Path(path_doc).name),
+                                    path=str(Path(path_doc)),
+                                    embedding_tokens=int(doc_indexation_tokens),
+                                    input_tokens=0,
+                                    output_tokens=0,
+                                )
+                self.data_manager.add_instance(instance=new_doc,
+                                                path=str(Path(path_doc).parent))
+                progress_bar.update(i)
+
+
+
+def contexts_to_prompts(contexts, docs_name):
+    context = ""
+    docs_context = []
+    for i in range(len(contexts)):
+        if contexts[i] not in context:
+            context += contexts[i] + "\n[...]\n"
+
+            if len(docs_name)>0:
+                docs_context.append(docs_name[i])
+    if len(docs_name)>0:
+        return context[:-7], docs_context
+    else:
+        return context[:-7]

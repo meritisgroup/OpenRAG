@@ -4,13 +4,13 @@ from ...utils.factory_vectorbase import get_vectorbase
 from ...utils.agent_functions import get_system_prompt
 from ...database.database_class import get_management_data
 from ...utils.agent import get_Agent
-from ..naive_rag.query import NaiveSearch
+from ..naive_rag.agent import NaiveRagAgent
 from .prompts import prompts
 import numpy as np
 from ..query_reformulation.query_reformulation import query_reformulation
 
 
-class SemanticChunkingRagAgent(RagAgent):
+class SemanticChunkingRagAgent(NaiveRagAgent):
     """
     This RAG methods uses an adaptative size of chunk in order to group sentences by similarity
     """

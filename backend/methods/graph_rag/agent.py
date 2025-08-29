@@ -1,4 +1,5 @@
 import numpy as np
+from sqlalchemy import func
 from .indexation import GraphRagIndexation
 from .local_search import LocalSearch
 from .global_search import GlobalSearch
@@ -10,6 +11,7 @@ from .prompts import PROMPTS
 from ..query_reformulation.query_reformulation import query_reformulation
 from ...database.database_class import get_management_data
 from ...database.rag_classes import Chunk, Entity, Relation, Tokens
+
 
 
 class GraphRagAgent(RagAgent):
@@ -82,6 +84,13 @@ class GraphRagAgent(RagAgent):
 
         index.run_pipeline(chunk_size=self.chunk_size, overlap=overlap)
 
+    def get_infos_embeddings(self):
+        infos = {}
+        infos["embedding_tokens"] = np.sum(self.data_manager.query(func.sum(Tokens.embedding_tokens)))
+        infos["input_tokens"] = np.sum(self.data_manager.query(func.sum(Tokens.input_tokens)))
+        infos["output_tokens"] = np.sum(self.data_manager.query(func.sum(Tokens.output_tokens)))
+        return infos
+                                                                                                        
     def get_rag_context(
         self,
         query: str,
