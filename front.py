@@ -18,6 +18,7 @@ documentation = st.Page("streamlit_/pages/6_📖_documentation.py", title="Docum
 advanced_configuration = st.Page(
     "streamlit_/pages/7_🛠️_advanced_configuration.py", title="Advanced Configuration"
 )
+metadatas = st.Page("streamlit_/pages/8_⚡_metadatas.py", title="Metadatas")
 pg = st.navigation(
     (
         [
@@ -28,6 +29,7 @@ pg = st.navigation(
             databases,
             documentation,
             advanced_configuration,
+            metadatas,
         ]
     )
 )
@@ -121,7 +123,9 @@ if "benchmark" not in st.session_state:
     st.session_state["benchmark"]["load"] = False
 
 
-st.session_state["custom_rags"] = get_custom_rags(provider=st.session_state["config_server"]["params_host_llm"]["type"])
+st.session_state["custom_rags"] = get_custom_rags(
+    provider=st.session_state["config_server"]["params_host_llm"]["type"]
+)
 if ".gitkeep" in st.session_state["custom_rags"]:
     st.session_state["custom_rags"].remove(".gitkeep")
 

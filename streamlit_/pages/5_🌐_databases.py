@@ -7,6 +7,13 @@ import re
 from backend.utils.open_doc import Opener
 import zipfile
 import io
+import json
+
+from streamlit_.utils.metadatas_funcs import (
+    init_metadata,
+    add_documents_metadata,
+    delete_database_metadata,
+)
 
 st.markdown("# Database Manager")
 
@@ -37,10 +44,12 @@ if right.button(label="Create DataBase", type="primary", use_container_width=Tru
         st.session_state["all_databases"].append(
             st.session_state["databases"]["new_name"]
         )
+        init_metadata(st.session_state["databases"]["new_name"])
         st.rerun()
 
 
 st.markdown("## Database visualization")
+
 
 left, right = st.columns([6, 1], vertical_alignment="bottom")
 database_name = left.selectbox(
@@ -63,7 +72,7 @@ if right.button(label="Delete DataBase", type="primary", use_container_width=Tru
     for index_name in es.indices.get_alias(index="*"):
         if database_name in index_name:
             es.indices.delete(index=index_name)
-    
+
     for database in os.listdir("./storage"):
         if database_name in database:
             os.remove("./storage/" + database)
@@ -75,12 +84,14 @@ if right.button(label="Delete DataBase", type="primary", use_container_width=Tru
     database_name = None
     st.rerun()
 
+
 if "new_doc" not in st.session_state:
     st.session_state["new_doc"] = False
 
 if database_name is not None:
     database_path = f"./data/databases/{database_name}"
-    document_list = os.listdir(f"./data/databases/{database_name}")
+    file_list = os.listdir(f"./data/databases/{database_name}")
+    document_list = [f for f in file_list if f != "metadatas.json"]
     display_db = pd.DataFrame(data={"Doc Name": document_list})
     st.write(display_db)
 
@@ -111,6 +122,7 @@ if "document_list" in globals() and document_list:
         os.remove(os.path.join(database_path, file_to_delete))
         st.success(f"Deleted {file_to_delete}")
         st.session_state["document_deleted"] = True
+        add_documents_metadata(database_name)
         st.rerun()
 else:
     st.info("No documents to display or delete.")
@@ -197,4 +209,5 @@ if st.session_state["new_doc"]:
                 )
 
     st.session_state["new_doc"] = False
+    add_documents_metadata(database_name)
     st.rerun()
