@@ -21,7 +21,6 @@ opencv-python
 elasticsearch==8.17.2
 colpali-engine
 SpeechRecognition
-streamlit
 pydub
 numpy 
 elasticsearch==8.17.2
@@ -33,3 +32,4 @@ mistralai
 ecologits
 rapidfuzz
 duckduckgo-search
+docling

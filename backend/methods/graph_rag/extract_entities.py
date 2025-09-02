@@ -18,6 +18,16 @@ import re
 import html
 import numpy as np
 
+import secrets
+import string
+
+# Alphabet base62 (URL/file-safe)
+_ALPHABET = string.ascii_letters + string.digits  # 26+26+10 = 62
+
+
+def make_chunk_id() -> str:
+    return ''.join(secrets.choice(_ALPHABET) for _ in range(15))
+
 
 
 
@@ -183,6 +193,7 @@ def _handle_single_entity_extraction(
     return entity
 
 
+
 def _handle_single_relationship_extraction(
     record_attributes: list[str], chunk_key: str, doc_name: str
 ):
@@ -248,19 +259,15 @@ def save_chunks_to_file(chunks: list[Chunk], output_path: str = "chunks_output.t
 
 
 
-def save_chunks_to_jsonl(doc_id, chunks: List["Chunk"], jsonl_path: str = "chunks_output.jsonl") :
+def save_chunks_to_jsonl(doc_id, chunks: List[Chunk], jsonl_path: str = "chunks_output.jsonl") :
     
     os.makedirs(os.path.dirname(jsonl_path) or ".", exist_ok=True)
 
     
     with open(jsonl_path, "a", encoding="utf-8") as f:
         for c in chunks:
-            record = {
-                "name_doc": getattr(c, "document", None),
-                "doc_id": doc_id,       
-                "chunk_id": getattr(c, "id", None),     
-                "chunk_content": str(getattr(c, "text", "")),
-            }
+            record = {col.name: getattr(c, col.name) for col in c.__table__.columns}
+            record["doc_id"] = doc_id
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
     
     return None 
@@ -371,7 +378,7 @@ class DocumentText:
 
         
         results = []
-        chunk_id = 1
+        chunk_position = 1
 
         if self.data_preprocessing=="md_with_images" or self.data_preprocessing=="md_without_images":
             # Create the markdown splitter
@@ -393,41 +400,42 @@ class DocumentText:
                 parts = extract_images_and_tables_blocks(section_text)
 
 
-                chunks = []
+                texts = []
                 for part in (parts):
                     if re.match(r"^<IMAGE\s+\d+\s*-->", part):  # image description bloc
-                        chunks.append(part)
+                        texts.append(part)
                     elif re.match(r"^\s*\|.*\|\s*$", part, re.MULTILINE):  # table bloc
-                        chunks.append(part)
+                        texts.append(part)
                         
                     else:
                         # Apply classic text splitter to non-table part
-                        sub_chunks = self.text_splitter.split_text(
+                        sub_text = self.text_splitter.split_text(
                             text=part, chunk_size=chunk_size, overlap=chunk_overlap
                         )
                         
-                        chunks.extend(sub_chunks)
+                        texts.extend(sub_text)
 
-                for chunk in chunks:
+                for text in texts:
                     if headers_str:
-                        final_text = headers_str + "\n" + chunk
+                        final_text = headers_str + "\n" + text
                     else:
-                        final_text = chunk
-                    results.append(Chunk(text=final_text, document=self.name_with_extension, id=chunk_id))
-                    chunk_id += 1
+                        final_text = text
+                        chunk_id = make_chunk_id()
+                    results.append(Chunk(text=final_text, document=self.name_with_extension, position_in_doc=chunk_position, id=chunk_id))
+                    chunk_position += 1
 
 
         else : 
             """
             # Fallback for non-markdown inputs
             """
-            chunks = self.text_splitter.split_text(
+            texts = self.text_splitter.split_text(
                 text=self.content, chunk_size=chunk_size, overlap=chunk_overlap
             )
             
-            for k, chunk in enumerate(chunks):
+            for k, text in enumerate(texts):
                 results.append(
-                    Chunk(text=chunk, document=self.name_with_extension, id=k + 1)
+                    Chunk(text=text, document=self.name_with_extension, position_in_doc=k + 1, id=make_chunk_id())
                 )
 
         #save chunks  
