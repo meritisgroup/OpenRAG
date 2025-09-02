@@ -3,9 +3,12 @@ from sqlalchemy.orm import Session, Query
 from ..utils.factory_vectorbase import get_vectorbase
 import os
 from pathlib import Path
+from sqlalchemy.orm import DeclarativeMeta
+from typing import Type
 
 
 from .rag_classes import (
+    Chunk,
     Base,
     Entity,
     Relation,
@@ -215,10 +218,8 @@ class Merger_Database_Vectorbase:
 
     def add_str_elements(
         self,
-        elements: list[str],
-        docs_name: list[str] = None,
+        chunks=list[Chunk],
         path_docs: list[str] = None,
-        metadata: list[dict] = [],
         display_message: bool = True,
         collection_name=None,
         vb_name: str = None,
@@ -230,19 +231,15 @@ class Merger_Database_Vectorbase:
 
         if vb_name is not None:
             return self.vectorbases[vb_name]["vectorbase"].add_str_elements(
-                elements=elements,
-                docs_name=docs_name,
-                metadata=metadata,
+                chunks=chunks,
                 display_message=display_message,
                 collection_name=collection_name,
             )
 
     def add_str_batch_elements(
         self,
-        elements: list[str],
-        docs_name: list[str] = None,
+        chunks: list[Chunk],
         path_docs: list[str] = None,
-        metadata: list[dict] = [],
         display_message: bool = True,
         collection_name=None,
         vb_name: str = None,
@@ -254,9 +251,7 @@ class Merger_Database_Vectorbase:
 
         if vb_name is not None:
             return self.vectorbases[vb_name]["vectorbase"].add_str_batch_elements(
-                elements=elements,
-                docs_name=docs_name,
-                metadata=metadata,
+                chunks=chunks,
                 display_message=display_message,
                 collection_name=collection_name,
             )

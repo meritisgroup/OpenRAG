@@ -18,7 +18,7 @@ class CompareQueryAnswer(BaseModel):
     Decision: bool
 
 class AgenticRagAgent(NaiveRagAgent):
-    "Original RAG with no modification"
+    "Iterative RAG"
 
     def __init__(
         self,

@@ -6,6 +6,7 @@ from ...utils.progress import ProgressBar
 import os
 import numpy as np
 from pathlib import Path
+from ...database.rag_classes import Chunk
 
 class NaiveRagIndexation:
     def __init__(
@@ -38,9 +39,9 @@ class NaiveRagIndexation:
         )
 
 
-    def __batch_indexation__(self, doc_chunks, name_docs, path_docs):
+    def __batch_indexation__(self, doc_chunks, path_docs):
         """
-        Adds a batch of chunks from doc_chunks to the indexation verctorbase
+        Adds a batch of chunks from doc_chunks to the indexation vectorbase
         Args:
             doc_chunks (list[str]) : Chunks to be indexed
             name_docs (list[str]) : Name of docs each chunk is from
@@ -48,20 +49,16 @@ class NaiveRagIndexation:
         Returns
             None
         """
-        elements = []
         tokens = 0
-        for k, chunk in enumerate(doc_chunks):
-            elements.append(chunk.text.replace("\n", "").replace("'", ""))
-
-        tokens = 0
+    
+        
         taille_batch = 500
-        range_chunks = range(0, len(elements), taille_batch)
+        range_chunks = range(0, len(doc_chunks), taille_batch)
         progress_bar_chunks = ProgressBar(total=len(range_chunks))
         j = 0
         for i in range_chunks:
             tokens += np.sum(
-                self.data_manager.add_str_batch_elements(elements=elements[i : i + taille_batch],
-                                                         docs_name=name_docs[i : i + taille_batch],
+                self.data_manager.add_str_batch_elements(chunks=doc_chunks[i : i + taille_batch],
                                                          path_docs=path_docs[i : i + taille_batch],
                                                          display_message=False))
             progress_bar_chunks.update(j)
@@ -69,25 +66,20 @@ class NaiveRagIndexation:
         return tokens
     
 
-    def __serial_indexation__(self, doc_chunks, name_docs, path_docs):
+    def __serial_indexation__(self, doc_chunks, path_docs):
         """
-        Adds a batch of chunks from doc_chunks to the indexation verctorbase
+        Adds a batch of chunks from doc_chunks to the indexation vectorbase
         Args:
-            doc_chunks (list[str]) : Chunks to be indexed
+            doc_chunks (list[Chunks]) : Chunks to be indexed
             name_docs (list[str]) : Name of docs each chunk is from
 
         Returns
             None
         """
-        tokens = 0
-        for k, chunk in enumerate(doc_chunks):
-            try:
-                tokens += self.data_manager.add_str_elements(elements=[chunk.text.replace("\n", "").replace("'", "")],
-                                                             docs_name=[name_docs[k]],
-                                                             path_docs=[path_docs[k]],
+        
+        tokens = self.data_manager.add_str_elements(doc_chunks,
+                                                             path_docs,
                                                              display_message=False)
-            except Exception:
-                None
         return tokens
     
 
@@ -123,17 +115,15 @@ class NaiveRagIndexation:
                 doc_chunks = doc.chunks(chunk_size=chunk_size,
                                         chunk_overlap=chunk_overlap)
     
-                name_docs = [str(Path(path_doc).name) for i in range(len(doc_chunks))]
+            
                 path_docs = [str(Path(path_doc).parent) for i in range(len(doc_chunks))]
 
                 if batch:
                     doc_indexation_tokens += self.__batch_indexation__(doc_chunks=doc_chunks,
-                                                                            name_docs=name_docs,
                                                                             path_docs=path_docs)
 
                 else:
                     doc_indexation_tokens += self.__serial_indexation__(doc_chunks=doc_chunks, 
-                                                                                name_docs=name_docs,
                                                                                 path_docs=path_docs)
 
                 new_doc = Document(

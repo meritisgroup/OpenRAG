@@ -14,24 +14,28 @@ class Base(DeclarativeBase):
 class Chunk(Base):
     __tablename__ = "chunks"
 
-    id: Mapped[int] = mapped_column(Integer(), primary_key=True)
+    id : Mapped[str] = mapped_column(String())
+    position_in_doc : Mapped[int] = mapped_column(Integer(), primary_key=True)
     document: Mapped[str] = mapped_column(String(), primary_key=True)
     text: Mapped[str] = mapped_column(String())
+    #metadata= Mapped[list[str]] = mapped_column(JSON())
 
     def __repr__(self) -> str:
-        return f"Chunk(id={self.id!r}, doc={self.document!r}, text={self.text!r})"
+        return f"Chunk(id={self.id!r}, doc={self.document!r}, text={self.text!r}, position_in_doc={self.position_in_doc!r}, metadata={self.metadata!r})"
 
 
 class ChunkPath(Base):
     __tablename__ = "chunks_image"
 
-    id: Mapped[int] = mapped_column(Integer(), primary_key=True)
-    doc_id: Mapped[int] = mapped_column(Integer(), primary_key=True)
+    id : Mapped[str] = mapped_column(String())
+    position_in_doc : Mapped[int] = mapped_column(Integer(), primary_key=True)
     document: Mapped[str] = mapped_column(String(), primary_key=True)
+    text: Mapped[str] = mapped_column(String())
+    #metadata= Mapped[list[str]] = mapped_column(JSON())
     path: Mapped[str] = mapped_column(String())
 
     def __repr__(self) -> str:
-        return f"Chunk(id={self.id!r}, doc={self.document!r}, path={self.path!r}, , doc_id={self.doc_id!r})"
+        return f"Chunk(id={self.id!r}, doc={self.document!r}, text={self.text!r}, position_in_doc={self.position_in_doc!r}, metadata={self.metadata!r},  path={self.path!r})"
 
 
 class Document(Base):
@@ -91,7 +95,7 @@ class DocumentText:
 
         for k, chunk in enumerate(chunks):
             results.append(
-                Chunk(text=chunk, document=self.name_with_extension, id=k + 1)
+                Chunk(text=chunk, document=self.name_with_extension, position_in_doc=k + 1)
             )
 
         return results
