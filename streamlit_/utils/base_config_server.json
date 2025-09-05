@@ -2,7 +2,7 @@
     "storage_path": "./storage",
     "storage_data_path": "./data/databases",
     "params_host_llm": {
-        "url": "",
+        "url": "http://localhost:11436/v1",
         "type": "ollama",
         "api_key": null
     },
@@ -25,7 +25,7 @@
     "reformulate_query": false,
     "reranker_model": "gemma3:1b",
     "max_attempts": 5,
-    "nb_chunks": 20,
+    "nb_chunks": 10,
     "ProcessorChunks": [
         "Contextual"
     ],

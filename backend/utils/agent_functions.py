@@ -41,9 +41,12 @@ def predict_json(
     client: Union[OpenAI, Mistral],
     json_format: BaseModel,
     temperature: float = None,
-    options_generation = None
+    options_generation=None,
 ) -> str:
-    if options_generation is not None and options_generation["type_generation"] == "no_generation":
+    if (
+        options_generation is not None
+        and options_generation["type_generation"] == "no_generation"
+    ):
         return ""
     try:
         params = {
@@ -74,7 +77,6 @@ def predict_json(
         print(f"Error: {e}")
 
 
-
 def predict_image(
     prompt: str,
     model: str,
@@ -83,19 +85,19 @@ def predict_image(
     json_format: BaseModel,
     temperature: float = None,
 ) -> str:
-    
+
     try:
         params = {
             "model": model,
             "messages": [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "image_url", "image_url": {"url": data_url}},
-                    {"type": "text", "text": prompt},
-                ],
-            }
-        ],
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "image_url", "image_url": {"url": data_url}},
+                        {"type": "text", "text": prompt},
+                    ],
+                }
+            ],
             "response_format": json_format,
         }
         # Only add temperature if not None
@@ -119,22 +121,28 @@ def predict_image(
 
 
 def predict(
-    system_prompt: str, prompt: str, model: str, 
-    client: OpenAI, temperature: float = 0,
-    options_generation = None
+    system_prompt: str,
+    prompt: str,
+    model: str,
+    client: OpenAI,
+    temperature: float = 0,
+    options_generation=None,
 ) -> str:
     """
     Gives the prompt to the LLM and returns the output
     """
-    if options_generation is not None and options_generation["type_generation"] == "no_generation":
+    if (
+        options_generation is not None
+        and options_generation["type_generation"] == "no_generation"
+    ):
         return {
-                "texts": "",
-                "nb_input_tokens": 0,
-                "nb_output_tokens": 0,
-                "impacts": [0, 0, ""],
-                "energy": [0, 0, ""],
-            }
-    
+            "texts": "",
+            "nb_input_tokens": 0,
+            "nb_output_tokens": 0,
+            "impacts": [0, 0, ""],
+            "energy": [0, 0, ""],
+        }
+
     EcoLogits.init()
     response = client.chat.completions.create(
         model=model,
@@ -196,21 +204,24 @@ def predict_vllm(
     temperature: float = 0,
     images: list[str] = None,
     json_format=None,
-    options_generation = None
+    options_generation=None,
 ) -> tuple[list[str], int, int]:
     """
     Gives the prompts to the LLM and returns the outputs
     """
 
-    if options_generation is not None and options_generation["type_generation"] == "no_generation":
+    if (
+        options_generation is not None
+        and options_generation["type_generation"] == "no_generation"
+    ):
         return {
-                "texts": "",
-                "nb_input_tokens": 0,
-                "nb_output_tokens": 0,
-                "impacts": [0, 0, ""],
-                "energy": [0, 0, ""],
-            }
-    
+            "texts": "",
+            "nb_input_tokens": 0,
+            "nb_output_tokens": 0,
+            "impacts": [0, 0, ""],
+            "energy": [0, 0, ""],
+        }
+
     if type(prompts) is type("str"):
         prompts = [prompts]
 
@@ -249,20 +260,23 @@ def multiple_predict(
     model: str,
     client: OpenAI,
     temperature: float = 0,
-    options_generation = None
+    options_generation=None,
 ) -> tuple[list[str], int, int]:
     """
     Gives the prompts to the LLM and returns the outputs
     """
 
-    if options_generation is not None and options_generation["type_generation"] == "no_generation":
+    if (
+        options_generation is not None
+        and options_generation["type_generation"] == "no_generation"
+    ):
         return {
-                "texts": ["" for k in range(len(prompts))],
-                "nb_input_tokens": 0,
-                "nb_output_tokens": 0,
-                "impacts": [0, 0, ""],
-                "energy": [0, 0, ""],
-            }
+            "texts": ["" for k in range(len(prompts))],
+            "nb_input_tokens": 0,
+            "nb_output_tokens": 0,
+            "impacts": [0, 0, ""],
+            "energy": [0, 0, ""],
+        }
 
     answers, input_tokens, output_tokens, impacts, energy = (
         [],
@@ -300,22 +314,28 @@ def multiple_predict(
 
 
 def predict_mistral(
-    system_prompt: str, prompt: str, model: str,
-    client: Mistral, temperature: float = 0,
-    options_generation = None
+    system_prompt: str,
+    prompt: str,
+    model: str,
+    client: Mistral,
+    temperature: float = 0,
+    options_generation=None,
 ) -> str:
     """
     Gives the prompt to the LLM and returns the output
     """
-    if options_generation is not None and options_generation["type_generation"] == "no_generation":
+    if (
+        options_generation is not None
+        and options_generation["type_generation"] == "no_generation"
+    ):
         return {
-                "texts": "",
-                "nb_input_tokens": 0,
-                "nb_output_tokens": 0,
-                "impacts": [0, 0, ""],
-                "energy": [0, 0, ""],
-            }
-    
+            "texts": "",
+            "nb_input_tokens": 0,
+            "nb_output_tokens": 0,
+            "impacts": [0, 0, ""],
+            "energy": [0, 0, ""],
+        }
+
     EcoLogits.init()
     response = client.chat.complete(
         model=model,
@@ -375,21 +395,23 @@ def multiple_predict_mistral(
     model: str,
     client: OpenAI,
     temperature: float = 0,
-    options_generation = None
+    options_generation=None,
 ) -> tuple[list[str], int, int]:
     """
     Gives the prompts to the LLM and returns the outputs
     """
 
-    if options_generation is not None and options_generation["type_generation"] == "no_generation":
+    if (
+        options_generation is not None
+        and options_generation["type_generation"] == "no_generation"
+    ):
         return {
-                "texts": ["" for k in range(len(prompts))],
-                "nb_input_tokens": 0,
-                "nb_output_tokens": 0,
-                "impacts": [0, 0, ""],
-                "energy": [0, 0, ""],
-            }
-    
+            "texts": ["" for k in range(len(prompts))],
+            "nb_input_tokens": 0,
+            "nb_output_tokens": 0,
+            "impacts": [0, 0, ""],
+            "energy": [0, 0, ""],
+        }
 
     answers, input_tokens, output_tokens, impacts, energy = (
         [],

@@ -66,12 +66,14 @@ class NaiveRagIndexation:
         tokens = 0
         taille_batch = 500
         for i in range(0, len(elements), taille_batch):
-            tokens += np.sum(self.data_manager.add_str_batch_elements(
-                    elements=elements[i:i + taille_batch],
+            tokens += np.sum(
+                self.data_manager.add_str_batch_elements(
+                    elements=elements[i : i + taille_batch],
                     docs_name=name_docs[i : i + taille_batch],
                     path_docs=path_docs[i : i + taille_batch],
-                    display_message=False
-            ))
+                    display_message=False,
+                )
+            )
         return tokens
 
     def __serial_indexation__(self, doc_chunks, name_docs, path_docs) -> int:
@@ -110,14 +112,19 @@ class NaiveRagIndexation:
         Returns:
             None
         """
-        docs_already_processed = [res[0] for res in self.data_manager.query(Document.path)]
-        to_process_norm = [Path(p).resolve().as_posix() for p in self.data_manager.get_list_path_documents()]
-        docs_already_norm = [Path(p).resolve().as_posix() for p in docs_already_processed]
+        docs_already_processed = [
+            res[0] for res in self.data_manager.query(Document.path)
+        ]
+        to_process_norm = [
+            Path(p).resolve().as_posix()
+            for p in self.data_manager.get_list_path_documents()
+        ]
+        docs_already_norm = [
+            Path(p).resolve().as_posix() for p in docs_already_processed
+        ]
 
         docs_to_process = [
-            doc
-            for doc in to_process_norm
-            if doc not in docs_already_norm
+            doc for doc in to_process_norm if doc not in docs_already_norm
         ]
 
         self.data_manager.create_collection()
@@ -126,7 +133,10 @@ class NaiveRagIndexation:
                 doc_tokens = 0
                 progress_bar.set_description(f"Embbeding chunks - {path_doc}")
                 doc = DocumentText(
-                    path=path_doc,config_server={"data_preprocessing" : "pdf_text_extraction"}, splitter=self.splitter
+                    doc_index=i,
+                    path=path_doc,
+                    config_server={"data_preprocessing": "pdf_text_extraction"},
+                    splitter=self.splitter,
                 )
                 doc_chunks = doc.chunks(
                     chunk_size=chunk_size, chunk_overlap=chunk_overlap
@@ -138,15 +148,19 @@ class NaiveRagIndexation:
                         chunks=doc_chunks, doc_content=doc.content, batch=batch
                     )
                     doc_chunks = data["chunks"]
-                    doc_tokens+=np.sum(data["nb_output_tokens"])
+                    doc_tokens += np.sum(data["nb_output_tokens"])
                     if batch:
                         doc_tokens += self.__batch_indexation__(
-                            doc_chunks=doc_chunks, name_docs=name_docs, path_docs=path_docs
+                            doc_chunks=doc_chunks,
+                            name_docs=name_docs,
+                            path_docs=path_docs,
                         )
 
                     else:
                         doc_tokens += self.__serial_indexation__(
-                            doc_chunks=doc_chunks, name_docs=name_docs, path_docs=path_docs
+                            doc_chunks=doc_chunks,
+                            name_docs=name_docs,
+                            path_docs=path_docs,
                         )
                 except Exception:
                     print("Failed indexing: {}".format(path_doc))
@@ -156,10 +170,9 @@ class NaiveRagIndexation:
 
                 new_doc = Document(
                     name=str(Path(path_doc).name),
-                                path=str(Path(path_doc)),
+                    path=str(Path(path_doc)),
                     embedding_tokens=doc_tokens,
                     input_tokens=0,
                     output_tokens=0,
                 )
-                self.data_manager.add_instance(new_doc,
-                                               path=str(Path(path_doc).parent))
+                self.data_manager.add_instance(new_doc, path=str(Path(path_doc).parent))

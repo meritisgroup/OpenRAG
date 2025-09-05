@@ -3,21 +3,20 @@ from ..naive_rag.agent import NaiveRagAgent
 from .prompts import prompts
 from ..naive_rag.indexation import contexts_to_prompts
 import numpy as np
+from backend.database.rag_classes import Chunk
+from ...utils.chunk_lists_merger import merge_chunk_lists
 
 
 class SelfRagAgent(NaiveRagAgent):
 
     def __init__(
-        self,
-        config_server: dict,
-        dbs_name: list[str],
-        data_folders_name: list[str]
+        self, config_server: dict, dbs_name: list[str], data_folders_name: list[str]
     ) -> None:
 
         super().__init__(
             config_server=config_server,
             dbs_name=dbs_name,
-            data_folders_name=data_folders_name
+            data_folders_name=data_folders_name,
         )
         self.language = config_server["language"]
         self.prompts = prompts[self.language]
@@ -26,21 +25,31 @@ class SelfRagAgent(NaiveRagAgent):
     def get_nb_token_embeddings(self):
         return self.data_manager.get_nb_token_embeddings()
 
-    def get_rag_context(self, query: str, nb_chunks: int = 5) -> list[str]:
-        """ """
-        ns = NaiveSearch(data_manager=self.data_manager,
-                         nb_chunks=nb_chunks)
-        context = ns.get_context(query=query)
-        return context
+    def get_rag_context(self, query: str, nb_chunks: int = 5) -> list[list[Chunk]]:
+        """
+        Takes a query and retrieves a given number of chunks using the NaiveSearch implemented
 
-    def __run_batch_answer(self, query, agent, contexts):
-        useful_contexts = []
+        Args:
+            query (str) : The query that needs answering
+            nb_chunks (int) : Number of chunks to be retrieved
+        Output:
+            context (list[str]) : All retrieved chunks
+        """
+        ns = NaiveSearch(data_manager=self.data_manager, nb_chunks=nb_chunks)
+        chunk_lists = ns.get_context(query=query)
+        # print(chunk_lists)
+        return chunk_lists
+
+    def __run_batch_answer(self, query, agent, chunk_lists: list[list[Chunk]]):
+
+        chunk_list = merge_chunk_lists(chunk_lists)
+        useful_chunks = []
         prompts = []
         system_prompts = []
         impacts, energies = [0, 0, ""], [0, 0, ""]
-        for i, context in enumerate(contexts):
+        for i, context in enumerate(chunk_list):
             prompt = self.prompts["document_relevance"]["QUERY_TEMPLATE"].format(
-                context=contexts[i], query=query
+                context=chunk_list[i].text, query=query
             )
             system_prompt = self.prompts["document_relevance"]["SYSTEM_PROMPT"]
             prompts.append(prompt)
@@ -58,18 +67,18 @@ class SelfRagAgent(NaiveRagAgent):
 
         scores = scores["texts"]
         final_answer = ""
-        for j in range(len(contexts)):
+        for j in range(len(chunk_list)):
             if "relevant" in scores[j].lower():
-                useful_contexts.append(contexts[j])
+                useful_chunks.append(chunk_list[j])
 
-        if len(useful_contexts) > 0:
+        if len(useful_chunks) > 0:
             answers_fully = []
             answers_partially = []
             prompts = []
             system_prompts = []
-            for i, context in enumerate(useful_contexts):
+            for i, chunk in enumerate(useful_chunks):
                 prompt = self.prompts["smooth_generation"]["QUERY_TEMPLATE"].format(
-                    context=context, query=query
+                    context=chunk.text, query=query
                 )
                 system_prompt = self.prompts["smooth_generation"]["SYSTEM_PROMPT"]
                 prompts.append(prompt)
@@ -88,9 +97,9 @@ class SelfRagAgent(NaiveRagAgent):
             answers = answers["texts"]
             prompts = []
             system_prompts = []
-            for i, context in enumerate(useful_contexts):
+            for i, chunk in enumerate(useful_chunks):
                 prompt = self.prompts["supported_generation"]["QUERY_TEMPLATE"].format(
-                    context=context, query=answers[i]
+                    context=chunk.text, query=answers[i]
                 )
                 system_prompt = self.prompts["supported_generation"]["SYSTEM_PROMPT"]
                 prompts.append(prompt)
@@ -110,7 +119,7 @@ class SelfRagAgent(NaiveRagAgent):
             supports = supports["texts"]
             prompts = []
             system_prompts = []
-            for i, context in enumerate(useful_contexts):
+            for i, chunk in enumerate(useful_chunks):
                 prompt = self.prompts["rate_generation"]["QUERY_TEMPLATE"].format(
                     context=answers[i], query=query
                 )
@@ -139,7 +148,7 @@ class SelfRagAgent(NaiveRagAgent):
                     if int(answers_fully[i][1]) > best_rate:
                         best_rate = int(answers_fully[i][1])
                         final_answer = answers_fully[i][0]
-                        context = useful_contexts[i]
+                        context = useful_chunks[i]
             elif len(answers_partially) > 0:
                 for i in range(len(answers_partially)):
                     if int(answers_partially[i][1]) > best_rate:
@@ -177,18 +186,20 @@ class SelfRagAgent(NaiveRagAgent):
             answer = answer["texts"]
         return {
             "texts": final_answer,
+            "context": useful_chunks,
             "nb_input_tokens": nb_input_tokens,
             "nb_output_tokens": nb_output_tokens,
             "impacts": impacts,
             "energy": energies,
         }
 
-    def __run_serial_answer(self, query, agent, contexts):
-        useful_contexts = []
+    def __run_serial_answer(self, query, agent, chunk_lists: list[list[Chunk]]):
+        chunk_list = merge_chunk_lists(chunk_lists)
+        useful_chunks = []
         impacts, energies = [0, 0, ""], [0, 0, ""]
-        for i, context in enumerate(contexts):
+        for i, chunk in enumerate(chunk_list):
             prompt = self.prompts["document_relevance"]["QUERY_TEMPLATE"].format(
-                context=contexts[i], query=query
+                context=chunk[i].text, query=query
             )
             system_prompt = self.prompts["document_relevance"]["SYSTEM_PROMPT"]
             score = agent.predict(prompt=prompt, system_prompt=system_prompt)
@@ -213,14 +224,14 @@ class SelfRagAgent(NaiveRagAgent):
 
             score = score["texts"]
             if "relevant" in score.lower():
-                useful_contexts.append(context)
+                useful_chunks.append(chunk)
 
-        if len(useful_contexts) > 0:
+        if len(useful_chunks) > 0:
             answers_fully = []
             answers_partially = []
-            for i, context in enumerate(useful_contexts):
+            for i, chunk in enumerate(useful_chunks):
                 prompt = self.prompts["smooth_generation"]["QUERY_TEMPLATE"].format(
-                    context=context, query=query
+                    context=chunk.text, query=query
                 )
                 system_prompt = self.prompts["smooth_generation"]["SYSTEM_PROMPT"]
                 answer = agent.predict(prompt=prompt, system_prompt=system_prompt)
@@ -278,13 +289,13 @@ class SelfRagAgent(NaiveRagAgent):
                     if int(answers_fully[i][1]) > best_rate:
                         best_rate = int(answers_fully[i][1])
                         answer = answers_fully[i][0]
-                        context = useful_contexts[i]
+                        context = useful_chunks[i]
             elif len(answers_partially) > 0:
                 for i in range(len(answers_partially)):
                     if int(answers_partially[i][1]) > best_rate:
                         best_rate = int(answers_partially[i][1])
                         answer = answers_partially[i][0]
-                        context = useful_contexts[i]
+                        context = useful_chunks[i]
             else:
                 prompt = self.prompts["conversationnal"]["QUERY_TEMPLATE"].format(
                     query=query
@@ -316,6 +327,7 @@ class SelfRagAgent(NaiveRagAgent):
             context = ""
         return {
             "texts": answer,
+            "context": useful_chunks,
             "nb_input_tokens": nb_input_tokens,
             "nb_output_tokens": nb_output_tokens,
             "impacts": impacts,
@@ -363,15 +375,15 @@ class SelfRagAgent(NaiveRagAgent):
 
         answer = None
         if "yes" in retrieval_necessary.lower():
-            contexts = self.get_rag_context(query=query, nb_chunks=nb_chunks)
+            chunk_lists = self.get_rag_context(query=query, nb_chunks=nb_chunks)
 
             if batch:
                 answer = self.__run_batch_answer(
-                    query=query, agent=agent, contexts=contexts
+                    query=query, agent=agent, chunk_lists=chunk_lists
                 )
             else:
                 answer = self.__run_serial_answer(
-                    query=query, agent=agent, contexts=contexts
+                    query=query, agent=agent, chunk_lists=chunk_lists
                 )
             nb_input_tokens += answer["nb_input_tokens"]
             nb_output_tokens += answer["nb_output_tokens"]
@@ -380,9 +392,11 @@ class SelfRagAgent(NaiveRagAgent):
             prompt = self.prompts["conversationnal"]["QUERY_TEMPLATE"].format(
                 query=query
             )
-            answer = agent.predict(prompt=prompt,
-                                   system_prompt=self.system_prompt,
-                                   options_generation=self.config_server["options_generation"])
+            answer = agent.predict(
+                prompt=prompt,
+                system_prompt=self.system_prompt,
+                options_generation=self.config_server["options_generation"],
+            )
 
             nb_input_tokens += np.sum(answer["nb_input_tokens"])
             nb_output_tokens += np.sum(answer["nb_output_tokens"])
@@ -394,14 +408,12 @@ class SelfRagAgent(NaiveRagAgent):
         energies[0] += answer["energy"][0]
         energies[1] += answer["energy"][1]
 
-        context = contexts_to_prompts(contexts=chunk)
-
         return {
             "answer": answer["texts"],
             "docs_name": [],
             "nb_input_tokens": nb_input_tokens,
             "nb_output_tokens": nb_output_tokens,
-            "context": context,
+            "context": answer["context"],
             "impacts": impacts,
             "energy": energies,
         }
@@ -409,22 +421,24 @@ class SelfRagAgent(NaiveRagAgent):
     def release_gpu_memory(self):
         self.agent.release_memory()
 
-    def get_rag_contexts(self, queries: list[str], nb_chunks: int = 5):
-        contexts = []
-        names_docs = []
-        for query in queries:
-            context, name_docs = self.get_rag_context(query=query, nb_chunks=nb_chunks)
-            contexts.append(context)
-            names_docs.append(name_docs)
-        return contexts, names_docs
+    # def get_rag_contexts(self, queries: list[str], nb_chunks: int = 5):
+    #     contexts = []
+    #     names_docs = []
+    #     for query in queries:
+    #         context, name_docs = self.get_rag_context(query=query, nb_chunks=nb_chunks)
+    #         contexts.append(context)
+    #         names_docs.append(name_docs)
+    #     return contexts, names_docs
 
-    def generate_answers(self, queries: list[str], nb_chunks: int = 2, options_generation = None):
+    def generate_answers(
+        self, queries: list[str], nb_chunks: int = 2, options_generation=None
+    ):
         answers = []
         impact = 0
         for query in queries:
-            answer = self.generate_answer(query=query,
-                                          nb_chunks=nb_chunks,
-                                          options_generation=options_generation)
+            answer = self.generate_answer(
+                query=query, nb_chunks=nb_chunks, options_generation=options_generation
+            )
             answers.append(answer)
             impact += answer["impacts"][0]
 
