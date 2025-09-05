@@ -5,7 +5,7 @@ from ...database.rag_classes import (
 )
 from ...database.database_class import DataBase
 from .extract_entities import extract_entities_relations
-from ...database.rag_classes import DocumentText
+from ...database.data_extraction import DocumentText
 from .graph_creation import Graph
 from .community_description import CommunityDescription
 from ...utils.splitter import get_splitter
@@ -60,7 +60,9 @@ class GraphRagIndexation:
             need_extraction = True
         return need_extraction, docs_to_process
 
-    def extract_entities(self, db_name: str, to_process_norm, chunk_size: int = 500, overlap: bool = True):
+    def extract_entities(self, db_name: str, to_process_norm, 
+                         chunk_size: int = 500, overlap: bool = True,
+                         config_server = {}):
         """
         Extract entities and relations from texts located in the folder self.data_path and save all the results in the data base self.db
         """
@@ -73,6 +75,8 @@ class GraphRagIndexation:
                                 text="Entities extraction - Processing file {}".format(path_doc))
 
             document = DocumentText(path=path_doc,
+                                    doc_index=k,
+                                    config_server=config_server,
                                     splitter=self.splitter)
             chunks = document.chunks(chunk_size=chunk_size,
                                      chunk_overlap=overlap)
@@ -234,7 +238,7 @@ class GraphRagIndexation:
                                        db=db)
 
 
-    def run_pipeline(self, chunk_size: int = 500, overlap: bool = True):
+    def run_pipeline(self, chunk_size: int = 500, overlap: bool = True, config_server= {}):
         """
         Indexation phase for graph rag, from entities extraction to community description.
         """        
@@ -248,7 +252,8 @@ class GraphRagIndexation:
                 self.extract_entities(chunk_size=chunk_size,
                                       to_process_norm=docs_to_process, 
                                         overlap=overlap,
-                                        db_name=db_name)
+                                        db_name=db_name,
+                                        config_server=config_server)
                 progress_bar.update(1, text="Merging muliples entities of entities")
                 self.clean_entities(db_name=db_name)
                 progress_bar.update(2, text="Creation of the graph")

@@ -14,7 +14,7 @@ class NaiveSearch(Search):
         self.data_manager = data_manager
         self.nb_chunks = nb_chunks
 
-    def get_context(self, query: str) -> str:
+    def get_context(self, query: str, to_prompt=True) -> str:
         """
         Build the context using naive rag method.
 
@@ -31,6 +31,10 @@ class NaiveSearch(Search):
         chunks = [res["text"] for res in search_res[0]]
         docs_name = [res["doc_name"] for res in search_res[0]]
 
-        context, docs_name = contexts_to_prompts(contexts=chunks,
-                                                 docs_name=docs_name)
-        return context, docs_name
+        if to_prompt:
+            context, docs_name = contexts_to_prompts(contexts=chunks,
+                                                    docs_name=docs_name)
+            return context, docs_name
+        else:
+            return chunks, docs_name
+        

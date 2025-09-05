@@ -1,6 +1,6 @@
 from ...utils.factory_vectorbase import get_vectorbase
 from ...utils.agent_functions import get_system_prompt
-from ..naive_rag.agent import NaiveRagAgent
+from ..advanced_rag.agent import AdvancedRag
 from .indexation import QbRagIndexation
 from .query import QbSearch
 from ...utils.agent import get_Agent
@@ -11,7 +11,7 @@ from ..query_reformulation.query_reformulation import query_reformulation
 from ...database.database_class import get_management_data
 
 
-class QueryBasedRagAgent(NaiveRagAgent):
+class QueryBasedRagAgent(AdvancedRag):
     """
     RAG Agent based on Query-Based principle meaning we pass to a LLM all our chunked documents for asking it to generate questions about chunks.
     Then we associate the generated questions with their related chunks and when a query match a question we give as context the relevant chunk.
@@ -24,6 +24,9 @@ class QueryBasedRagAgent(NaiveRagAgent):
         data_folders_name: list[str]
     ) -> None:
         """ """
+        super().__init__(config_server=config_server,
+                        dbs_name = dbs_name,
+                        data_folders_name = data_folders_name)
         self.dbs_name = dbs_name
         self.data_folders_name = data_folders_name
         self.embedding_model = config_server["embedding_model"]
@@ -79,8 +82,9 @@ class QueryBasedRagAgent(NaiveRagAgent):
     def get_rag_context(
         self,
         query: str,
-        method_parameter: int = 2,
+        nb_chunks: int = 5,
         model: str = None,
+        to_prompt = False
     ) -> str:
         """ """
         agent = self.agent
@@ -88,64 +92,14 @@ class QueryBasedRagAgent(NaiveRagAgent):
         qs = QbSearch(
             agent=agent,
             data_manager=self.data_manager,
-            nb_questions=method_parameter,
+            nb_questions=nb_chunks,
             language=self.language,
         )
 
-        context, docs_name = qs.get_context(query=query)
+        context, docs_name = qs.get_context(query=query,
+                                            to_prompt=to_prompt)
 
         return context, docs_name
-
-    def generate_answer(
-        self,
-        query: str,
-        nb_chunks: str = 2,
-        model: str = None,
-        options_generation = None
-    ) -> str:
-        """ """
-        agent = self.agent
-        nb_input_tokens = 0
-        nb_output_tokens = 0
-        impacts, energies = [0, 0, ""], [0, 0, ""]
-        if self.reformulate_query:
-            query, input_t, output_t, impacts, energies = self.reformulater.reformulate(
-                query=query, nb_reformulation=1
-            )
-            query = query[0]
-            nb_input_tokens += input_t
-            nb_output_tokens = output_t
-
-        context, docs_name = self.get_rag_context(
-            query=query, method_parameter=nb_chunks, model=model
-        )
-        prompt = self.prompts["smooth_generation"]["QUERY_TEMPLATE"].format(
-            context=context, query=query
-        )
-        if options_generation is None:
-            options_generation = self.config_server["options_generation"]
-
-        answer = agent.predict(prompt=prompt, system_prompt=self.system_prompt,
-                               options_generation=options_generation)
-        nb_input_tokens += np.sum(answer["nb_input_tokens"])
-        nb_output_tokens += np.sum(answer["nb_output_tokens"])
-
-        impacts[2] = answer["impacts"][2]
-        impacts[0] += answer["impacts"][0]
-        impacts[1] += answer["impacts"][1]
-        energies[2] = answer["energy"][2]
-        energies[0] += answer["energy"][0]
-        energies[1] += answer["energy"][1]
-
-        return {
-            "answer": answer["texts"],
-            "nb_input_tokens": nb_input_tokens,
-            "nb_output_tokens": nb_output_tokens,
-            "docs_name": docs_name,
-            "context": context,
-            "impacts": impacts,
-            "energy": energies,
-        }
 
     def release_gpu_memory(self):
         self.agent.release_memory()

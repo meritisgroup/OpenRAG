@@ -1,9 +1,10 @@
 from ...database.database_class import DataBase
 from ...utils.agent import Agent
 from ...utils.splitter import get_splitter
-from ..graph_rag.extract_entities import DocumentText
+from ...database.data_extraction import DocumentText
 from ...database.rag_classes import Document
 from .Processor_chunks import Processor_chunks
+from ...utils.progress import ProgressBar
 from tqdm.auto import tqdm
 import numpy as np
 import os
@@ -98,7 +99,7 @@ class NaiveRagIndexation:
         return indexation_tokens
 
     def run_pipeline(
-        self, chunk_size: int = 500, chunk_overlap: bool = True, batch: bool = True
+        self, chunk_size: int = 500, chunk_overlap: bool = True, batch: bool = True, config_server={}
     ) -> None:
         """
         Split texts from self.data_path, embed them and save them in a vector base.
@@ -121,45 +122,46 @@ class NaiveRagIndexation:
         ]
 
         self.data_manager.create_collection()
-        with tqdm(docs_to_process) as progress_bar:
-            for i, path_doc in enumerate(progress_bar):
-                doc_tokens = 0
-                progress_bar.set_description(f"Embbeding chunks - {path_doc}")
-                doc = DocumentText(
-                    path=path_doc,config_server={"data_preprocessing" : "pdf_text_extraction"}, splitter=self.splitter
-                )
-                doc_chunks = doc.chunks(
+        progress_bar = ProgressBar(total=len(docs_to_process))
+        for i, path_doc in enumerate(docs_to_process):
+            doc_tokens = 0
+            progress_bar.set_description(f"Embbeding chunks - {path_doc}")
+            doc = DocumentText(path=path_doc,
+                                   doc_index=i,
+                                   config_server=config_server,
+                                   splitter=self.splitter
+            )
+            doc_chunks = doc.chunks(
                     chunk_size=chunk_size, chunk_overlap=chunk_overlap
-                )
-                name_docs = [str(Path(path_doc).name) for i in range(len(doc_chunks))]
-                path_docs = [str(Path(path_doc).parent) for i in range(len(doc_chunks))]
-                try:
-                    data = self.processor_chunks.process_chunk(
+            )
+            name_docs = [str(Path(path_doc).name) for i in range(len(doc_chunks))]
+            path_docs = [str(Path(path_doc).parent) for i in range(len(doc_chunks))]
+            try:
+                data = self.processor_chunks.process_chunk(
                         chunks=doc_chunks, doc_content=doc.content, batch=batch
                     )
-                    doc_chunks = data["chunks"]
-                    doc_tokens+=np.sum(data["nb_output_tokens"])
-                    if batch:
-                        doc_tokens += self.__batch_indexation__(
+                doc_chunks = data["chunks"]
+                doc_tokens+=np.sum(data["nb_output_tokens"])
+                if batch:
+                    doc_tokens += self.__batch_indexation__(
                             doc_chunks=doc_chunks, name_docs=name_docs, path_docs=path_docs
                         )
 
-                    else:
-                        doc_tokens += self.__serial_indexation__(
+                else:
+                    doc_tokens += self.__serial_indexation__(
                             doc_chunks=doc_chunks, name_docs=name_docs, path_docs=path_docs
                         )
-                except Exception:
-                    print("Failed indexing: {}".format(path_doc))
+            except Exception:
+                print("Failed indexing: {}".format(path_doc))
 
-                if i == len(progress_bar) - 1:
-                    progress_bar.set_description(f"Embbeding chunks - ✅")
-
-                new_doc = Document(
+            new_doc = Document(
                     name=str(Path(path_doc).name),
                                 path=str(Path(path_doc)),
                     embedding_tokens=doc_tokens,
                     input_tokens=0,
                     output_tokens=0,
                 )
-                self.data_manager.add_instance(new_doc,
+            self.data_manager.add_instance(new_doc,
                                                path=str(Path(path_doc).parent))
+            progress_bar.update(i)
+        progress_bar.clear()

@@ -31,7 +31,7 @@ def change_config_server(rag_name, config_server):
     elif config_server["params_host_llm"]["type"] == "ollama":
         config_server["model"] = "gemma2:9b"
         config_server["embedding_model"] = "mxbai-embed-large:latest"
-        config_server["reranker_model"] = "gemma3:1b"
+        config_server["reranker_model"] = "gemma3:12b"
     elif config_server["params_host_llm"]["type"] == "vllm":
         config_server["model"] = "google/gemma-2-2b-it"
         config_server["embedding_model"] = "BAAI/bge-m3"
@@ -139,7 +139,6 @@ def get_rag_agent(rag_name, config_server, databases_name=[""]):
 
 
 def get_custom_rag_agent(base_rag_name, config_server, databases_name=[""]):
-    print(base_rag_name, "custom rag")
     names = [config_server["name"] + "_" + config_server["params_vectorbase"]["backend"] + "_" + re.sub(r"[^a-zA-Z0-9]", "_", config_server["embedding_model"]) + "_" + "_" + config_server["params_host_llm"]["type"] + "_" + database_name for database_name in databases_name]
     
     names = [name.lower() for name in names]
@@ -153,9 +152,9 @@ def get_custom_rag_agent(base_rag_name, config_server, databases_name=[""]):
                             dbs_name=names,
                             data_folders_name=databases_name)
     elif base_rag_name == "advanced_rag":
-        agent = AdvancedRag(
-            config_server=config_server,
-        )
+        agent = AdvancedRag(config_server=config_server, 
+                            dbs_name=names,
+                            data_folders_name=databases_name)
     elif base_rag_name == "merger":
         agent = MergerRagAgent(config_server=config_server, 
                               dbs_name=names,

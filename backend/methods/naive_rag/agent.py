@@ -111,7 +111,8 @@ class NaiveRagAgent(RagAgent):
         index.run_pipeline(
             chunk_size=self.chunk_size,
             chunk_overlap=overlap,
-            batch=self.params_vectorbase["batch"], config_server=self.config_server)
+            batch=self.params_vectorbase["batch"],
+            config_server=self.config_server)
 
         return None
 

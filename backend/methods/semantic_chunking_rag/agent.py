@@ -4,13 +4,13 @@ from ...utils.factory_vectorbase import get_vectorbase
 from ...utils.agent_functions import get_system_prompt
 from ...database.database_class import get_management_data
 from ...utils.agent import get_Agent
-from ..naive_rag.agent import NaiveRagAgent
+from ..advanced_rag.agent import AdvancedRag
 from .prompts import prompts
 import numpy as np
 from ..query_reformulation.query_reformulation import query_reformulation
 
 
-class SemanticChunkingRagAgent(NaiveRagAgent):
+class SemanticChunkingRagAgent(AdvancedRag):
     """
     This RAG methods uses an adaptative size of chunk in order to group sentences by similarity
     """
@@ -91,33 +91,19 @@ class SemanticChunkingRagAgent(NaiveRagAgent):
             threshold=90,
         )
         if not overlap:
-            index.run_pipeline(batch=True, chunk_size=self.chunk_size, overlap_size=0)
+            index.run_pipeline(batch=True, 
+                               chunk_size=self.chunk_size,
+                               overlap_size=0,
+                               config_server=self.config_server)
         else:
-            index.run_pipeline(batch=True, chunk_size=self.chunk_size)
+            index.run_pipeline(batch=True,
+                               chunk_size=self.chunk_size,
+                               config_server=self.config_server)
 
         return None
 
     def get_nb_token_embeddings(self):
         return self.data_manager.get_nb_token_embeddings()
-
-    def get_rag_context(
-        self,
-        query: str,
-        nb_chunks: int = 5,
-    ) -> list[str]:
-        """
-        Takes a query and retrieves a given number of chunks using the NaiveSearch implemented
-
-        Args:
-            query (str) : The query that needs answering
-            nb_chunks (int) : Number of chunks to be retrieved
-        Output:
-            context (str) : All retrieved chunks, seperated by a new line and '[...]'
-        """
-        ns = NaiveSearch(data_manager=self.data_manager,
-                         nb_chunks=nb_chunks)
-        context, docs_name = ns.get_context(query=query)
-        return context, docs_name
 
     def generate_answer(
         self,

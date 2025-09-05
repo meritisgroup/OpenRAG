@@ -9,7 +9,7 @@ from backend.utils.factory_name_dataset_vectorbase import get_name
 from streamlit_.utils.params_func import get_possible_embeddings_model, get_default_embeddings_model, get_config_rag
 
 
-config_new_rag = {}
+config_new_rag = st.session_state["config_server"].copy()
 st.markdown("# Customize your RAG:")
 
 
@@ -49,6 +49,22 @@ type_retrieval = st.selectbox(
 
 config_new_rag["type_retrieval"] = type_retrieval
 
+data_preparation = { "pdf_text_extraction":"PDF text extraction", 
+                     "md_without_images": "PDF conversion into markdown",
+                     "md_with_images" : "PDF conversion into markdown with image description" }
+selected_data_prep = st.selectbox(
+    label="**Choose data preparation method:**",
+    options=list(data_preparation.keys()),
+    format_func=lambda x:data_preparation[x],
+    index= list(data_preparation.keys()).index(
+        st.session_state["config_server"]["data_preprocessing"]
+    ),
+    key="data_prep",
+)
+
+config_new_rag["data_preprocessing"] = selected_data_prep
+
+
 splitter_dic = {
     "Semantic_TextSplitter": "Semantic Splitting",
     "Recursive_TextSplitter": "Recursive Splitting",
@@ -59,6 +75,34 @@ config_new_rag["TextSplitter"] = st.selectbox(
     options=splitter_dic.keys(),
     format_func=lambda x: splitter_dic[x],
 )
+
+if config_new_rag["base"]=="advanced_rag" or config_new_rag["base"]=="agentic":
+    pre_proccessor_dic = {"Contextual integration": "Contextual"}
+    selected_processors = []
+
+    st.write("**Choose Pre-Processor Chunks**")
+    for i, (label, value) in enumerate(pre_proccessor_dic.items()):
+        checked = st.checkbox(label, key=f"preproc_{i}")
+        if checked:
+            selected_processors.append(value)
+
+    config_new_rag["ProcessorChunks"] = selected_processors
+
+
+    nb_reranker = st.slider(
+            label="**Choose number of chunks after reranker**",
+            min_value=0,
+            max_value=200,
+            step=5,
+            value=st.session_state["config_server"]["nb_chunks_reranker"],
+            help=(
+                "The higher the number of chunks, the better the RAG agent might perform. "
+                "However, a number of chunks too large can slow down responses and increase costs."
+            ),
+            key="chunk"
+        )
+
+    config_new_rag["nb_chunks_reranker"] = nb_reranker
 
 possible_embeddings = get_possible_embeddings_model(provider=st.session_state["config_server"]["params_host_llm"]["type"])
 possible_embeddings.insert(0, "default")
@@ -71,7 +115,8 @@ config_new_rag["embedding_model"] = st.selectbox(
 )
 if config_new_rag["embedding_model"]!="default":
     st.warning(f"⚠️ This RAG will be only available for '{st.session_state['config_server']['params_host_llm']['type']}' provider.")
-
+else:
+    config_new_rag["embedding_model"] = possible_embeddings[1]
 
 config_new_rag["nb_chunks"] = st.slider(
     label="**Choose number of chunks to retrieve per query**",
@@ -165,20 +210,12 @@ if st.button(
             "generation_system_prompt_name": system_prompt,
             "forced_system_prompt": True,
         }
-        saved_config = st.session_state["config_server"].copy()
-        saved_config["base"] = config_new_rag["base"]
-        saved_config["TextSplitter"] = config_new_rag["TextSplitter"]
-        saved_config["type_retrieval"] = config_new_rag["type_retrieval"]
-        saved_config["nb_chunks"] = config_new_rag["nb_chunks"]
-        saved_config["name"] = config_new_rag["name"]
-        saved_config["embedding_model"] = config_new_rag["embedding_model"]
-        saved_config["params_vectorbase"] = config_new_rag["params_vectorbase"]
-        saved_config["local_params"] = local_params
-        saved_config["chunk_length"] = st.session_state["chunk_length"]
+        config_new_rag["local_params"] = local_params
+        config_new_rag["chunk_length"] = st.session_state["chunk_length"]
 
 
         if config_new_rag["embedding_model"]!="default":
-            folders_save = [saved_config["params_host_llm"]["type"]]
+            folders_save = [config_new_rag["params_host_llm"]["type"]]
         else:
             folders_save = ["ollama", "mistral", "openai", "vllm"]
 
@@ -190,9 +227,9 @@ if st.button(
                 f"data/custom_rags/{folder}/{config_new_rag['name']}.json", "w"
             ) as config:
                 if config_new_rag["embedding_model"] == "default":
-                    saved_config["embedding_model"] = get_default_embeddings_model(provider=folder)
+                    config_new_rag["embedding_model"] = get_default_embeddings_model(provider=folder)
 
-                json.dump(saved_config, config, ensure_ascii=False, indent=4)
+                json.dump(config_new_rag, config, ensure_ascii=False, indent=4)
 
             st.session_state["all_rags"][folder][config_new_rag["name"]] = (
                     config_new_rag["name"]

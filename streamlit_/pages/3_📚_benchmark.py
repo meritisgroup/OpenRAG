@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import os
+from streamlit_.utils.background_running import run_benchmark
 from backend.factory_RagAgent import (
     get_custom_rag_agent,
     change_config_server,
@@ -15,7 +16,10 @@ from streamlit_.utils.benchmark_funcs import (
     display_plot,
     match_name_cleaner,
     clean_bench_df,
-    run_indexation_benchmark
+    run_indexation_benchmark,
+    get_folder_saved_benchmark,
+    show_already_done_benchmark,
+    get_report_path
 )
 from streamlit_.utils.chat_funcs import get_chat_agent, change_default_prompt
 
@@ -127,17 +131,12 @@ if st.session_state["benchmark"]["load"]:
 
 
 st.markdown("## Choose database to perfom benchmark on")
-st.selectbox(
-    "Choose database",
-    options=st.session_state["all_databases"],
-    label_visibility="collapsed",
-    index=(
-        st.session_state["all_databases"].index(st.session_state["benchmark_database"])
-        if st.session_state["benchmark_database"] is not None
-        else None
-    ),
-    key="benchmark_database",
-)
+st.multiselect(
+        label="Choose database",
+        options=st.session_state["all_databases"],
+        key="benchmark_database",
+    )
+
 
 if "all_system_prompt" not in st.session_state:
     st.session_state["all_system_prompt"] = st.session_state["config_server"][
@@ -228,8 +227,19 @@ def handle_click():
         icon="📖",
     )
 
+benchmark_already_done = ["None"] + get_folder_saved_benchmark()
+st.markdown("## Benchmark already done")
+system_prompt_selected = st.selectbox(
+    label="**Choose benchmark done**",
+    options=benchmark_already_done,
+    key="benchmark_done",
+    on_change=show_already_done_benchmark,
+)
 
-col1, col2, col3, col4 = st.columns([0.20, 0.20, 0.20, 0.40])
+col1, col2, col3, col4, col5 = st.columns([0.20, 0.20, 0.20, 0.25, 0.15])
+with col5:
+    background_running = st.checkbox("Run in background", value=False)
+    
 if col1.button(
     "Generate Contexts",
     on_click=handle_click,
@@ -241,14 +251,9 @@ if col1.button(
         st.session_state["benchmark_clicked"] = False
         st.error("Choose a database")
     else:
-        rag_agents, rag_names = run_indexation_benchmark(reset_index=reset_index)
-        if len(rag_agents) > 1:
-            generate_contexts(rag_names=rag_names,
-                              rag_agents=rag_agents)
-            
-        st.session_state["benchmark_clicked"] = False
-        st.set_option("client.showSidebarNavigation", True)
-        st.rerun()
+        run_benchmark(type_bench="contexts", 
+                      reset_index=reset_index,
+                      background=False)
 
 if col2.button(
     "Generate Answers",
@@ -261,12 +266,9 @@ if col2.button(
         st.session_state["benchmark_clicked"] = False
         st.error("Choose a database")
     else:
-        rag_agents, rag_names = run_indexation_benchmark(reset_index=reset_index)
-        if len(rag_agents) > 1:
-            generate_answers(rag_names, rag_agents)
-        st.session_state["benchmark_clicked"] = False
-        st.set_option("client.showSidebarNavigation", True)
-        st.rerun()
+        run_benchmark(type_bench="answers", 
+                      reset_index=reset_index,
+                      background=False)
         
 
 if col3.button(
@@ -280,26 +282,24 @@ if col3.button(
         st.session_state["benchmark_clicked"] = False
         st.error("Choose a database")
     else:
-        rag_agents, rag_names = run_indexation_benchmark(reset_index=reset_index)
-        if len(rag_agents) > 1:
-            with st.spinner(
-                f"**Generating benchmark for the following RAGs:** {rag_names}",
-                show_time=True,
-            ):
-                generate_benchmark(rag_names, rag_agents)
-                st.session_state["benchmark_clicked"] = False
-                st.set_option("client.showSidebarNavigation", True)
-                st.rerun()
-        else:
-            st.session_state["benchmark_clicked"] = False
-            st.error("Choose at least 2 rags methods")
+        run_benchmark(type_bench="full_bench", 
+                      reset_index=reset_index,
+                      background=background_running)
     put_default_local_parameters()
 
 
 if "report_path" in st.session_state["benchmark"]:
+    databases = st.session_state['benchmark_database']
+    markdown_text = "**Benchmark runned on the following database:**\n"
+    for db in databases:
+        markdown_text += f"- {db}\n"
+    st.markdown(markdown_text)
+
     st.success(
         "***Benchmark terminé !***",
     )
+    
+
     with open(
         st.session_state["benchmark"]["report_path"] + "/plot_report.pdf", "rb"
     ) as file:

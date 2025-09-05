@@ -152,7 +152,6 @@ if prompt := st.chat_input(
             )
             end_time = time.time()
 
-
         context = prepare_show_context(context=answer["context"],
                                        docs_name=answer["docs_name"])
 

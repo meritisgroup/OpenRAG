@@ -1,5 +1,5 @@
 from ...utils.splitter import get_splitter
-from ..graph_rag.extract_entities import DocumentText
+from ...database.data_extraction import DocumentText
 from ...database.rag_classes import Document
 from tqdm.auto import tqdm
 from ...utils.progress import ProgressBar
@@ -66,6 +66,7 @@ class NaiveRagIndexation:
                                                          display_message=False))
             progress_bar_chunks.update(j)
             j+=1
+        progress_bar_chunks.clear()
         return tokens
     
 
@@ -113,39 +114,42 @@ class NaiveRagIndexation:
             if doc not in docs_already_norm
         ]
         self.data_manager.create_collection()
-        with tqdm(docs_to_process) as progress_bar:
-            for i, path_doc in enumerate(progress_bar):
-                doc_indexation_tokens = 0
-                progress_bar.set_description(f"Embbeding chunks - {path_doc}")
-                doc = DocumentText(path=path_doc, doc_index=i,
-                                   config_server=config_server, splitter=self.splitter)
+        progress_bar = ProgressBar(total=len(docs_to_process))
+        for i, path_doc in enumerate(docs_to_process):
+            doc_indexation_tokens = 0
+            progress_bar.set_description(f"Embbeding chunks - {path_doc}")
+            doc = DocumentText(path=path_doc, 
+                                doc_index=i,
+                                config_server=config_server,
+                                splitter=self.splitter)
                 
-                doc_chunks = doc.chunks(chunk_size=chunk_size,
+            doc_chunks = doc.chunks(chunk_size=chunk_size,
                                         chunk_overlap=chunk_overlap)
     
-                name_docs = [str(Path(path_doc).name) for i in range(len(doc_chunks))]
-                path_docs = [str(Path(path_doc).parent) for i in range(len(doc_chunks))]
+            name_docs = [str(Path(path_doc).name) for i in range(len(doc_chunks))]
+            path_docs = [str(Path(path_doc).parent) for i in range(len(doc_chunks))]
 
-                if batch:
-                    doc_indexation_tokens += self.__batch_indexation__(doc_chunks=doc_chunks,
+            if batch:
+                doc_indexation_tokens += self.__batch_indexation__(doc_chunks=doc_chunks,
                                                                             name_docs=name_docs,
                                                                             path_docs=path_docs)
 
-                else:
-                    doc_indexation_tokens += self.__serial_indexation__(doc_chunks=doc_chunks, 
+            else:
+                doc_indexation_tokens += self.__serial_indexation__(doc_chunks=doc_chunks, 
                                                                                 name_docs=name_docs,
                                                                                 path_docs=path_docs)
 
-                new_doc = Document(
+            new_doc = Document(
                                     name=str(Path(path_doc).name),
                                     path=str(Path(path_doc)),
                                     embedding_tokens=int(doc_indexation_tokens),
                                     input_tokens=0,
                                     output_tokens=0,
                                 )
-                self.data_manager.add_instance(instance=new_doc,
+            self.data_manager.add_instance(instance=new_doc,
                                                 path=str(Path(path_doc).parent))
-                progress_bar.update(i)
+            progress_bar.update(i)
+        progress_bar.clear()
 
 
 

@@ -90,28 +90,6 @@ st.session_state["config_server"]["data_preprocessing"] = st.session_state["data
 def reset_retrieval():
     st.session_state["ret"] = "embeddings"
 
-st.session_state["config_server"]["device"] = "cpu"
-
-if st.session_state["config_server"]["params_host_llm"]["type"] == "ollama":
-    st.session_state["config_server"]["model"] = "gemma2:9b"
-    st.session_state["config_server"]["model_for_image"] = "gemma3:12b"
-    st.session_state["config_server"]["embedding_model"] = "mxbai-embed-large:latest"
-
-elif st.session_state["config_server"]["params_host_llm"]["type"] == "vllm":
-    st.session_state["config_server"]["model"] = "google/gemma-2-2b-it"
-    st.session_state["config_server"]["embedding_model"] = "BAAI/bge-m3"
-
-elif st.session_state["config_server"]["params_host_llm"]["type"] == "openai":
-    st.session_state["config_server"]["model"] = "gpt-4o-mini"
-    st.session_state["config_server"]["embedding_model"] = "text-embedding-3-small"
-
-elif st.session_state["config_server"]["params_host_llm"]["type"] == "mistral":
-    st.session_state["config_server"]["model"] = "mistral-small-latest"
-    st.session_state["config_server"]["embedding_model"] = "mistral-embed"
-
-
-st.session_state["config_server"]["reranker_model"] = "BAAI/bge-reranker-v2-m3"
-
 if "ret" not in st.session_state:
     st.session_state["ret"] = st.session_state["config_server"]["type_retrieval"]
 

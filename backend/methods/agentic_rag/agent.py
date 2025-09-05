@@ -5,7 +5,7 @@ Created on Thu Feb  6 16:37:47 2025
 @author: chardy
 """
 from ...base_classes import RagAgent
-from ..naive_rag.agent import NaiveRagAgent
+from ..advanced_rag.agent import AdvancedRag
 from ...database.database_class import get_management_data
 from ...utils.agent import get_Agent
 from .prompts import prompts
@@ -17,7 +17,7 @@ from ..query_reformulation.query_reformulation import query_reformulation
 class CompareQueryAnswer(BaseModel):
     Decision: bool
 
-class AgenticRagAgent(NaiveRagAgent):
+class AgenticRagAgent(AdvancedRag):
     "Original RAG with no modification"
 
     def __init__(
@@ -117,67 +117,6 @@ class AgenticRagAgent(NaiveRagAgent):
 
         return final_answer['texts']
 
-
-
-
-    def generate_intermediate_answer(
-        self,
-        query: str,
-        nb_chunks: int = 5,
-        options_generation = None,
-    ) -> str:
-        """
-        Takes a query, retrieves appropriated context and generates an answer
-        Args:
-            query (str) : The query that needs answering
-            model (str) : name of the model used to answer
-            nb_chunks (int) : number of chunks to retrieve
-
-        Output:
-            answer (str) : The answer to the query given the retrieved context
-        """
-        agent = self.agent
-        nb_input_tokens = 0
-        nb_output_tokens = 0
-        impacts, energies = [0, 0, ""], [0, 0, ""]
-        if self.reformulate_query:
-            query, input_t, output_t, impacts, energies = self.reformulater.reformulate(
-                query=query, nb_reformulation=1
-            )
-            query = query[0]
-            nb_input_tokens += input_t
-            nb_output_tokens = output_t
-
-        context, docs_name = self.get_rag_context(
-            query=query, nb_chunks=nb_chunks
-        )
-        prompt = self.prompts["smooth_generation"]["QUERY_TEMPLATE"].format(
-            context=context, query=query
-        )
-        system_prompt = self.prompts["smooth_generation"]["SYSTEM_PROMPT"]
-        answer = agent.predict(prompt=prompt, 
-                               system_prompt=system_prompt,
-                               options_generation=options_generation)
-        nb_input_tokens += np.sum(answer["nb_input_tokens"])
-        nb_output_tokens += np.sum(answer["nb_output_tokens"])
-        impacts[2] = answer["impacts"][2]
-        impacts[0] += answer["impacts"][0]
-        impacts[1] += answer["impacts"][1]
-        energies[2] = answer["energy"][2]
-        energies[0] += answer["energy"][0]
-        energies[1] += answer["energy"][1]
-
-        return {
-            "answer": answer["texts"],
-            "nb_input_tokens": nb_input_tokens,
-            "nb_output_tokens": nb_output_tokens,
-            "docs_name": docs_name,
-            "context": context,
-            "impacts": impacts,
-            "energy": energies,
-        }
-
-
     
     def generate_answer(
         self,
@@ -198,11 +137,10 @@ class AgenticRagAgent(NaiveRagAgent):
         """
         agent = self.agent
         
-
         iter = 0
-        info = self.generate_intermediate_answer(query, 
-                                                 nb_chunks=nb_chunks,
-                                                 options_generation=options_generation)
+        info = super().generate_answer(query, 
+                                       nb_chunks=nb_chunks,
+                                       options_generation=options_generation)
         answer = info["answer"]
         
         nb_input_tokens = info["nb_input_tokens"]
@@ -215,9 +153,9 @@ class AgenticRagAgent(NaiveRagAgent):
             iter += 1
             query_additional = self.reformulate(query, answer, agent)['texts']
 
-            info = self.generate_intermediate_answer(query_additional,
-                                                     nb_chunks=nb_chunks,
-                                                     options_generation=options_generation)
+            info = super().generate_answer(query_additional,
+                                           nb_chunks=nb_chunks,
+                                           options_generation=options_generation)
             answer_additional = info["answer"]
             
 

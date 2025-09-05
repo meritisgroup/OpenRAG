@@ -558,6 +558,8 @@ class DataBase:
 
     def get_list_path_documents(self):
         all_files = os.listdir(self.path_data)
+        if "metadatas.json" in all_files:
+            all_files.remove("metadatas.json")
         all_files = [os.path.join(self.path_data, doc_name) for doc_name in all_files]
         all_docs = [f for f in all_files if f != "metadatas.json"]
         return all_docs
