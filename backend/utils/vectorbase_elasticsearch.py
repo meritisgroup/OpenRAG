@@ -10,6 +10,7 @@ from sqlalchemy.orm import DeclarativeMeta
 from sqlalchemy import Integer, String
 from typing import Type
 
+
 def get_mapping_vb_embedding(class_: Type[DeclarativeMeta], vector_dims: int) -> dict:
     """
     Generate an Elastic search mapping
@@ -23,10 +24,9 @@ def get_mapping_vb_embedding(class_: Type[DeclarativeMeta], vector_dims: int) ->
         elif isinstance(column.type, String):
             es_properties[column.name] = {"type": "text"}
         else:
-            
+
             es_properties[column.name] = {"type": "text"}
 
-    
     es_properties["vector"] = {
         "type": "dense_vector",
         "dims": vector_dims,
@@ -37,14 +37,11 @@ def get_mapping_vb_embedding(class_: Type[DeclarativeMeta], vector_dims: int) ->
     return {"mappings": {"properties": es_properties}}
 
 
-
-
 def get_mapping_to_bm25(
     class_: Type[DeclarativeMeta],
     k1: float = 1.2,
     b: float = 0.75,
 ) -> dict:
-   
     """
     Generate an Elastic search mapping adapted to BM25
     """
@@ -55,10 +52,7 @@ def get_mapping_to_bm25(
         if isinstance(column.type, Integer):
             es_properties[column.name] = {"type": "integer"}
         elif isinstance(column.type, String):
-            es_properties[column.name] = {
-                "type": "text",
-                "similarity": "default"
-            }
+            es_properties[column.name] = {"type": "text", "similarity": "default"}
         else:
             es_properties[column.name] = {"type": "keyword"}
 
@@ -76,7 +70,6 @@ def get_mapping_to_bm25(
     }
 
     return mapping
-
 
 
 def chunk_to_dict_vb_embedding(chunk, embedding):
@@ -105,15 +98,15 @@ def chunk_to_dict_vb_bm25(chunk):
     return data
 
 
-def reconstruct_chunk_after_k_search(k_search_output: dict, class_: Type[DeclarativeMeta]) -> object:
-    
-    
+def reconstruct_chunk_after_k_search(
+    k_search_output: dict, class_: Type[DeclarativeMeta]
+) -> object:
+
     valid_columns = {col.name for col in class_.__table__.columns}
 
     filtered_source = {k: v for k, v in k_search_output.items() if k in valid_columns}
 
     return class_(**filtered_source)
-
 
 
 class Multiple_Vectorbase:
@@ -137,23 +130,24 @@ class VectorBase_embeddings_elasticsearch(VectorBase):
         self.vb_name = vb_name
         self.agent = agent
         self.auth = auth
- 
+
         self.dimension = len(
             self.agent.embeddings("test", model=embedding_model)["embeddings"][0]
         )
 
-        
         self.nb_tokens_embeddings = 0
         self.build_connection()
 
     def build_connection(self):
-        self.client = Elasticsearch(self.url_elasticsearch,
-                                    basic_auth=self.auth,
-                                    request_timeout=60,   
-                                    max_retries=3,
-                                    retry_on_timeout=True)
-        
-    def create_collection(self, name=None,  add_fields=[]) -> None:
+        self.client = Elasticsearch(
+            self.url_elasticsearch,
+            basic_auth=self.auth,
+            request_timeout=60,
+            max_retries=3,
+            retry_on_timeout=True,
+        )
+
+    def create_collection(self, name=None, add_fields=[]) -> None:
         if name is None:
             name = self.vb_name
 
@@ -173,12 +167,9 @@ class VectorBase_embeddings_elasticsearch(VectorBase):
         else:
             print(f'The collection "{name}" already exists')
 
-    
     def check_collection_exist(self, collection_name):
         print(f"[DEBUG] Checking collection: {collection_name}")
         return self.client.indices.exists(index=collection_name)
-        
-
 
     def check_element_exist(self, element, collection_name=None):
         if collection_name is None:
@@ -201,35 +192,28 @@ class VectorBase_embeddings_elasticsearch(VectorBase):
         if collection_name is None:
             collection_name = self.vb_name
 
-        
-
-        
         if not self.check_collection_exist(collection_name=collection_name):
             self.create_collection(name=collection_name)
-        
 
         data = []
         if chunks != []:
             texts = [chunk.text for chunk in chunks]
-            
-            embeddings = self.agent.embeddings(
-                texts=texts, model=self.embedding_model
-            )
+
+            embeddings = self.agent.embeddings(texts=texts, model=self.embedding_model)
             nb_embeddings_tokens = embeddings["nb_tokens"]
             if type(nb_embeddings_tokens) is list:
                 nb_embeddings_tokens = np.sum(nb_embeddings_tokens)
 
         for k, chunk in enumerate(chunks):
             source = chunk_to_dict_vb_embedding(
-        chunk=chunk,
-        embedding=embeddings["embeddings"][k])
-            
-            temp = {
-        "_index": collection_name,
-        "_source": source,
-    }
+                chunk=chunk, embedding=embeddings["embeddings"][k]
+            )
 
-            
+            temp = {
+                "_index": collection_name,
+                "_source": source,
+            }
+
             data.append(temp)
 
         res = helpers.bulk(self.client, data)
@@ -259,29 +243,21 @@ class VectorBase_embeddings_elasticsearch(VectorBase):
                 print("No chunks to add.")
             return
 
-        
-        
-
-        
         if not self.check_collection_exist(collection_name=collection_name):
             self.create_collection(name=collection_name)
-
 
         data = []
         if chunks != []:
             texts = [chunk.text for chunk in chunks]
-            embeddings = self.agent.embeddings(
-                texts=texts, model=self.embedding_model
-            )
+            embeddings = self.agent.embeddings(texts=texts, model=self.embedding_model)
             nb_embeddings_tokens = embeddings["nb_tokens"]
             if type(nb_embeddings_tokens) is list:
                 nb_embeddings_tokens = np.sum(nb_embeddings_tokens)
 
             for k, chunk in enumerate(chunks):
                 data = chunk_to_dict_vb_embedding(
-        chunk=chunk,
-        embedding=embeddings["embeddings"][k]
-    )
+                    chunk=chunk, embedding=embeddings["embeddings"][k]
+                )
 
                 res = self.client.index(index=collection_name, document=data)
 
@@ -302,6 +278,7 @@ class VectorBase_embeddings_elasticsearch(VectorBase):
         self,
         queries: Union[str, list[str]],
         k: int,
+        output_fields: list[str] = ["text"],
         filters: dict = None,
         collection_name=None,
     ) -> list[Chunk]:
@@ -321,7 +298,7 @@ class VectorBase_embeddings_elasticsearch(VectorBase):
                     "num_candidates": 500,  # Number of candidates to consider
                 },
             }
-            
+
             response = self.client.search(index=collection_name, body=body)
             res.append(response)
 
@@ -356,12 +333,14 @@ class VectorBase_BM25_elasticsearch(VectorBase):
         self.build_connection()
 
     def build_connection(self):
-        self.client = Elasticsearch(self.url_elasticsearch,
-                                    basic_auth=self.auth,
-                                    request_timeout=60,   
-                                    max_retries=3,
-                                    retry_on_timeout=True)
-        
+        self.client = Elasticsearch(
+            self.url_elasticsearch,
+            basic_auth=self.auth,
+            request_timeout=60,
+            max_retries=3,
+            retry_on_timeout=True,
+        )
+
     def create_collection(self, name=None, add_fields=[]) -> None:
         if name is None:
             name = self.vb_name
@@ -406,11 +385,6 @@ class VectorBase_BM25_elasticsearch(VectorBase):
         if collection_name is None:
             collection_name = self.vb_name
 
-        
-
-        
-
-        
         if not self.check_collection_exist(collection_name=collection_name):
             self.create_collection(name=collection_name)
 
@@ -418,14 +392,13 @@ class VectorBase_BM25_elasticsearch(VectorBase):
         if chunks != []:
             for k, chunk in enumerate(chunks):
 
-                source = chunk_to_dict_vb_bm25(
-            chunk=chunk)
-                
+                source = chunk_to_dict_vb_bm25(chunk=chunk)
+
                 temp = {
-            "_index": collection_name,
-            "_source": source,
-        }
-                
+                    "_index": collection_name,
+                    "_source": source,
+                }
+
                 data.append(temp)
             helpers.bulk(self.client, data)
             if display_message:
@@ -449,17 +422,14 @@ class VectorBase_BM25_elasticsearch(VectorBase):
         if collection_name is None:
             collection_name = self.vb_name
 
-
-        
         if not self.check_collection_exist(collection_name=collection_name):
             self.create_collection(name=collection_name)
 
-
         data = []
-        if chunks!= []:
+        if chunks != []:
             for k, chunk in enumerate(chunks):
                 data = chunk_to_dict_vb_bm25(chunk)
-                
+
             self.client.index(index=collection_name, document=data)
 
             if display_message:
@@ -477,6 +447,7 @@ class VectorBase_BM25_elasticsearch(VectorBase):
         self,
         queries: Union[str, list[str]],
         k: int,
+        output_fields: list[str] = ["text"],
         filters: dict = None,
         collection_name=None,
     ) -> list[Chunk]:
@@ -529,10 +500,11 @@ class VectorBase_hybrid_elasticsearch(VectorBase_embeddings_elasticsearch):
         self,
         queries: Union[str, list[str]],
         k: int,
+        output_fields: list[str] = ["text"],
         filters: dict = None,
         collection_name=None,
     ) -> list[Chunk]:
-        
+
         if type(queries) is type(""):
             queries = [queries]
         if collection_name is None:
@@ -576,9 +548,9 @@ class VectorBase_hybrid_elasticsearch(VectorBase_embeddings_elasticsearch):
         results = []
         for l in range(len(res)):
             result = []
-            #print("res", res[l]["hits"]["hits"], len(res[l]["hits"]["hits"]))
+            # print("res", res[l]["hits"]["hits"], len(res[l]["hits"]["hits"]))
             for i in range(np.min([len(res[l]["hits"]["hits"]), k])):
-                source=res[l]["hits"]["hits"][i]["_source"]
+                source = res[l]["hits"]["hits"][i]["_source"]
                 result.append(reconstruct_chunk_after_k_search(source, Chunk))
             results.append(result)
         return results

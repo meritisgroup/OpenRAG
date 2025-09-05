@@ -11,7 +11,7 @@ from streamlit_.utils.chat_funcs import (
     handle_click,
     reset_success_button,
     change_default_prompt,
-    prepare_show_context
+    prepare_show_context,
 )
 
 st.markdown("# OpenRAG by Meritis")
@@ -93,8 +93,10 @@ with st.sidebar:
         type="primary",
     ):
         with st.spinner("Setting up RAG agent", show_time=True):
-            rag_agent = get_chat_agent(rag_method=rag_method,
-                                       databases_name=st.session_state["chat_database_name"])
+            rag_agent = get_chat_agent(
+                rag_method=rag_method,
+                databases_name=st.session_state["chat_database_name"],
+            )
 
         with st.spinner("Indexation running", show_time=True):
             rag_agent.indexation_phase(
@@ -152,9 +154,7 @@ if prompt := st.chat_input(
             )
             end_time = time.time()
 
-
-        context = prepare_show_context(context=answer["context"],
-                                       docs_name=answer["docs_name"])
+        context = prepare_show_context(chunks=answer["context"])
 
         st.markdown(
             """
@@ -172,7 +172,7 @@ if prompt := st.chat_input(
             }
             </style>
             """,
-            unsafe_allow_html=True
+            unsafe_allow_html=True,
         )
 
         with st.expander("💡 Voir le contexte utilisé"):

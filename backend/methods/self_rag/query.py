@@ -1,5 +1,6 @@
 from ...utils.agent import Agent
 from ...base_classes import Search
+from backend.database.rag_classes import Chunk
 
 
 class NaiveSearch(Search):
@@ -13,19 +14,18 @@ class NaiveSearch(Search):
         self.data_manager = data_manager
         self.nb_chunks = nb_chunks
 
-    def get_context(self, query: str) -> str:
+    def get_context(self, query: str) -> list[list[Chunk]]:
         """
         Build the context using naive rag method.
 
         Args :
             query (str): user's request you want a context to answer
         """
-        search_res = self.data_manager.k_search(
-            queries=query,
-            k=self.nb_chunks,
-            output_fields=["text"],
-        )
-        docs_name = [res["doc_name"] for res in search_res[0]]
-        chunks = [res["text"] for res in search_res[0]]
 
-        return chunks, docs_name
+        if type(query) is str:
+            query = [query]
+
+        search_res = self.data_manager.k_search(
+            queries=query, k=self.nb_chunks, output_fields=["text", "doc_name"]
+        )
+        return search_res

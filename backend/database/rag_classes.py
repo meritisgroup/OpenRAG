@@ -14,24 +14,36 @@ class Base(DeclarativeBase):
 class Chunk(Base):
     __tablename__ = "chunks"
 
-    id : Mapped[str] = mapped_column(String())
-    position_in_doc : Mapped[int] = mapped_column(Integer(), primary_key=True)
+    id: Mapped[str] = mapped_column(String())
+    position_in_doc: Mapped[int] = mapped_column(Integer(), primary_key=True)
     document: Mapped[str] = mapped_column(String(), primary_key=True)
     text: Mapped[str] = mapped_column(String())
-    #metadata= Mapped[list[str]] = mapped_column(JSON())
+    rerank_score: Mapped[float] = mapped_column(String(), default=None)
+    # metadata= Mapped[list[str]] = mapped_column(JSON())
 
     def __repr__(self) -> str:
         return f"Chunk(id={self.id!r}, doc={self.document!r}, text={self.text!r}, position_in_doc={self.position_in_doc!r}, metadata={self.metadata!r})"
+
+    def to_dict(self) -> dict:
+
+        return {
+            "id": self.id,
+            "position_in_doc": self.position_in_doc,
+            "document": self.document,
+            "text": self.text,
+            "rerank_score": self.rerank_score,
+            # "metadata": self.metadata if you enable it
+        }
 
 
 class ChunkPath(Base):
     __tablename__ = "chunks_image"
 
-    id : Mapped[str] = mapped_column(String())
-    position_in_doc : Mapped[int] = mapped_column(Integer(), primary_key=True)
+    id: Mapped[str] = mapped_column(String())
+    position_in_doc: Mapped[int] = mapped_column(Integer(), primary_key=True)
     document: Mapped[str] = mapped_column(String(), primary_key=True)
     text: Mapped[str] = mapped_column(String())
-    #metadata= Mapped[list[str]] = mapped_column(JSON())
+    # metadata= Mapped[list[str]] = mapped_column(JSON())
     path: Mapped[str] = mapped_column(String())
 
     def __repr__(self) -> str:
@@ -64,7 +76,8 @@ class DocumentPath(Base):
 
 
 class DocumentText:
-    """ Class used to open, chunk and store documents"""
+    """Class used to open, chunk and store documents"""
+
     def __init__(self, path: str, splitter: Splitter = TextSplitter()):
 
         self.name_with_extension = path.split("/")[-1]
@@ -95,7 +108,9 @@ class DocumentText:
 
         for k, chunk in enumerate(chunks):
             results.append(
-                Chunk(text=chunk, document=self.name_with_extension, position_in_doc=k + 1)
+                Chunk(
+                    text=chunk, document=self.name_with_extension, position_in_doc=k + 1
+                )
             )
 
         return results

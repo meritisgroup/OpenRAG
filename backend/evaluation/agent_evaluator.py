@@ -7,6 +7,7 @@ from .comparators import (
 from sqlalchemy import func
 import numpy as np
 from backend.database.rag_classes import Document, Tokens
+from backend.database.database_class import ContextDatabase
 import time
 from ..utils.agent import get_Agent
 from ..base_classes import RagAgent
@@ -73,35 +74,63 @@ class AgentEvaluator:
         )
 
     def create_plot_report(self, plots, report_dir) -> str:
-        plots["token_graph"].write_image(os.path.join(report_dir, "tokens.png"), format="png")
+        plots["token_graph"].write_image(
+            os.path.join(report_dir, "tokens.png"), format="png"
+        )
         plots["ground_truth_graph"].write_image(
             report_dir + "/ground_truth.png", format="png"
         )
-        plots["context_graph"].write_image(os.path.join(report_dir,"context.png"), format="png")
-        plots["time_graph"].write_image(os.path.join(report_dir, "time_graph.png"), format="png")
+        plots["context_graph"].write_image(
+            os.path.join(report_dir, "context.png"), format="png"
+        )
+        plots["time_graph"].write_image(
+            os.path.join(report_dir, "time_graph.png"), format="png"
+        )
         for match, fig in plots["arena_graphs"].items():
             fig.write_image(os.path.join(report_dir, f"{match}.png"), format="png")
         plots["report_arena_graph"].write_image(
-            os.path.join(report_dir,"report_arena_graph.png"), format="png"
+            os.path.join(report_dir, "report_arena_graph.png"), format="png"
         )
 
         for file in os.listdir(report_dir):
             if "_v_" in file:
                 example_arena = file
                 break
-        
+
         BASE_DIR = os.path.dirname(os.path.abspath(__file__))
         template_path = os.path.join(BASE_DIR, "plot_report_template.tex")
 
         with open(template_path, "r", encoding="utf-8") as report_template:
             content = report_template.read()
             final_report = (
-                content.replace("{token_graph_path}", str(os.path.join(report_dir, "tokens.png")).replace("\\", "/"))
-                .replace("{gt_graph_path}", str(os.path.join(report_dir, "ground_truth.png")).replace("\\", "/"))
-                .replace("{context_graph_path}", str(os.path.join(report_dir, "context.png")).replace("\\", "/"))
-                .replace("{example_arena_graph}", str(os.path.join(report_dir, example_arena)).replace("\\", "/"))
-                .replace("{report_arena_graph}", str(os.path.join(report_dir, "report_arena_graph.png")).replace("\\", "/"))
-                .replace("{time_graph}", str(os.path.join(report_dir, "time_graph.png")).replace("\\", "/"))
+                content.replace(
+                    "{token_graph_path}",
+                    str(os.path.join(report_dir, "tokens.png")).replace("\\", "/"),
+                )
+                .replace(
+                    "{gt_graph_path}",
+                    str(os.path.join(report_dir, "ground_truth.png")).replace(
+                        "\\", "/"
+                    ),
+                )
+                .replace(
+                    "{context_graph_path}",
+                    str(os.path.join(report_dir, "context.png")).replace("\\", "/"),
+                )
+                .replace(
+                    "{example_arena_graph}",
+                    str(os.path.join(report_dir, example_arena)).replace("\\", "/"),
+                )
+                .replace(
+                    "{report_arena_graph}",
+                    str(os.path.join(report_dir, "report_arena_graph.png")).replace(
+                        "\\", "/"
+                    ),
+                )
+                .replace(
+                    "{time_graph}",
+                    str(os.path.join(report_dir, "time_graph.png")).replace("\\", "/"),
+                )
             )
         if plots["impact_graph"] is not None:
             plots["impact_graph"].write_image(
@@ -190,8 +219,8 @@ class DataFramePreparator:
             self.column_names[1]: self.ground_truths,
         }
         self.dataframe = pd.DataFrame(data, columns=self.column_names)
+        self.context_database = ContextDatabase()
         self.indexation_tokens = {}
-        
 
     def get_dataframe(self) -> pd.DataFrame:
         return self.dataframe
@@ -207,7 +236,7 @@ class DataFramePreparator:
 
         return queries, ground_truths
 
-    def run_all_queries(self, options_generation = None) -> None:
+    def run_all_queries(self, options_generation=None) -> None:
 
         progress_bar = ProgressBar(
             zip(self.rags_available, self.rag_agents),
@@ -223,9 +252,9 @@ class DataFramePreparator:
             )
             indexation_tokens[rag_available] = rag_agent.get_infos_embeddings()
             start_time = time.time()
-            rag_results = rag_agent.generate_answers(self.queries, 
-                                                     rag_agent.nb_chunks,
-                                                     options_generation=options_generation)
+            rag_results = rag_agent.generate_answers(
+                self.queries, rag_agent.nb_chunks, options_generation=options_generation
+            )
             end_time = time.time()
             answer_time = end_time - start_time
             answers = [rag_result["answer"] for rag_result in rag_results]
@@ -258,5 +287,7 @@ class DataFramePreparator:
                     energies,
                 )
             ]
-
+            self.context_database.complete_context_database(
+                rag_name=rag_available, queries=self.queries, answers=rag_results
+            )
         progress_bar.success("Answers ready for evaluation")

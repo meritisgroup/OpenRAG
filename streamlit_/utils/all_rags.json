@@ -10,6 +10,7 @@
         "query_reformulation_rag": "Query Reformulation RAG",
         "naive_chatbot": "Naive Chatbot",
         "agentic": "Agentic RAG",
+        "advanced_rag": "Advanced RAG",
         "reranker_rag": "Reranker RAG"
     },
     "vllm": {
@@ -35,6 +36,7 @@
         "contextual_retrieval": "Contextual Retrieval RAG",
         "query_reformulation_rag": "Query Reformulation RAG",
         "naive_chatbot": "Naive Chatbot",
+        "advanced_rag": "Advanced RAG",
         "reranker_rag": "Reranker RAG"
     },
     "mistral": {

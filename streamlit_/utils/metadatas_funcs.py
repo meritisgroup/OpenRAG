@@ -47,6 +47,10 @@ def get_metadatas(database_name):
 def load_metadatas_keys(database_name):
 
     metadata_path = get_database_path(database_name)
+
+    if not os.path.exists("chemin/vers/fichier.txt"):
+        init_metadata(database_name)
+
     with open(metadata_path, "r") as f:
         metadatas = json.load(f)
     return metadatas["keys"]
