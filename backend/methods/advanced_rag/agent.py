@@ -6,8 +6,8 @@ Created on Thu Feb  6 16:37:47 2025
 """
 from .indexation import NaiveRagIndexation
 from ..naive_rag.indexation import contexts_to_prompts
-from .query import NaiveSearch
 from ..naive_rag.agent import NaiveRagAgent
+from ..naive_rag.query import NaiveSearch
 from .reranker import Reranker
 from ..query_reformulation.query_reformulation import query_reformulation
 import numpy as np
@@ -23,8 +23,7 @@ class AdvancedRag(NaiveRagAgent):
         self,
         config_server: dict,
         dbs_name: list[str],
-        data_folders_name: list[str],
-        type_processor_chunks: list[str] = [],
+        data_folders_name: list[str]
     ) -> None:
         """
         Args:
@@ -41,7 +40,7 @@ class AdvancedRag(NaiveRagAgent):
         self.reranker_model = config_server["reranker_model"]
         self.reformulate_query = config_server["reformulate_query"]
         self.language = config_server["language"]
-        self.type_processor_chunks = type_processor_chunks
+        self.type_processor_chunks = config_server["ProcessorChunks"]
         self.nb_chunks = config_server["nb_chunks"]
         self.nb_input_tokens = 0
         self.nb_output_tokens = 0
@@ -87,11 +86,12 @@ class AdvancedRag(NaiveRagAgent):
             chunk_size=self.chunk_size,
             chunk_overlap=overlap,
             batch=self.params_vectorbase["batch"],
+            config_server=self.config_server
         )
 
         return None
 
-    def get_rag_context(self, query: str, nb_chunks: int = 5) -> list[str]:
+    def get_rag_context(self, query: str, nb_chunks: int = 5, to_prompt=False) -> list[str]:
         """
         Takes a query and retrieves a given number of chunks using the NaiveSearch implemented in backend/methods/naive_rag/query.py
 
@@ -104,7 +104,7 @@ class AdvancedRag(NaiveRagAgent):
 
         ns = NaiveSearch(data_manager=self.data_manager, nb_chunks=nb_chunks)
 
-        context, docs_name = ns.get_context(query=query)
+        context, docs_name = ns.get_context(query=query, to_prompt=to_prompt)
 
         return context, docs_name
 
@@ -143,7 +143,7 @@ class AdvancedRag(NaiveRagAgent):
             queries = [query]
 
         results = [
-            self.get_rag_context(query=query, nb_chunks=nb_chunks) for query in queries
+            self.get_rag_context(query=query, nb_chunks=nb_chunks, to_prompt=False) for query in queries
         ]
         contexts = []
         docs_name = []
@@ -153,7 +153,7 @@ class AdvancedRag(NaiveRagAgent):
 
         if len(contexts) > 0 and self.rerank:
             contexts, additional_data, nb_input_tokens = self.reranker.rerank(
-                query=query, contexts=contexts, max_contexts=20,
+                query=query, contexts=contexts, max_contexts=self.config_server["nb_chunks_reranker"],
                 additional_data={"docs_name": docs_name}
             )
             self.nb_input_tokens += nb_input_tokens

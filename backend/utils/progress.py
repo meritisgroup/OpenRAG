@@ -8,14 +8,26 @@ class ProgressBar:
         self.desc = desc
         self.placeholder = st.empty()
         self.progress_bar = self.placeholder.progress(0, text=self.desc)
-        
+        self.progress_value = 0
+
+
+    def set_description(self, desc):
+        self.desc = desc
+        if self.progress_bar:
+            current_value = int(self.progress_value)
+            self.progress_bar.progress(current_value, 
+                                       text=self.desc)
+
 
     def update(self, index, text=None):
         try:
             if self.progress_bar:
+                self.progress_value = int((index + 1) / self.total * 100)
                 self.progress_bar.progress(
-                    int((index + 1) / self.total * 100), text or self.desc
+                    self.progress_value, text or self.desc
                 )
+                if self.progress_value >= 100:
+                    self.clear()
             else:
                 self.progress_bar = st.progress(
                     int((index + 1) / self.total * 100), text

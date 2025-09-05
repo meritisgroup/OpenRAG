@@ -21,14 +21,13 @@
     "embedding_model": "mxbai-embed-large:latest",
     "language": "FR",
     "type_retrieval": "embeddings",
-    "TextSplitter": "Semantic_TextSplitter",
+    "TextSplitter": "TextSplitter",
     "reformulate_query": false,
-    "reranker_model": "gemma3:1b",
+    "reranker_model": "gemma3:12b",
     "max_attempts": 5,
-    "nb_chunks": 20,
-    "ProcessorChunks": [
-        "Contextual"
-    ],
+    "nb_chunks": 30,
+    "nb_chunks_reranker": 20,
+    "ProcessorChunks": [],
     "hf_token": null,
     "params_llm_dockling": {
         "url": "",

@@ -82,7 +82,9 @@ class GraphRagAgent(RagAgent):
             embedding_model=self.embedding_model
         )
 
-        index.run_pipeline(chunk_size=self.chunk_size, overlap=overlap)
+        index.run_pipeline(chunk_size=self.chunk_size, 
+                           overlap=overlap,
+                           config_server=self.config_server)
 
     def get_infos_embeddings(self):
         infos = {}

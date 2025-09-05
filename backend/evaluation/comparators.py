@@ -5,6 +5,7 @@ from .prompts import PROMPTS
 from ..utils.progress import ProgressBar
 
 import pandas as pd
+import json
 import numpy as np
 
 
@@ -66,7 +67,7 @@ class ArenaBattle:
 
         return final_scores
 
-    def run_battles_scores(self):
+    def run_battles_scores(self, log_file):
         """
         Runs battles between all RAG models and computes score matrices.
 
@@ -81,6 +82,9 @@ class ArenaBattle:
             total=total_comparisons, desc="Arena Battles Progress"
         )
         k = 0
+        with open(log_file, "r") as f:
+            data_logs = json.load(f)
+
         for i in range(num_rags):
             for j in range(i + 1, num_rags):
 
@@ -106,6 +110,9 @@ class ArenaBattle:
                     text=f"Arena Battles Progress ({k+1} / {int(num_rags * int((num_rags - 1))/2)})",
                 )
                 k += 1
+                data_logs["Arena Battles"] = int(((k+1) / (int(num_rags * int((num_rags - 1))/2)))*100)
+                with open(log_file, "w") as f:
+                    json.dump(data_logs, f)
         self.all_scores_dict = all_scores_dict
         progress_bar.success("Arena battles completed")
 
@@ -158,7 +165,10 @@ class GroundTruthComparator:
 
         return final_scores
 
-    def run_evaluations(self):
+    def run_evaluations(self, log_file):
+
+        with open(log_file, "r") as f:
+            data_logs = json.load(f)
 
         num_rags = len(self.rag_list)
         all_scores = {metric: np.zeros(num_rags) for metric in self.metrics}
@@ -179,6 +189,10 @@ class GroundTruthComparator:
             for metric in self.metrics:
                 all_scores[metric][i] = scores[metric]
                 all_scores_dict[rag][metric] = scores[metric]
+
+            data_logs["Ground Truth comparison"] = int(((i+1)/n)*100)
+            with open(log_file, "w") as f:
+                json.dump(data_logs, f)
 
         progress_bar.success("Ground truth comparison done")
 
@@ -229,7 +243,10 @@ class ContextRelevanceComparator:
 
         return final_scores
 
-    def run_evaluations(self):
+    def run_evaluations(self, log_file):
+        with open(log_file, "r") as f:
+            data_logs = json.load(f)
+
         num_rags = len(self.rag_list)
         all_scores = {f"{rag}": 0.0 for rag in self.rag_list}
 
@@ -246,6 +263,10 @@ class ContextRelevanceComparator:
             score = self.process_evaluation(rag_contexts)
 
             all_scores[rag] = score
+
+            data_logs["context relevance"] = int(((i+1)/n)*100)
+            with open(log_file, "w") as f:
+                json.dump(data_logs, f)
 
         progress_bar.success("Context relevance evaluations done")
         return all_scores
@@ -295,7 +316,10 @@ class ContextFaithfulnessComparator:
 
         return final_scores
 
-    def run_evaluations(self):
+    def run_evaluations(self, log_file):
+        with open(log_file, "r") as f:
+            data_logs = json.load(f)
+
         num_rags = len(self.rag_list)
         all_scores = {f"{rag}": 0.0 for rag in self.rag_list}
 
@@ -311,6 +335,10 @@ class ContextFaithfulnessComparator:
             contexts = [row["CONTEXT"] for row in self.dataframe[rag]]
             score = self.process_evaluation(self.ground_truth, contexts)
             all_scores[rag] = score
+
+            data_logs["Context faithfulness"] = int(((i+1)/n)*100)
+            with open(log_file, "w") as f:
+                json.dump(data_logs, f)
 
         progress_bar.success("Context faithfulness evaluations done")
         return all_scores

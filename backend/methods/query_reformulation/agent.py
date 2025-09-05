@@ -1,8 +1,9 @@
-from ..advanced_rag.query import NaiveSearch
+from ..naive_rag.query import NaiveSearch
 from ..naive_rag.agent import NaiveRagAgent
 from itertools import chain
 from .prompts import prompts
 from .query_reformulation import query_reformulation
+from ..naive_rag.indexation import contexts_to_prompts
 import numpy as np
 
 
@@ -29,11 +30,12 @@ class QueryReformulationRag(NaiveRagAgent):
         return self.data_manager.get_nb_token_embeddings()
 
     def get_rag_context(
-        self, query: str, nb_chunks: int = 5
+        self, query: str, nb_chunks: int = 5, to_prompt=False
     ) -> list[str]:
         ns = NaiveSearch(data_manager=self.data_manager,
                          nb_chunks=nb_chunks)
-        context, docs_name = ns.get_context(query=query)
+        context, docs_name = ns.get_context(query=query,
+                                            to_prompt=to_prompt)
         return context, docs_name
 
     def generate_answer(
@@ -51,7 +53,7 @@ class QueryReformulationRag(NaiveRagAgent):
         )
 
         results = [
-            self.get_rag_context(query=query, nb_chunks=nb_chunks) for query in queries
+            self.get_rag_context(query=query, nb_chunks=nb_chunks, to_prompt=False) for query in queries
         ]
         contexts = []
         docs_name = []
@@ -59,17 +61,18 @@ class QueryReformulationRag(NaiveRagAgent):
             contexts+=result[0]
             docs_name+=result[1]
 
-        context, docs_name = self.contexts_to_prompts(contexts=contexts,
-                                                      docs_name=docs_name)
+        contexts, docs_name = contexts_to_prompts(contexts=contexts,
+                                                  docs_name=docs_name)
         prompt = self.prompts["smooth_generation"]["QUERY_TEMPLATE"].format(
-            context=context, query=query
+            context=contexts, query=query
         )
         system_prompt = self.prompts["smooth_generation"]["SYSTEM_PROMPT"]
 
         if options_generation is None:
             options_generation = self.config_server["options_generation"]
 
-        answer = agent.predict(prompt=prompt, system_prompt=system_prompt,
+        answer = agent.predict(prompt=prompt,
+                               system_prompt=system_prompt,
                                options_generation=options_generation)
         nb_input_tokens += np.sum(answer["nb_input_tokens"])
         nb_output_tokens += np.sum(answer["nb_output_tokens"])
@@ -86,7 +89,7 @@ class QueryReformulationRag(NaiveRagAgent):
             "answer": answer["texts"],
             "nb_input_tokens": np.sum(nb_input_tokens),
             "nb_output_tokens": np.sum(nb_output_tokens),
-            "context": context,
+            "context": contexts,
             "docs_name": docs_name,
             "impacts": impacts,
             "energy" : energies

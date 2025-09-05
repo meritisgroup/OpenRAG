@@ -1,4 +1,4 @@
-from ...database.rag_classes import DocumentText
+from ...database.data_extraction import DocumentText
 from ...database.rag_classes import Document,Chunk
 from ...utils.splitter import get_splitter
 from .contextual import run_batch_contextual, run_serial_contextual
@@ -57,14 +57,20 @@ class ContextualRetrievalIndexation:
         for k, chunk in enumerate(doc_chunks):
             elements.append(chunk.replace("\n", "").replace("'", ""))
 
-        taille_batch = 50
-        for i in range(0, len(elements), taille_batch):
+        taille_batch = 500
+        range_chunks = range(0, len(elements), taille_batch)
+        progress_bar_chunks = ProgressBar(total=len(range_chunks))
+        j = 0
+        for i in range_chunks:
             doc_tokens += np.sum(self.data_manager.add_str_batch_elements(
                     elements=elements[i:i + taille_batch],
                     docs_name=name_docs[i : i + taille_batch],
                     path_docs=path_docs[i : i + taille_batch],
                     display_message=False
             ))
+            progress_bar_chunks.update(j)
+            j+=1
+        progress_bar_chunks.clear()
         return doc_tokens
 
     def __serial_indexation__(self, doc_chunks, name_docs, path_docs):
@@ -115,8 +121,10 @@ class ContextualRetrievalIndexation:
             embedding_tokens = 0
             input_tokens = 0
             output_tokens = 0
-            doc = DocumentText(path=path_doc,config_server={"data_preprocessing" : "pdf_text_extraction"},
-                                splitter=self.splitter)
+            doc = DocumentText(path=path_doc,
+                               doc_index=i,
+                               config_server={"data_preprocessing" : "pdf_text_extraction"},
+                               splitter=self.splitter)
             doc_content = doc.content
             size_limit_doc = []
             left = 0
@@ -177,3 +185,4 @@ class ContextualRetrievalIndexation:
                                                path=str(Path(path_doc).parent))
 
             progress_bar.update(i)
+        progress_bar.clear()

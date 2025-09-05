@@ -2,9 +2,6 @@ from sqlalchemy import String, Integer, JSON, Float
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
-from ..utils.open_doc import Opener
-from ..utils.splitter import TextSplitter
-from ..utils.base_classes import Splitter
 
 
 class Base(DeclarativeBase):
@@ -58,52 +55,6 @@ class DocumentPath(Base):
     def __repr__(self) -> str:
         return f"DocumentImage(id={self.id!r}, name={self.name!r}, path={self.path!r})"
 
-
-class DocumentText:
-    """ Class used to open, chunk and store documents"""
-    def __init__(self, path: str, splitter: Splitter = TextSplitter()):
-
-        self.name_with_extension = path.split("/")[-1]
-        try:
-            self.content = Opener(save=False).open_doc(path)
-
-        except Exception as e:
-            self.content = ""
-            print(f'Error "{e}" while trying to open doc {self.name_with_extension}')
-
-        self.name = ".".join(self.name_with_extension.split(".")[:-1])
-        self.path = path
-        self.extension = "." + self.name_with_extension.split(".")[-1]
-        self.text_splitter = splitter
-        self.embedding_tokens = 0
-        self.input_tokens = 0
-        self.output_tokens = 0
-
-    def chunks(self, chunk_size: int = 500, chunk_overlap: bool = True) -> list[Chunk]:
-        """
-        Split the text according to parameters and return associated chunks
-        """
-        chunks = self.text_splitter.split_text(
-            text=self.content, chunk_size=chunk_size, overlap=chunk_overlap
-        )
-
-        results = []
-
-        for k, chunk in enumerate(chunks):
-            results.append(
-                Chunk(text=chunk, document=self.name_with_extension, id=k + 1)
-            )
-
-        return results
-
-    def convert_in_base(self) -> Document:
-        return Document(
-            name=self.name_with_extension,
-            path=self.path,
-            embedding_tokens=self.embedding_tokens,
-            input_tokens=self.input_tokens,
-            output_tokens=self.output_tokens,
-        )
 
 
 class Entity(Base):

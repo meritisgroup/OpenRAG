@@ -1,5 +1,5 @@
 from ..advanced_rag.agent import AdvancedRag
-from ..advanced_rag.query import NaiveSearch
+from ..naive_rag.query import NaiveSearch
 from ..naive_rag.indexation import contexts_to_prompts
 import numpy as np
 from itertools import chain
@@ -39,7 +39,7 @@ class RerankerRag(AdvancedRag):
         )
         self.nb_chunks = config_server["nb_chunks"]
 
-    def get_rag_context(self, query: str, nb_chunks: int = 5) -> list[str]:
+    def get_rag_context(self, query: str, nb_chunks: int = 5, to_prompt=False) -> list[str]:
         """
         Takes a query and retrieves a given number of chunks using the NaiveSearch implemented in backend/methods/naive_rag/query.py
 
@@ -53,7 +53,8 @@ class RerankerRag(AdvancedRag):
 
         ns = NaiveSearch(data_manager=self.data_manager, 
                          nb_chunks=nb_chunks)
-        context, docs_name = ns.get_context(query=query)
+        context, docs_name = ns.get_context(query=query,
+                                            to_prompt=to_prompt)
         return context, docs_name
 
     def release_gpu_memory(self):
@@ -92,7 +93,9 @@ class RerankerRag(AdvancedRag):
 
 
         results = [
-            self.get_rag_context(query=query, nb_chunks=nb_chunks) for query in queries
+            self.get_rag_context(query=query, 
+                                 nb_chunks=nb_chunks,
+                                 to_prompt=False) for query in queries
         ]
         contexts = []
         docs_name = []
@@ -102,7 +105,7 @@ class RerankerRag(AdvancedRag):
 
         if len(contexts) > 0 and self.rerank:
             contexts, additional_data, input_tokens = self.reranker.rerank(
-                query=query, contexts=contexts, max_contexts=20,
+                query=query, contexts=contexts, max_contexts=self.config_server["nb_chunks_reranker"],
                 additional_data={"docs_name": docs_name})
             nb_input_tokens += input_tokens
 

@@ -20,7 +20,7 @@ class QbSearch(Search):
         self.data_manager = data_manager
 
 
-    def get_context(self, query: str) -> str:
+    def get_context(self, query: str, to_prompt=True) -> str:
         search_res = self.data_manager.k_search(
             queries=query,
             k=self.nb_questions,
@@ -30,10 +30,11 @@ class QbSearch(Search):
             [(res["doc_name"]) for res in search_res[0]],
             key=lambda x: x[0],
         )
-        chunks = [res["text"] for res in search_res[0]]
+        chunks = [res["chunk_text"] for res in search_res[0]]
         docs_name = [res["doc_name"] for res in search_res[0]]
-        context = ""
-        context, docs_name = contexts_to_prompts(contexts=chunks,
-                                                 docs_name=docs_name)
-
-        return context, docs_name
+        if to_prompt:
+            context, docs_name = contexts_to_prompts(contexts=chunks,
+                                                    docs_name=docs_name)
+            return context, docs_name
+        else:
+            return chunks, docs_name

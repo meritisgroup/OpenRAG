@@ -1,6 +1,6 @@
 import ast
 from ...database.rag_classes import Document
-from ..graph_rag.extract_entities import DocumentText
+from ...database.data_extraction import DocumentText
 from ...utils.splitter import get_splitter
 from .prompts import prompts
 import numpy as np

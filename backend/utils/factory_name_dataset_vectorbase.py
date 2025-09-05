@@ -61,9 +61,9 @@ def get_name(rag_name, config_server, additionnal_name=""):
             config_server["TextSplitter"],
         )
 
-    #name += "_{}".format(config_server["params_host_llm"]["type"])
     name += "_{}".format(config_server["data_preprocessing"])
-
+    name += "_{}".format(config_server["params_host_llm"]["type"])
+    
     if additionnal_name != "":
         name += "_" + additionnal_name
     name = name.lower()

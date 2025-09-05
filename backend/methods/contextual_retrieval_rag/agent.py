@@ -7,6 +7,8 @@ from ..naive_rag.agent import NaiveRagAgent
 from .indexation import ContextualRetrievalIndexation
 from ..naive_rag.query import NaiveSearch
 import numpy as np
+from sqlalchemy import func
+from backend.database.rag_classes import Document, Tokens
 from ..query_reformulation.query_reformulation import query_reformulation
 from ...database.database_class import get_management_data
 

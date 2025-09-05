@@ -1,4 +1,5 @@
 import streamlit as st
+import pickle
 import plotly.express as px
 from plotly.subplots import make_subplots
 from math import sqrt
@@ -27,25 +28,70 @@ color_discrete_sequence = [
     "#FECB52",
 ]
 
-def run_indexation_benchmark(reset_index):
+def get_folder_saved_benchmark():
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    report_dir = os.path.normpath(os.path.join(BASE_DIR,
+                                                "..",
+                                                "..",
+                                                "data",
+                                                "report"))
+    folder_bench = []
+    for foldername in os.listdir(report_dir):
+        folder = os.path.join(report_dir, foldername)
+        file_pkl = os.path.join(folder, "results_bench.pkl")
+        if os.path.exists(file_pkl):
+            folder_bench.append(foldername)
+    return folder_bench
+
+
+
+
+def run_indexation_benchmark(reset_index, databases, 
+                             report_dir, session_state=None):
+    if session_state is None:
+        session_state = st.session_state
+
+    log_file = os.path.join(report_dir, "logs.json")
+    if not os.path.exists(log_file):
+        data_logs = {"indexation": 0.0,
+                     "answers": 0.0,
+                     "Arena Battles": 0.0,
+                     "Ground Truth comparison": 0.0,
+                     "Context faithfulness": 0.0,
+                     "context relevance": 0.0}
+        with open(log_file, "w") as f:
+            json.dump(data_logs, f)
+    else:
+        with open(log_file, "r") as f:
+            data_logs = json.load(f)
+            
     rag_agents = []
     rag_names = []
     with st.spinner("**Indexation Running**", show_time=True):
         progress_bar_iterable = [
             rag
-            for rag in st.session_state["benchmark"]["rags"].keys()
-            if st.session_state["benchmark"]["rags"][rag]
+            for rag in session_state["benchmark"]["rags"].keys()
+            if session_state["benchmark"]["rags"][rag]
         ]
+        n = len(progress_bar_iterable)
         indexation_progress_bar = ProgressBar(progress_bar_iterable)
         for i, rag in enumerate(indexation_progress_bar.iterable):
-            if st.session_state["benchmark"]["rags"][rag]:
+            if session_state["benchmark"]["rags"][rag]:
                 rag_agent = get_chat_agent(rag,
-                                           databases_name=[st.session_state['benchmark_database']])
+                                           databases_name=databases,
+                                           session_state=session_state)
                 rag_agent.indexation_phase(reset_index=reset_index)
                 rag_agents.append(rag_agent)
                 rag_names.append(rag)
                 indexation_progress_bar.update(i)
+
+
+            data_logs["indexation"] = int(((i+1)/n)*100)
+            with open(log_file, "w") as f:
+                json.dump(data_logs, f)
+
         indexation_progress_bar.success("Indexation done")
+        indexation_progress_bar.clear()
     return rag_agents, rag_names
 
 
@@ -85,68 +131,126 @@ def generate_contexts(rag_names, rag_agents):
     df.to_csv(os.path.join(get_report_path(), "contexts_df.csv"), index=False)
 
 
-def generate_benchmark(rag_names, rag_agents):
-
-    dataframe_preparator = DataFramePreparator(
-        rag_agents=rag_agents,
-        rags_available=rag_names,
-        input_path=os.path.join("data", "queries",
-                                 st.session_state["benchmark"]["queries_doc_name"])
-    )
-    dataframe_preparator.run_all_queries(options_generation={"type_generation": "simple_generation"})
-
-    df = dataframe_preparator.get_dataframe()
-    evaluation_agent = AgentEvaluator(
-        dataframe=df,
-        rags_available=rag_names,
-        config_server=st.session_state["config_server"],
-    )
-
-    evals = evaluation_agent.get_evals()
-    (
-        st.session_state["benchmark"]["arena_matrix"],
-        st.session_state["benchmark"]["ground_truth"],
-        st.session_state["benchmark"]["context_faithfulness"],
-        st.session_state["benchmark"]["context_relevance"],
-    ) = evals
-    st.session_state["benchmark"]["ground_truth"] = evaluation_agent.ground_truth_comparator.all_scores_dict
-    st.session_state["benchmark"]["arena_matrix"] = evaluation_agent.arena.all_scores_dict
-    st.session_state["benchmark"]["all_queries"] = dataframe_preparator.dataframe
-    st.session_state["benchmark"]["indexation_tokens"] = dataframe_preparator.indexation_tokens
-
-    impact = extract_impact(df)
-    energy = extract_energy(df)
-    time = extract_time(df)
-    st.session_state["benchmark"]["impacts"] = impact
-    st.session_state["benchmark"]["energy"] = energy
-    st.session_state["time"] = time
+def show_already_done_benchmark():
+    if st.session_state["benchmark_done"]=="None":
+        return
     
-    arena_graph = arena_graphs()
-    if st.session_state["config_server"]["params_host_llm"]["type"] in ["openai", "mistral"]:
-        impacts_graph = impact_graph()
-        energies_graph = energy_graph()
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    report_dir = os.path.normpath(os.path.join(BASE_DIR,
+                                                "..",
+                                                "..",
+                                                "data",
+                                                "report",
+                                                st.session_state["benchmark_done"]))
+    file_eval_save = os.path.join(report_dir, "results_bench.pkl")
+    with open(file_eval_save, "rb") as f:
+        results = pickle.load(f)
+    plots, impact, energy = show_benchmark(results=results)
+    st.session_state["benchmark"]["plots"] = plots
+    st.session_state["benchmark"]["report_path"] = report_dir
+    st.session_state['benchmark_database'] = results["databases"]
+
+     
+def show_benchmark(results, session_state=None):
+    if session_state is None:
+        session_state = st.session_state
+
+    (
+        session_state["benchmark"]["arena_matrix"],
+        session_state["benchmark"]["ground_truth"],
+        session_state["benchmark"]["context_faithfulness"],
+        session_state["benchmark"]["context_relevance"],
+    ) = results["evals"]
+    session_state["benchmark"]["ground_truth"] = results["ground_truth_scores"]
+    session_state["benchmark"]["arena_matrix"] = results["arena_scores"]
+    session_state["benchmark"]["all_queries"] = results["df"]
+    session_state["benchmark"]["indexation_tokens"] = results["indexations_tokens"] 
+
+    impact = extract_impact(results["df"])
+    energy = extract_energy(results["df"])
+    time = extract_time(results["df"])
+    session_state["benchmark"]["impacts"] = impact
+    session_state["benchmark"]["energy"] = energy
+    session_state["time"] = time
+    
+    arena_graph = arena_graphs(session_state=session_state)
+    if session_state["config_server"]["params_host_llm"]["type"] in ["openai", "mistral"]:
+        impacts_graph = impact_graph(session_state=session_state)
+        energies_graph = energy_graph(session_state=session_state)
     
     else:
         impacts_graph = None
         energies_graph = None
 
     plots = {
-        "token_graph": token_graph(),
-        "ground_truth_graph": ground_truth_graph(),
-        "context_graph": context_graph(),
+        "token_graph": token_graph(session_state=session_state),
+        "ground_truth_graph": ground_truth_graph(session_state=session_state),
+        "context_graph": context_graph(session_state=session_state),
         "arena_graphs": arena_graph,
-        "report_arena_graph": report_arena_graph(arena_graph),
+        "report_arena_graph": report_arena_graph(arena_graph, session_state=session_state),
         "impact_graph" : impacts_graph,
         "energy_graph" : energies_graph,
-        "time_graph" : time_graph()
+        "time_graph" : time_graph(session_state=session_state)
     }
-    st.session_state["benchmark"]["plots"] = plots
-    st.session_state["benchmark"]["report_path"] = evaluation_agent.create_plot_report(plots=plots,
-                                                                                       report_dir=get_report_path())
-    df.to_csv(os.path.join(st.session_state["benchmark"]["report_path"], "bench_df.csv"), index=False)
-    with open(os.path.join(st.session_state["benchmark"]["report_path"], "impact.json"), "w") as file:
+    return plots, impact, energy
+
+
+def generate_benchmark(rag_names, 
+                       rag_agents,
+                       databases,
+                       queries_doc_mane,
+                       config_server,
+                       report_dir,
+                       session_state=None):
+    if session_state is None:
+        session_state = st.session_state
+        
+    log_file = os.path.join(report_dir, "logs.json")
+    if not os.path.exists(log_file):
+        with open(log_file, "w") as f:
+            json.dump({"indexation": 0.0,
+                       "answers": 0.0,
+                        "Arena Battles": 0.0,
+                        "Ground Truth comparison": 0.0,
+                        "Context faithfulness": 0.0,
+                        "context relevance": 0.0}, f)
+
+    dataframe_preparator = DataFramePreparator(rag_agents=rag_agents,
+                                               rags_available=rag_names,
+                                               input_path=os.path.join("data", "queries",
+                                                                        queries_doc_mane))
+    dataframe_preparator.run_all_queries(options_generation={"type_generation": "simple_generation"},
+                                         log_file=log_file)
+
+    df = dataframe_preparator.get_dataframe()
+    evaluation_agent = AgentEvaluator(dataframe=df,
+                                      rags_available=rag_names,
+                                      config_server=config_server)
+
+    evals = evaluation_agent.get_evals(log_file=log_file)
+
+    results_bench = {"df":df,
+                     "evals": evals,
+                     "ground_truth_scores": evaluation_agent.ground_truth_comparator.all_scores_dict,
+                     "arena_scores": evaluation_agent.arena.all_scores_dict,
+                     "indexations_tokens": dataframe_preparator.indexation_tokens,
+                     "databases": databases}
+    
+    file_eval_save = os.path.join(report_dir, "results_bench.pkl")
+    with open(file_eval_save, "wb") as f:
+        pickle.dump(results_bench, f)
+
+    plots, impact, energy = show_benchmark(results=results_bench,
+                                           session_state=session_state)
+
+    session_state["benchmark"]["plots"] = plots
+    session_state["benchmark"]["report_path"] = evaluation_agent.create_plot_report(plots=plots,
+                                                                                       report_dir=report_dir)
+    
+    df.to_csv(os.path.join(session_state["benchmark"]["report_path"], "bench_df.csv"), index=False)
+    with open(os.path.join(session_state["benchmark"]["report_path"], "impact.json"), "w") as file:
         json.dump(impact,file,indent=4)
-    with open(os.path.join(st.session_state["benchmark"]["report_path"], "energy.json"), "w") as file:
+    with open(os.path.join(session_state["benchmark"]["report_path"], "energy.json"), "w") as file:
         json.dump(energy,file,indent=4)
 
 
@@ -162,9 +266,12 @@ def display_plot():
         st.plotly_chart(st.session_state["benchmark"]["plots"]["energy_graph"])
 
 
-def token_graph():
-    all_queries = st.session_state["benchmark"]["all_queries"]
-    indexation_tokens = st.session_state["benchmark"]["indexation_tokens"]
+def token_graph(session_state=None):
+    if session_state is None:
+        session_state = st.session_state
+
+    all_queries = session_state["benchmark"]["all_queries"]
+    indexation_tokens = session_state["benchmark"]["indexation_tokens"]
     tokens = {}
     for rag in all_queries.columns[2:]:
         tokens[rag] = {
@@ -217,8 +324,8 @@ def token_graph():
                 "Nb Tokens": tokens[rag]["indexation_output_tokens"],
             }
         )
-    host = st.session_state["config_server"]["params_host_llm"]["type"]
-    tickstext = [st.session_state["all_rags"][host][tick] for tick in ticksval]
+    host = session_state["config_server"]["params_host_llm"]["type"]
+    tickstext = [session_state["all_rags"][host][tick] for tick in ticksval]
     fig = px.bar(
         data,
         x="RAG Method",
@@ -241,9 +348,12 @@ def token_graph():
     return fig
 
 
-def context_graph():
-    faithfulness = st.session_state["benchmark"]["context_faithfulness"]
-    relevance = st.session_state["benchmark"]["context_relevance"]
+def context_graph(session_state=None):
+    if session_state is None:
+        session_state = st.session_state
+
+    faithfulness = session_state["benchmark"]["context_faithfulness"]
+    relevance = session_state["benchmark"]["context_relevance"]
 
     ticksval = []
     data = []
@@ -260,8 +370,8 @@ def context_graph():
                 "Metric": "Context Faithfulness",
             }
         )
-    host = st.session_state["config_server"]["params_host_llm"]["type"]
-    tickstext = [st.session_state["all_rags"][host][tick] for tick in ticksval]
+    host = session_state["config_server"]["params_host_llm"]["type"]
+    tickstext = [session_state["all_rags"][host][tick] for tick in ticksval]
     fig = px.bar(
         data,
         x="Score",
@@ -286,8 +396,11 @@ def context_graph():
     return fig
 
 
-def ground_truth_graph():
-    ground_truth = st.session_state["benchmark"]["ground_truth"]
+def ground_truth_graph(session_state=None):
+    if session_state is None:
+        session_state = st.session_state
+
+    ground_truth = session_state["benchmark"]["ground_truth"]
 
     data = []
     ticksval = []
@@ -313,8 +426,8 @@ def ground_truth_graph():
         orientation="h",
         color_discrete_sequence=color_discrete_sequence,
     )
-    host = st.session_state["config_server"]["params_host_llm"]["type"]
-    tickstext = [st.session_state["all_rags"][host][tick] for tick in ticksval]
+    host = session_state["config_server"]["params_host_llm"]["type"]
+    tickstext = [session_state["all_rags"][host][tick] for tick in ticksval]
     fig.update_layout(
         title=dict(text="Ground Truth Analysis", x=0.5, xanchor="center"),
         xaxis={"title": {"text": "Score"}},
@@ -326,27 +439,30 @@ def ground_truth_graph():
     return fig
 
 
-def arena_graphs():
+def arena_graphs(session_state=None):
+    if session_state is None:
+        session_state = st.session_state
+
     figures = {}
-    arena_matrix = st.session_state["benchmark"]["arena_matrix"]
+    arena_matrix = session_state["benchmark"]["arena_matrix"]
     for match in arena_matrix.keys():
         mid = match.find("_v_")
         rag1 = match[:mid]
         rag2 = match[mid + 3 :]
         data = []
-        host = st.session_state["config_server"]["params_host_llm"]["type"]
+        host = session_state["config_server"]["params_host_llm"]["type"]
         for metric in arena_matrix[match].keys():
             data.append(
                 {
                     "Metric": metric,
-                    "RAG": st.session_state["all_rags"][host][rag1],
+                    "RAG": session_state["all_rags"][host][rag1],
                     "Score": arena_matrix[match][metric][0],
                 }
             )
             data.append(
                 {
                     "Metric": metric,
-                    "RAG": st.session_state["all_rags"][host][rag2],
+                    "RAG": session_state["all_rags"][host][rag2],
                     "Score": arena_matrix[match][metric][1],
                 }
             )
@@ -366,16 +482,19 @@ def arena_graphs():
     return figures
 
 
-def report_arena_graph(arena_graphs):
+def report_arena_graph(arena_graphs, session_state=None):
+    if session_state is None:
+        session_state = st.session_state
+
     n_cols = max(1, int((-1 + sqrt(1 + 8 * len(arena_graphs))) / 2))
 
     rag_list = []
-    host = st.session_state["config_server"]["params_host_llm"]["type"]
-    st.session_state["benchmark"]["matches"] = list(arena_graphs.keys())
+    host = session_state["config_server"]["params_host_llm"]["type"]
+    session_state["benchmark"]["matches"] = list(arena_graphs.keys())
     for match in list(arena_graphs.keys())[0:n_cols]:
         mid = match.find("_v_")
         rag_b = match[mid + 3 :]
-        rag_list.append(st.session_state["all_rags"][host][rag_b])
+        rag_list.append(session_state["all_rags"][host][rag_b])
 
     while len(rag_list) < n_cols**2:
         rag_list.append("")
@@ -395,7 +514,7 @@ def report_arena_graph(arena_graphs):
         if rag_a != prev_rag_a:
             row += 1
             col = 1
-            y_titles.append(st.session_state["all_rags"][host][rag_a])
+            y_titles.append(session_state["all_rags"][host][rag_a])
 
         for trace in figure.data:
             fig.add_trace(trace, row=row, col=col)
@@ -473,14 +592,17 @@ def extract_time(df : pd.DataFrame):
         time[rag] = df[rag][0]['TIME']
     return time
 
-def impact_graph():
-    impacts = st.session_state["benchmark"]["impacts"]
-    host = st.session_state["config_server"]["params_host_llm"]["type"]
+def impact_graph(session_state=None):
+    if session_state is None:
+        session_state = st.session_state
+
+    impacts = session_state["benchmark"]["impacts"]
+    host = session_state["config_server"]["params_host_llm"]["type"]
     data = []
     for rag in impacts.keys():
         data.append(
             {
-                "RAG Method" : st.session_state["all_rags"][host][rag],
+                "RAG Method" : session_state["all_rags"][host][rag],
                 "center" : (impacts[rag][0] + impacts[rag][1]) / 2,
                 "error" : (impacts[rag][0] - impacts[rag][1]) / 2
             }
@@ -499,14 +621,17 @@ def impact_graph():
                       title=dict(text="Greenhouse gas emissions estimations", x=0.5, xanchor="center"))
     return fig
 
-def energy_graph():
-    energies = st.session_state["benchmark"]["energy"]
-    host = st.session_state["config_server"]["params_host_llm"]["type"]
+def energy_graph(session_state=None):
+    if session_state is None:
+        session_state = st.session_state
+
+    energies = session_state["benchmark"]["energy"]
+    host = session_state["config_server"]["params_host_llm"]["type"]
     data = []
     for rag in energies.keys():
         data.append(
             {
-                "RAG Method" : st.session_state["all_rags"][host][rag],
+                "RAG Method" : session_state["all_rags"][host][rag],
                 "center" : (energies[rag][0] + energies[rag][1]) / 2,
                 "error" : (energies[rag][0] - energies[rag][1]) / 2
             }
@@ -525,12 +650,15 @@ def energy_graph():
                       title=dict(text="Energy consumption estimations", x=0.5, xanchor="center"))
     return fig
 
-def time_graph():
-    raw_data = st.session_state["time"]
+def time_graph(session_state=None):
+    if session_state is None:
+        session_state = st.session_state
+
+    raw_data = session_state["time"]
     data = []
-    host = st.session_state["config_server"]["params_host_llm"]["type"]
+    host = session_state["config_server"]["params_host_llm"]["type"]
     for rag in raw_data:
-        rag_data = {"RAG Method" : st.session_state["all_rags"][host][rag],
+        rag_data = {"RAG Method" : session_state["all_rags"][host][rag],
                     "Answering Time" : raw_data[rag]}
         data.append(rag_data)
 
