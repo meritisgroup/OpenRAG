@@ -11,24 +11,40 @@ class Base(DeclarativeBase):
 class Chunk(Base):
     __tablename__ = "chunks"
 
-    id: Mapped[int] = mapped_column(Integer(), primary_key=True)
+    id: Mapped[str] = mapped_column(String())
+    position_in_doc: Mapped[int] = mapped_column(Integer(), primary_key=True)
     document: Mapped[str] = mapped_column(String(), primary_key=True)
     text: Mapped[str] = mapped_column(String())
+    rerank_score: Mapped[float] = mapped_column(String(), default=None)
+    # metadata= Mapped[list[str]] = mapped_column(JSON())
 
     def __repr__(self) -> str:
-        return f"Chunk(id={self.id!r}, doc={self.document!r}, text={self.text!r})"
+        return f"Chunk(id={self.id!r}, doc={self.document!r}, text={self.text!r}, position_in_doc={self.position_in_doc!r}, metadata={self.metadata!r})"
+
+    def to_dict(self) -> dict:
+
+        return {
+            "id": self.id,
+            "position_in_doc": self.position_in_doc,
+            "document": self.document,
+            "text": self.text,
+            "rerank_score": self.rerank_score,
+            # "metadata": self.metadata if you enable it
+        }
 
 
 class ChunkPath(Base):
     __tablename__ = "chunks_image"
 
-    id: Mapped[int] = mapped_column(Integer(), primary_key=True)
-    doc_id: Mapped[int] = mapped_column(Integer(), primary_key=True)
+    id: Mapped[str] = mapped_column(String())
+    position_in_doc: Mapped[int] = mapped_column(Integer(), primary_key=True)
     document: Mapped[str] = mapped_column(String(), primary_key=True)
+    text: Mapped[str] = mapped_column(String())
+    # metadata= Mapped[list[str]] = mapped_column(JSON())
     path: Mapped[str] = mapped_column(String())
 
     def __repr__(self) -> str:
-        return f"Chunk(id={self.id!r}, doc={self.document!r}, path={self.path!r}, , doc_id={self.doc_id!r})"
+        return f"Chunk(id={self.id!r}, doc={self.document!r}, text={self.text!r}, position_in_doc={self.position_in_doc!r}, metadata={self.metadata!r},  path={self.path!r})"
 
 
 class Document(Base):
@@ -55,6 +71,55 @@ class DocumentPath(Base):
     def __repr__(self) -> str:
         return f"DocumentImage(id={self.id!r}, name={self.name!r}, path={self.path!r})"
 
+
+class DocumentText:
+    """Class used to open, chunk and store documents"""
+
+    def __init__(self, path: str, splitter: Splitter = TextSplitter()):
+
+        self.name_with_extension = path.split("/")[-1]
+        try:
+            self.content = Opener(save=False).open_doc(path)
+
+        except Exception as e:
+            self.content = ""
+            print(f'Error "{e}" while trying to open doc {self.name_with_extension}')
+
+        self.name = ".".join(self.name_with_extension.split(".")[:-1])
+        self.path = path
+        self.extension = "." + self.name_with_extension.split(".")[-1]
+        self.text_splitter = splitter
+        self.embedding_tokens = 0
+        self.input_tokens = 0
+        self.output_tokens = 0
+
+    def chunks(self, chunk_size: int = 500, chunk_overlap: bool = True) -> list[Chunk]:
+        """
+        Split the text according to parameters and return associated chunks
+        """
+        chunks = self.text_splitter.split_text(
+            text=self.content, chunk_size=chunk_size, overlap=chunk_overlap
+        )
+
+        results = []
+
+        for k, chunk in enumerate(chunks):
+            results.append(
+                Chunk(
+                    text=chunk, document=self.name_with_extension, position_in_doc=k + 1
+                )
+            )
+
+        return results
+
+    def convert_in_base(self) -> Document:
+        return Document(
+            name=self.name_with_extension,
+            path=self.path,
+            embedding_tokens=self.embedding_tokens,
+            input_tokens=self.input_tokens,
+            output_tokens=self.output_tokens,
+        )
 
 
 class Entity(Base):

@@ -14,20 +14,17 @@ from ...utils.agent import get_Agent
 from .prompts import prompts
 import numpy as np
 from sqlalchemy import func
-from backend.database.rag_classes import Document, Tokens
+from backend.database.rag_classes import Document, Tokens, Chunk
 from ..query_reformulation.query_reformulation import query_reformulation
+from .indexation import concat_chunks
 
 
 class NaiveRagAgent(RagAgent):
     "Original RAG with no modification"
 
     def __init__(
-        self,
-        config_server: dict,
-        dbs_name: list[str],
-        data_folders_name: list[str]
+        self, config_server: dict, dbs_name: list[str], data_folders_name: list[str]
     ) -> None:
-        
         """
         Args:
             model (str): model used to generate answer, to be set in backend/methods/naive_rag/config.json file
@@ -55,17 +52,18 @@ class NaiveRagAgent(RagAgent):
         self.params_vectorbase = config_server["params_vectorbase"]
 
         self.agent = get_Agent(config_server)
-        self.data_manager = get_management_data(dbs_name=self.dbs_name,
-                                                data_folders_name=self.data_folders_name,
-                                                storage_path=self.storage_path,
-                                                config_server=config_server,
-                                                agent=self.agent)
-        
+        self.data_manager = get_management_data(
+            dbs_name=self.dbs_name,
+            data_folders_name=self.data_folders_name,
+            storage_path=self.storage_path,
+            config_server=config_server,
+            agent=self.agent,
+        )
+
         self.config_server = config_server
 
         self.prompts = prompts[self.language]
-        self.system_prompt = get_system_prompt(self.config_server,
-                                               self.prompts)
+        self.system_prompt = get_system_prompt(self.config_server, self.prompts)
         self.chunk_size = config_server["chunk_length"]
         self.reformulate_query = config_server["reformulate_query"]
 
@@ -76,14 +74,20 @@ class NaiveRagAgent(RagAgent):
 
     def get_nb_token_embeddings(self):
         return self.data_manager.get_nb_token_embeddings()
-    
+
     def get_infos_embeddings(self):
         infos = {}
-        infos["embedding_tokens"] = (np.sum(self.data_manager.query(func.sum(Document.embedding_tokens))))
-        infos["input_tokens"] = np.sum(self.data_manager.query(func.sum(Document.input_tokens)))
-        infos["output_tokens"] = np.sum(self.data_manager.query(func.sum(Document.output_tokens)))
+        infos["embedding_tokens"] = np.sum(
+            self.data_manager.query(func.sum(Document.embedding_tokens))
+        )
+        infos["input_tokens"] = np.sum(
+            self.data_manager.query(func.sum(Document.input_tokens))
+        )
+        infos["output_tokens"] = np.sum(
+            self.data_manager.query(func.sum(Document.output_tokens))
+        )
         return infos
-    
+
     def indexation_phase(
         self,
         reset_index: bool = False,
@@ -116,7 +120,7 @@ class NaiveRagAgent(RagAgent):
 
         return None
 
-    def get_rag_context(self, query: str, nb_chunks: int = 5) -> list[str]:
+    def get_rag_context(self, query: str, nb_chunks: int = 5) -> list[list[Chunk]]:
         """
         Takes a query and retrieves a given number of chunks using the NaiveSearch implemented
 
@@ -126,16 +130,23 @@ class NaiveRagAgent(RagAgent):
         Output:
             context (list[str]) : All retrieved chunks
         """
-        ns = NaiveSearch(data_manager=self.data_manager, 
-                         nb_chunks=nb_chunks)
-        context, docs_name = ns.get_context(query=query)
-        return context, docs_name
+        ns = NaiveSearch(data_manager=self.data_manager, nb_chunks=nb_chunks)
+        chunk_lists = ns.get_context(query=query)
+        # print(chunk_lists)
+        return chunk_lists
+
+    def build_final_prompt(self, chunk_lists: list[list[Chunk]], query: str):
+        # Remplacer par :
+
+        context = concat_chunks(chunk_lists)
+
+        prompt = self.prompts["smooth_generation"]["QUERY_TEMPLATE"].format(
+            context=context, query=query
+        )
+        return prompt
 
     def generate_answer(
-        self,
-        query: str,
-        nb_chunks: int = 5,
-        options_generation = None
+        self, query: str, nb_chunks: int = 5, options_generation=None
     ) -> str:
         """
         Takes a query, retrieves appropriated context and generates an answer
@@ -159,18 +170,21 @@ class NaiveRagAgent(RagAgent):
             nb_input_tokens += input_t
             nb_output_tokens = output_t
 
-        context, docs_name = self.get_rag_context(query=query,
-                                                  nb_chunks=nb_chunks)
-        
-        prompt = self.prompts["smooth_generation"]["QUERY_TEMPLATE"].format(
-            context=context, query=query
-        )
+        # Building the prompt in 2 steps
+        chunk_lists = self.get_rag_context(query=query, nb_chunks=nb_chunks)
+        prompt = self.build_final_prompt(chunk_lists, query)
+
+        chunks = [chunk for chunk_list in chunk_lists for chunk in chunk_list]
+
         if options_generation is None:
             options_generation = self.config_server["options_generation"]
 
-        answer = agent.predict(prompt=prompt,
-                               system_prompt=self.system_prompt,
-                               options_generation=options_generation)
+        answer = agent.predict(
+            prompt=prompt,
+            system_prompt=self.system_prompt,
+            options_generation=options_generation,
+        )
+
         nb_input_tokens += np.sum(answer["nb_input_tokens"])
         nb_output_tokens += np.sum(answer["nb_output_tokens"])
         impacts[2] = answer["impacts"][2]
@@ -184,8 +198,7 @@ class NaiveRagAgent(RagAgent):
             "answer": answer["texts"],
             "nb_input_tokens": nb_input_tokens,
             "nb_output_tokens": nb_output_tokens,
-            "context": context,
-            "docs_name": docs_name,
+            "context": chunks,
             "impacts": impacts,
             "energy": energies,
         }
@@ -193,20 +206,22 @@ class NaiveRagAgent(RagAgent):
     def release_gpu_memory(self):
         self.agent.release_memory()
 
-    def get_rag_contexts(self, queries: list[str], nb_chunks: int = 5):
-        contexts = []
-        names_docs = []
-        for query in queries:
-            context, name_docs = self.get_rag_context(query=query, nb_chunks=nb_chunks)
-            contexts.append(context)
-            names_docs.append(name_docs)
-        return contexts, names_docs
+    # def get_rag_contexts(self, queries: list[str], nb_chunks: int = 5):
+    #     contexts = []
+    #     names_docs = []
+    #     for query in queries:
+    #         context, name_docs = self.get_rag_context(query=query, nb_chunks=nb_chunks)
+    #         contexts.append(context)
+    #         names_docs.append(name_docs)
+    #     return contexts, names_docs
 
-    def generate_answers(self, queries: list[str], nb_chunks: int = 2, options_generation = None):
+    def generate_answers(
+        self, queries: list[str], nb_chunks: int = 2, options_generation=None
+    ):
         answers = []
         for query in queries:
-            answer = self.generate_answer(query=query,
-                                          nb_chunks=nb_chunks,
-                                          options_generation=options_generation)
+            answer = self.generate_answer(
+                query=query, nb_chunks=nb_chunks, options_generation=options_generation
+            )
             answers.append(answer)
         return answers

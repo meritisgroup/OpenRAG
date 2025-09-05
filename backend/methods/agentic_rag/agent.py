@@ -17,8 +17,8 @@ from ..query_reformulation.query_reformulation import query_reformulation
 class CompareQueryAnswer(BaseModel):
     Decision: bool
 
-class AgenticRagAgent(AdvancedRag):
-    "Original RAG with no modification"
+class AgenticRagAgent(NaiveRagAgent):
+    "Iterative RAG"
 
     def __init__(
         self,

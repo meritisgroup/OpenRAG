@@ -6,6 +6,8 @@ from ...utils.progress import ProgressBar
 import os
 import numpy as np
 from pathlib import Path
+from ...database.rag_classes import Chunk
+
 
 class NaiveRagIndexation:
     def __init__(
@@ -37,10 +39,9 @@ class NaiveRagIndexation:
             embedding_model=self.embedding_model,
         )
 
-
-    def __batch_indexation__(self, doc_chunks, name_docs, path_docs):
+    def __batch_indexation__(self, doc_chunks, path_docs):
         """
-        Adds a batch of chunks from doc_chunks to the indexation verctorbase
+        Adds a batch of chunks from doc_chunks to the indexation vectorbase
         Args:
             doc_chunks (list[str]) : Chunks to be indexed
             name_docs (list[str]) : Name of docs each chunk is from
@@ -48,52 +49,47 @@ class NaiveRagIndexation:
         Returns
             None
         """
-        elements = []
         tokens = 0
-        for k, chunk in enumerate(doc_chunks):
-            elements.append(chunk.text.replace("\n", "").replace("'", ""))
 
-        tokens = 0
         taille_batch = 500
-        range_chunks = range(0, len(elements), taille_batch)
+        range_chunks = range(0, len(doc_chunks), taille_batch)
         progress_bar_chunks = ProgressBar(total=len(range_chunks))
         j = 0
         for i in range_chunks:
             tokens += np.sum(
-                self.data_manager.add_str_batch_elements(elements=elements[i : i + taille_batch],
-                                                         docs_name=name_docs[i : i + taille_batch],
-                                                         path_docs=path_docs[i : i + taille_batch],
-                                                         display_message=False))
+                self.data_manager.add_str_batch_elements(
+                    chunks=doc_chunks[i : i + taille_batch],
+                    path_docs=path_docs[i : i + taille_batch],
+                    display_message=False,
+                )
+            )
             progress_bar_chunks.update(j)
             j+=1
         progress_bar_chunks.clear()
         return tokens
-    
 
-    def __serial_indexation__(self, doc_chunks, name_docs, path_docs):
+    def __serial_indexation__(self, doc_chunks, path_docs):
         """
-        Adds a batch of chunks from doc_chunks to the indexation verctorbase
+        Adds a batch of chunks from doc_chunks to the indexation vectorbase
         Args:
-            doc_chunks (list[str]) : Chunks to be indexed
+            doc_chunks (list[Chunks]) : Chunks to be indexed
             name_docs (list[str]) : Name of docs each chunk is from
 
         Returns
             None
         """
-        tokens = 0
-        for k, chunk in enumerate(doc_chunks):
-            try:
-                tokens += self.data_manager.add_str_elements(elements=[chunk.text.replace("\n", "").replace("'", "")],
-                                                             docs_name=[name_docs[k]],
-                                                             path_docs=[path_docs[k]],
-                                                             display_message=False)
-            except Exception:
-                None
+
+        tokens = self.data_manager.add_str_elements(
+            doc_chunks, path_docs, display_message=False
+        )
         return tokens
-    
 
     def run_pipeline(
-        self, chunk_size: int = 500, chunk_overlap: bool = True, batch: bool = True, config_server={}
+        self,
+        chunk_size: int = 500,
+        chunk_overlap: bool = True,
+        batch: bool = True,
+        config_server={},
     ) -> None:
         """
         Split texts from self.data_path, embed them and save them in a vector base.
@@ -105,13 +101,20 @@ class NaiveRagIndexation:
         Returns:
             None
         """
-        docs_already_processed = [res[0] for res in self.data_manager.query(Document.path)]
-        to_process_norm = [Path(p).resolve().as_posix() for p in self.data_manager.get_list_path_documents()]
-        docs_already_norm = [Path(p).resolve().as_posix() for p in docs_already_processed]
+
+        docs_already_processed = [
+            res[0] for res in self.data_manager.query(Document.path)
+        ]
+
+        to_process_norm = [
+            Path(p).resolve().as_posix()
+            for p in self.data_manager.get_list_path_documents()
+        ]
+        docs_already_norm = [
+            Path(p).resolve().as_posix() for p in docs_already_processed
+        ]
         docs_to_process = [
-            doc
-            for doc in to_process_norm
-            if doc not in docs_already_norm
+            doc for doc in to_process_norm if doc not in docs_already_norm
         ]
         self.data_manager.create_collection()
         progress_bar = ProgressBar(total=len(docs_to_process))
@@ -152,7 +155,6 @@ class NaiveRagIndexation:
         progress_bar.clear()
 
 
-
 def contexts_to_prompts(contexts, docs_name):
     context = ""
     docs_context = []
@@ -160,9 +162,21 @@ def contexts_to_prompts(contexts, docs_name):
         if contexts[i] not in context:
             context += contexts[i] + "\n[...]\n"
 
-            if len(docs_name)>0:
+            if len(docs_name) > 0:
                 docs_context.append(docs_name[i])
-    if len(docs_name)>0:
+    if len(docs_name) > 0:
         return context[:-7], docs_context
     else:
         return context[:-7]
+
+
+def concat_chunks(chunk_lists: list[list[Chunk]]):
+
+    texts = [chunk.text for chunk_list in chunk_lists for chunk in chunk_list]
+
+    context = ""
+    for i in range(len(texts)):
+        if texts[i] not in context:
+            context += texts[i] + "\n[...]\n"
+
+    return context

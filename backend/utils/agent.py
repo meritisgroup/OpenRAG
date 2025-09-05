@@ -19,17 +19,16 @@ from typing import List
 from .base_classes import Agent
 from .agent_functions import np_array_to_file
 from pydantic import BaseModel
+from backend.database.rag_classes import Chunk
 
 
-def get_Agent(
-    config_server: dict,image_description= False
-):
+def get_Agent(config_server: dict, image_description=False):
     params_host_llm = config_server["params_host_llm"]
-    
-    if image_description==False:
-        choix_model="model"
-    elif image_description==True:
-        choix_model="model_for_image"
+
+    if image_description == False:
+        choix_model = "model"
+    elif image_description == True:
+        choix_model = "model_for_image"
 
     if params_host_llm["type"] == "ollama":
 
@@ -86,16 +85,29 @@ class Agent_ollama(Agent):
         self.max_attempts = max_attempts
         self.temperature = 0
 
-    def predict(self, prompt: str, system_prompt: str, temperature=0, options_generation = None) -> str:
+    def predict(
+        self, prompt: str, system_prompt: str, temperature=0, options_generation=None
+    ) -> str:
         """
         It formats the query with the good prompt, then gives this prompt to the LLM and return the cleaned output
         """
-        answer = predict(system_prompt, prompt, self.model, self.client, temperature, options_generation=options_generation)
+        answer = predict(
+            system_prompt,
+            prompt,
+            self.model,
+            self.client,
+            temperature,
+            options_generation=options_generation,
+        )
         return answer
 
     def predict_json(
-        self, prompt: str, system_prompt: str, json_format: BaseModel, temperature=0,
-        options_generation = None
+        self,
+        prompt: str,
+        system_prompt: str,
+        json_format: BaseModel,
+        temperature=0,
+        options_generation=None,
     ) -> BaseModel:
         """
         It formats the queries with good prompts, then gives these prompts to the LLM and return the cleaned outputs following the given BaseModel format
@@ -107,10 +119,10 @@ class Agent_ollama(Agent):
             self.client,
             json_format,
             temperature,
-            options_generation=options_generation
+            options_generation=options_generation,
         )
         return answer
-    
+
     def predict_image(
         self, prompt: str, data_url, json_format: BaseModel, temperature=0
     ) -> BaseModel:
@@ -128,15 +140,22 @@ class Agent_ollama(Agent):
         return answer
 
     def multiple_predict(
-        self, prompts: List[str], system_prompts: List[str], temperature=0, 
-        options_generation = None
+        self,
+        prompts: List[str],
+        system_prompts: List[str],
+        temperature=0,
+        options_generation=None,
     ) -> str:
         """
         It formats the queries with good prompts, then gives these prompts to the LLM and return the cleaned outputs
         """
         answers = multiple_predict(
-            system_prompts, prompts, self.model, self.client, 
-            temperature, options_generation=options_generation
+            system_prompts,
+            prompts,
+            self.model,
+            self.client,
+            temperature,
+            options_generation=options_generation,
         )
         return answers
 
@@ -156,7 +175,7 @@ class Agent_ollama(Agent):
             "nb_tokens": embeddings.usage.total_tokens,
         }
 
-    def reranking(self, query: str, contexts: list[str], model: str = "gemma3:1b"):
+    def reranking(self, query: str, chunk_list: list[Chunk], model: str = "gemma3:1b"):
         scores = []
         input_tokens = []
         system_prompt = """You are a highly accurate reranking model. Given a user query and a retrieved document chunk, your job is to assign a numerical relevance score from 0 to 1, where:
@@ -165,8 +184,8 @@ class Agent_ollama(Agent):
                             0.0 means "completely irrelevant".
 
                             Evaluate the document chunk solely based on its relevance to answering or supporting the query. Do not hallucinate or infer information not present in the chunk."""
-        for context in contexts:
-            prompt = f" Context : {context}\n Query : {query}"
+        for chunk in chunk_list:
+            prompt = f" Context : {chunk.text}\n Query : {query}"
             json_response, nb_input_tokens = rerank(
                 system_prompt, prompt, model, self.client, temperature=None
             )
@@ -204,7 +223,7 @@ class Agent_Vllm(Agent):
         images: list[list[str]] = None,
         json_format=None,
         temperature=0,
-        options_generation = None
+        options_generation=None,
     ) -> str:
         """
         It formats the query with the good prompt, then gives this prompt to the LLM and return the cleaned output
@@ -219,7 +238,7 @@ class Agent_Vllm(Agent):
             temperature=self.temperature,
             images=images,
             json_format=json_format,
-            options_generation=options_generation
+            options_generation=options_generation,
         )
 
         return answers
@@ -231,17 +250,19 @@ class Agent_Vllm(Agent):
         json_format: BaseModel,
         temperature=0,
         images: list[str] = None,
-        options_generation = None
+        options_generation=None,
     ) -> BaseModel:
         """
         It formats the queries with good prompts, then gives these prompts to the LLM and return the cleaned outputs following the given BaseModel format
         """
-        answer = self.multiple_predict(prompts=[prompt],
-                                       system_prompts=[system_prompt],
-                                       temperature=temperature,
-                                       json_format=json_format,
-                                       images=[images],
-                                       options_generation=options_generation)
+        answer = self.multiple_predict(
+            prompts=[prompt],
+            system_prompts=[system_prompt],
+            temperature=temperature,
+            json_format=json_format,
+            images=[images],
+            options_generation=options_generation,
+        )
         answer = answer["texts"][0]
 
         if "json" in answer:
@@ -270,14 +291,19 @@ class Agent_Vllm(Agent):
         return answer
 
     def predict(
-        self, prompt: str, system_prompt: str, images: list[str] = None, temperature=0, options_generation = None
+        self,
+        prompt: str,
+        system_prompt: str,
+        images: list[str] = None,
+        temperature=0,
+        options_generation=None,
     ) -> str:
         answer = self.multiple_predict(
             prompts=[prompt],
             system_prompts=[system_prompt],
             temperature=temperature,
             images=[images],
-            options_generation = options_generation
+            options_generation=options_generation,
         )
         answer["texts"] = answer["texts"][0]
         return answer
@@ -318,9 +344,10 @@ class Agent_Vllm(Agent):
         embeddings = np.array(embeddings["embeddings"])
         return {"embeddings": embeddings, "nb_tokens": nb_tokens}
 
-    def reranking(self, query, contexts, model):
-        if type(contexts) is str:
-            contexts = [contexts]
+    def reranking(self, query, chunk_list: list[Chunk], model):
+        if type(chunk_list) is Chunk:
+            chunk_list = [chunk_list]
+        contexts = [chunk.text for chunk in chunk_list]
         data = {"model_name": model, "query": query, "contexts": contexts}
         url = self.url + "/reranking"
         scores = requests.post(url, json=data).json()
@@ -356,7 +383,12 @@ class Agent_openai(Agent):
         self.temperature = 0
 
     def predict_json(
-        self, prompt: str, system_prompt: str, json_format: BaseModel, temperature=0, options_generation = None
+        self,
+        prompt: str,
+        system_prompt: str,
+        json_format: BaseModel,
+        temperature=0,
+        options_generation=None,
     ) -> BaseModel:
         """
         It formats the queries with good prompts, then gives these prompts to the LLM and return the cleaned outputs following the given BaseModel format
@@ -369,10 +401,10 @@ class Agent_openai(Agent):
             self.client,
             json_format,
             temperature,
-            options_generation=options_generation
+            options_generation=options_generation,
         )
         return answer
-    
+
     def predict_image(
         self, prompt: str, data_url, json_format: BaseModel, temperature=0
     ) -> BaseModel:
@@ -389,27 +421,45 @@ class Agent_openai(Agent):
         )
         return answer
 
-    def predict(self, prompt: str, system_prompt: str, temperature: float = 0, 
-        options_generation = None) -> str:
+    def predict(
+        self,
+        prompt: str,
+        system_prompt: str,
+        temperature: float = 0,
+        options_generation=None,
+    ) -> str:
         """
         It formats the query with the good prompt, then gives this prompt to the LLM and return the cleaned output
         """
         temperature = self.temperature
         answer = predict(
-            system_prompt, prompt, self.model, self.client, temperature=temperature, options_generation=options_generation
+            system_prompt,
+            prompt,
+            self.model,
+            self.client,
+            temperature=temperature,
+            options_generation=options_generation,
         )
         return answer
 
     def multiple_predict(
-        self, prompts: List[str], system_prompts: List[str], temperature: float = 0, 
-        options_generation = None
+        self,
+        prompts: List[str],
+        system_prompts: List[str],
+        temperature: float = 0,
+        options_generation=None,
     ) -> str:
         """
         It formats the queries with good prompts, then gives these prompts to the LLM and return the cleaned outputs
         """
         temperature = self.temperature
         answers = multiple_predict(
-            system_prompts, prompts, self.model, self.client, temperature=temperature, options_generation=options_generation
+            system_prompts,
+            prompts,
+            self.model,
+            self.client,
+            temperature=temperature,
+            options_generation=options_generation,
         )
         return answers
 
@@ -429,7 +479,7 @@ class Agent_openai(Agent):
             "nb_tokens": embeddings.usage.total_tokens,
         }
 
-    def reranking(self, query: str, contexts: list[str], model: str = "gemma3:1b"):
+    def reranking(self, query: str, chunk_list: list[Chunk], model: str = "gemma3:1b"):
         scores = []
         input_tokens = []
         system_prompt = """You are a highly accurate reranking model. Given a user query and a retrieved document chunk, your job is to assign a numerical relevance score from 0 to 1, where:
@@ -439,8 +489,8 @@ class Agent_openai(Agent):
 
                             Evaluate the document chunk solely based on its relevance to answering or supporting the query. Do not hallucinate or infer information not present in the chunk."""
 
-        for context in contexts:
-            prompt = f" Context : {context}\n Query : {query}"
+        for chunk in chunk_list:
+            prompt = f" Context : {chunk.text}\n Query : {query}"
             json_response, nb_input_tokens = rerank(
                 system_prompt, prompt, model, self.client, temperature=None
             )
@@ -503,46 +553,66 @@ class Agent_mistral(Agent_openai):
         }
 
     def predict_json(
-        self, prompt: str,
+        self,
+        prompt: str,
         system_prompt: str,
         json_format: BaseModel,
         temperature=0,
-        options_generation = None
+        options_generation=None,
     ) -> BaseModel:
-            """
-            It formats the queries with good prompts, then gives these prompts to the LLM and return the cleaned outputs following the given BaseModel format
-            """
-            temperature=self.temperature
-            answer = predict_json(
-                system_prompt,
-                prompt,
-                self.model,
-                self.client,
-                json_format,
-                temperature,
-                options_generation=options_generation
-            )
-            return answer
-    
-    def predict(self, prompt: str, system_prompt: str, temperature: float = 0, options_generation = None) -> str:
+        """
+        It formats the queries with good prompts, then gives these prompts to the LLM and return the cleaned outputs following the given BaseModel format
+        """
+        temperature = self.temperature
+        answer = predict_json(
+            system_prompt,
+            prompt,
+            self.model,
+            self.client,
+            json_format,
+            temperature,
+            options_generation=options_generation,
+        )
+        return answer
+
+    def predict(
+        self,
+        prompt: str,
+        system_prompt: str,
+        temperature: float = 0,
+        options_generation=None,
+    ) -> str:
         """
         It formats the query with the good prompt, then gives this prompt to the LLM and return the cleaned output
         """
         answer = predict_mistral(
-            system_prompt, prompt, self.model, self.client, temperature=temperature, options_generation=options_generation
+            system_prompt,
+            prompt,
+            self.model,
+            self.client,
+            temperature=temperature,
+            options_generation=options_generation,
         )
 
         return answer
 
     def multiple_predict(
-        self, prompts: List[str], system_prompts: List[str], temperature: float = 0, 
-        options_generation = None
+        self,
+        prompts: List[str],
+        system_prompts: List[str],
+        temperature: float = 0,
+        options_generation=None,
     ) -> str:
         """
         It formats the queries with good prompts, then gives these prompts to the LLM and return the cleaned outputs
         """
         answers = multiple_predict_mistral(
-            system_prompts, prompts, self.model, self.client, temperature=temperature, options_generation=options_generation
+            system_prompts,
+            prompts,
+            self.model,
+            self.client,
+            temperature=temperature,
+            options_generation=options_generation,
         )
         return answers
 
