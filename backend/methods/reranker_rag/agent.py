@@ -1,8 +1,10 @@
 from ..advanced_rag.agent import AdvancedRag
-from ..naive_rag.query import NaiveSearch
+from ..naive_rag.agent import NaiveRagAgent
+from ..advanced_rag.query import NaiveSearch
 from ..naive_rag.indexation import contexts_to_prompts
 import numpy as np
 from itertools import chain
+from backend.database.rag_classes import Chunk
 
 
 class RerankerRag(AdvancedRag):
@@ -34,28 +36,24 @@ class RerankerRag(AdvancedRag):
         config_server["reformulate_query"] = False
         super().__init__(
             config_server=config_server,
-            dbs_name = dbs_name,
-            data_folders_name = data_folders_name
+            dbs_name=dbs_name,
+            data_folders_name=data_folders_name,
         )
         self.nb_chunks = config_server["nb_chunks"]
 
-    def get_rag_context(self, query: str, nb_chunks: int = 5, to_prompt=False) -> list[str]:
+    def get_rag_context(self, query: str, nb_chunks: int = 5) -> list[list[Chunk]]:
         """
-        Takes a query and retrieves a given number of chunks using the NaiveSearch implemented in backend/methods/naive_rag/query.py
+        Takes a query and retrieves a given number of chunks using the NaiveSearch implemented
 
         Args:
             query (str) : The query that needs answering
             nb_chunks (int) : Number of chunks to be retrieved
-
         Output:
-            context (str) : All retrieved chunks, seperated by a new line and '[...]'
+            context (list[str]) : All retrieved chunks
         """
-
-        ns = NaiveSearch(data_manager=self.data_manager, 
-                         nb_chunks=nb_chunks)
-        context, docs_name = ns.get_context(query=query,
-                                            to_prompt=to_prompt)
-        return context, docs_name
+        ns = NaiveSearch(data_manager=self.data_manager, nb_chunks=nb_chunks)
+        chunk_lists = ns.get_context(query=query)
+        return chunk_lists
 
     def release_gpu_memory(self):
         self.agent.release_memory()
@@ -65,97 +63,92 @@ class RerankerRag(AdvancedRag):
         query: str,
         nb_chunks: int = 7,
         nb_reformulation=5,
-        options_generation = None
+        options_generation=None,
     ) -> str:
         """
         Takes a query, retrieves appropriated context and generates an answer
         Args:
             query (str) : The query that needs answering
-            model (str) :
             nb_chunks (int): Number of chunks to be retrieved
+            nb_reformulation (int): How many reformulation of the query will be computed and fed to an LLM
         Output:
             answer (str) : The answer to the query given the retrieved context
         """
         agent = self.agent
-        nb_input_tokens = 0
-        nb_output_tokens = 0
-        impacts, energies = [0, 0, ""], [0, 0, ""]
+        impacts = [0, 0, ""]
+        energy = [0, 0, ""]
         if self.reformulate_query:
-            queries, input_t, output_t, immpacts, energies = (
-                self.reformulater.reformulate(
-                    query=query, nb_reformulation=nb_reformulation
-                )
+            queries, input_t, output_t, impacts, energy = self.reformulater.reformulate(
+                query=query, nb_reformulation=nb_reformulation
             )
-            nb_input_tokens += input_t
-            nb_output_tokens += output_t
+            self.nb_input_tokens += input_t
+            self.nb_output_tokens += output_t
         else:
             queries = [query]
 
+        # Building the prompt in several steps
+        chunk_lists = self.get_rag_context(query=queries[0], nb_chunks=nb_chunks)
 
-        results = [
-            self.get_rag_context(query=query, 
-                                 nb_chunks=nb_chunks,
-                                 to_prompt=False) for query in queries
-        ]
-        contexts = []
-        docs_name = []
-        for result in results:
-            contexts+=result[0]
-            docs_name+=result[1]
+        chunk_list = [chunk for chunk_list in chunk_lists for chunk in chunk_list]
+        docs_name = [chunk.document for chunk in chunk_list]
 
-        if len(contexts) > 0 and self.rerank:
-            contexts, additional_data, input_tokens = self.reranker.rerank(
-                query=query, contexts=contexts, max_contexts=self.config_server["nb_chunks_reranker"],
-                additional_data={"docs_name": docs_name})
-            nb_input_tokens += input_tokens
+        if len(chunk_list) > 0 and self.rerank:
+            rerank_chunk_list, additional_data, nb_input_tokens = self.reranker.rerank(
+                query=query,
+                chunk_list=chunk_list,
+                max_contexts=len(chunk_list),
+                additional_data={"docs_name": docs_name},
+            )
+            self.nb_input_tokens += nb_input_tokens
+        else:
+            rerank_chunk_list = chunk_list
 
-        docs_name = additional_data["docs_name"]
-
-        context, docs_name = contexts_to_prompts(contexts=contexts,
-                                                 docs_name=docs_name)
-        prompt = self.prompts["smooth_generation"]["QUERY_TEMPLATE"].format(
-            context=context, query=query
-        )
+        prompt = self.build_final_prompt([rerank_chunk_list], query)
 
         if options_generation is None:
             options_generation = self.config_server["options_generation"]
 
-        answer = agent.predict(prompt=prompt, 
-                               system_prompt=self.system_prompt,
-                               options_generation=options_generation)
-        nb_input_tokens += np.sum(answer["nb_input_tokens"])
-        nb_output_tokens += np.sum(answer["nb_output_tokens"])
-        impacts[2] = answer["impacts"][2]
-        impacts[0] += answer["impacts"][0]
-        impacts[1] += answer["impacts"][1]
-        energies[2] = answer["energy"][2]
-        energies[0] += answer["energy"][0]
-        energies[1] += answer["energy"][1]
+        answer = agent.predict(
+            prompt=prompt,
+            system_prompt=self.system_prompt,
+            options_generation=options_generation,
+        )
+        self.nb_input_tokens += np.sum(answer["nb_input_tokens"])
+        self.nb_output_tokens += np.sum(answer["nb_output_tokens"])
+
+        impact = answer["impacts"]
+        impact[0] += impacts[0]
+        impact[1] += impacts[1]
+
+        energies = answer["energy"]
+        energies[0] += energy[0]
+        energies[1] += energy[1]
 
         return {
             "answer": answer["texts"],
-            "nb_input_tokens": nb_input_tokens,
-            "nb_output_tokens": nb_output_tokens,
-            "context": context,
-            "docs_name": docs_name,
-            "impacts": impacts,
+            "nb_input_tokens": self.nb_input_tokens,
+            "nb_output_tokens": self.nb_output_tokens,
+            "context": rerank_chunk_list,
+            "impacts": impact,
             "energy": energies,
         }
 
-    def get_rag_contexts(self, queries: list[str], nb_chunks: int = 5):
-        contexts = []
-        names_docs = []
-        for query in queries:
-            context, name_docs = self.get_rag_context(query=query, nb_chunks=nb_chunks)
-            contexts.append(context)
-            names_docs.append(name_docs)
-        return contexts, names_docs
+    # def get_rag_contexts(self, queries: list[str], nb_chunks: int = 5):
+    #     contexts = []
+    #     names_docs = []
+    #     for query in queries:
+    #         context, name_docs = self.get_rag_context(query=query, nb_chunks=nb_chunks)
+    #         contexts.append(context)
+    #         names_docs.append(name_docs)
+    #     return contexts, names_docs
 
-    def generate_answers(self, queries: list[str], nb_chunks: int = 2, options_generation = None):
+    def generate_answers(
+        self, queries: list[str], nb_chunks: int = 2, options_generation=None
+    ):
         answers = []
         for query in queries:
-            answer = self.generate_answer(query=query, 
-                                          nb_chunks=nb_chunks,
-                                          options_generation=options_generation)
+            answer = self.generate_answer(
+                query=query, nb_chunks=nb_chunks, options_generation=options_generation
+            )
             answers.append(answer)
         return answers

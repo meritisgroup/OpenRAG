@@ -5,6 +5,7 @@ from backend.factory_RagAgent import (
     change_config_server,
 )
 import json
+from backend.database.rag_classes import Document, Tokens, Chunk
 
 
 def get_chat_agent(rag_method, databases_name, session_state=None):
@@ -78,26 +79,15 @@ def reset_success_button():
     st.session_state["success"] = False
 
 
+def prepare_show_context(chunks: list[Chunk]):
 
-def prepare_show_context(context, docs_name):
-    context = context.split("\n[...]\n")
-    context = [c for c in context if c.strip() != ""]
+    blocks = []
+    for chunk in chunks:
+        cleaned_context = chunk.text
+        block = f"source : {chunk.document}\n\n{cleaned_context}"
+        if chunk.rerank_score != None:
+            block += f"\n\n Rerank score : {chunk.rerank_score}"
+        blocks.append(block)
 
-    if len(docs_name)!=len(context):
-        blocks = []
-        for i in range(len(context)):
-            cleaned_context = context[i].lstrip("\n")  
-            block = f"{cleaned_context}"
-            blocks.append(block)
-            
-        output = "\n\n---\n\n".join(blocks)
-        return output
-    else:
-        blocks = []
-        for i in range(len(docs_name)):
-            cleaned_context = context[i].lstrip("\n")  
-            block = f"source : {docs_name[i]}\n\n{cleaned_context}"
-            blocks.append(block)
-            
-        output = "\n\n---\n\n".join(blocks)
-        return output
+    output = "\n\n---\n\n".join(blocks)
+    return output

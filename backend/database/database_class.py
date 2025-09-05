@@ -1,11 +1,23 @@
-from sqlalchemy import inspect, create_engine, delete, MetaData
+from sqlalchemy import (
+    inspect,
+    create_engine,
+    delete,
+    MetaData,
+    Column,
+    String,
+    Table,
+    JSON,
+)
 from sqlalchemy.orm import Session, Query
 from ..utils.factory_vectorbase import get_vectorbase
 import os
 from pathlib import Path
-
+from sqlalchemy.orm import DeclarativeMeta
+from typing import Type
+from .rag_classes import Chunk
 
 from .rag_classes import (
+    Chunk,
     Base,
     Entity,
     Relation,
@@ -215,10 +227,8 @@ class Merger_Database_Vectorbase:
 
     def add_str_elements(
         self,
-        elements: list[str],
-        docs_name: list[str] = None,
+        chunks=list[Chunk],
         path_docs: list[str] = None,
-        metadata: list[dict] = [],
         display_message: bool = True,
         collection_name=None,
         vb_name: str = None,
@@ -230,19 +240,15 @@ class Merger_Database_Vectorbase:
 
         if vb_name is not None:
             return self.vectorbases[vb_name]["vectorbase"].add_str_elements(
-                elements=elements,
-                docs_name=docs_name,
-                metadata=metadata,
+                chunks=chunks,
                 display_message=display_message,
                 collection_name=collection_name,
             )
 
     def add_str_batch_elements(
         self,
-        elements: list[str],
-        docs_name: list[str] = None,
+        chunks: list[Chunk],
         path_docs: list[str] = None,
-        metadata: list[dict] = [],
         display_message: bool = True,
         collection_name=None,
         vb_name: str = None,
@@ -254,9 +260,7 @@ class Merger_Database_Vectorbase:
 
         if vb_name is not None:
             return self.vectorbases[vb_name]["vectorbase"].add_str_batch_elements(
-                elements=elements,
-                docs_name=docs_name,
-                metadata=metadata,
+                chunks=chunks,
                 display_message=display_message,
                 collection_name=collection_name,
             )
@@ -269,7 +273,7 @@ class Merger_Database_Vectorbase:
         filters: dict = None,
         collection_name=None,
         vb_name: str = None,
-    ) -> None:
+    ) -> list[list[Chunk]]:
         if vb_name is not None:
             if collection_name is not None:
                 collection_name = vb_name + "_" + collection_name
@@ -558,8 +562,70 @@ class DataBase:
 
     def get_list_path_documents(self):
         all_files = os.listdir(self.path_data)
+<<<<<<< HEAD
         if "metadatas.json" in all_files:
             all_files.remove("metadatas.json")
         all_files = [os.path.join(self.path_data, doc_name) for doc_name in all_files]
         all_docs = [f for f in all_files if f != "metadatas.json"]
+=======
+        all_files = [
+            os.path.join(self.path_data, doc_name)
+            for doc_name in all_files
+            if doc_name != "metadatas.json"
+        ]
+        all_docs = [f for f in all_files]
+>>>>>>> 7befb5eec622f12a7637258fa5a5265ed4ea683e
         return all_docs
+
+
+class ContextDatabase:
+
+    def __init__(
+        self, db_name: str = "context_rags.db", db_folder_path: str = "./storage"
+    ):
+        self.db_name = db_name
+        self.metadata = MetaData()
+        self.db_path = os.path.join(db_folder_path, db_name)
+        self.engine = create_engine(f"sqlite:///{self.db_path}")
+
+    def create_rag_table(self, rag_name: str):
+        """
+        Dynamically create a table for a RAG.
+        Each table has:
+        - query (string, primary key)
+        - context (JSON: list of chunks)
+        """
+
+        rag_table = Table(
+            rag_name,
+            self.metadata,
+            Column("query", String, primary_key=True),
+            Column("context", JSON),  # Stores list[dict]
+            extend_existing=True,
+        )
+        self.metadata.create_all(self.engine)
+        return rag_table
+
+    def insert_results(self, rag_table, query: str, chunks: list[Chunk]):
+        """Insert one row (query + list of chunk dicts) into a given RAG table."""
+        dict_chunks = [chunk.to_dict() for chunk in chunks]
+        with self.engine.begin() as conn:
+            # Check if query already exists
+            sel = rag_table.select().where(rag_table.c.query == query)
+            result = conn.execute(sel).first()
+
+            if result is None:
+                # Insert only if not present
+                ins = rag_table.insert().values(query=query, context=dict_chunks)
+                conn.execute(ins)
+            else:
+                print(
+                    f"Query already exists in table '{rag_table.name}', skipping insert."
+                )
+
+    def complete_context_database(
+        self, rag_name: str, queries: list[str], answers: list[dict]
+    ):
+        table = self.create_rag_table(rag_name)
+        for query, answer in zip(queries, answers):
+            self.insert_results(table, query, answer["context"])

@@ -1,4 +1,5 @@
 import numpy as np
+from backend.database.rag_classes import Chunk
 
 
 class Reranker:
@@ -11,7 +12,9 @@ class Reranker:
         self.agent = agent
         self.reranking_model = reranking_model
 
-    def rerank(self, query, contexts, additional_data={}, max_contexts=5):
+    def rerank(
+        self, query, chunk_list: list[Chunk], additional_data={}, max_contexts=5
+    ) -> list[Chunk]:
         """
         Computes scores for all retrieved chunks and returns the max_contexts best
 
@@ -27,14 +30,17 @@ class Reranker:
 
         """
         scores = self.agent.reranking(
-            query=query, contexts=contexts, model=self.reranking_model
+            query=query, chunk_list=chunk_list, model=self.reranking_model
         )
 
         nb_input_tokens = np.sum(scores["nb_input_tokens"])
         scores = scores["scores"]
+        for i, chunk in enumerate(chunk_list):
+            chunk.rerank_score = scores[i]
         ranking_index = np.argsort(scores)[::-1][:max_contexts]
-        contexts = np.array(contexts)[ranking_index]
+        rerank_chunk_list = np.array(chunk_list)[ranking_index]
 
         for key in additional_data.keys():
             additional_data[key] = np.array(additional_data[key])[ranking_index]
-        return contexts, additional_data, nb_input_tokens
+
+        return rerank_chunk_list, additional_data, nb_input_tokens

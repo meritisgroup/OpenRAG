@@ -11,10 +11,7 @@
         "naive_chatbot": "Naive Chatbot",
         "agentic": "Agentic RAG",
         "advanced_rag": "Advanced RAG",
-        "reranker_rag": "Reranker RAG",
-        "test_merger": "test_merger",
-        "naive_fine_tune": "naive_fine_tune",
-        "naive_bge": "naive_bge"
+        "reranker_rag": "Reranker RAG"
     },
     "vllm": {
         "naive": "Naive RAG",
