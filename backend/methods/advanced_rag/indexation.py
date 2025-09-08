@@ -50,7 +50,7 @@ class NaiveRagIndexation:
             language=self.language,
         )
 
-    def __batch_indexation__(self, doc_chunks, name_docs, path_docs):
+    def __batch_indexation__(self, doc_chunks, path_docs):
         """
         Adds a batch of chunks from doc_chunks to the indexation verctorbase
         Args:
@@ -60,24 +60,26 @@ class NaiveRagIndexation:
         Returns
             None
         """
-        elements = []
-        for k, chunk in enumerate(doc_chunks):
-            elements.append(chunk.text.replace("\n", "").replace("'", ""))
-
         tokens = 0
+
         taille_batch = 500
-        for i in range(0, len(elements), taille_batch):
+        range_chunks = range(0, len(doc_chunks), taille_batch)
+        progress_bar_chunks = ProgressBar(total=len(range_chunks))
+        j = 0
+        for i in range_chunks:
             tokens += np.sum(
                 self.data_manager.add_str_batch_elements(
-                    elements=elements[i : i + taille_batch],
-                    docs_name=name_docs[i : i + taille_batch],
+                    chunks=doc_chunks[i : i + taille_batch],
                     path_docs=path_docs[i : i + taille_batch],
                     display_message=False,
                 )
             )
+            progress_bar_chunks.update(j)
+            j += 1
+        progress_bar_chunks.clear()
         return tokens
 
-    def __serial_indexation__(self, doc_chunks, name_docs, path_docs) -> int:
+    def __serial_indexation__(self, doc_chunks, path_docs) -> int:
         """
         Adds a batch of chunks from doc_chunks to the indexation verctorbase
         Args:
@@ -87,21 +89,17 @@ class NaiveRagIndexation:
         Returns
             indexation_tokens :
         """
-        indexation_tokens = 0
-        for k, chunk in enumerate(doc_chunks):
-            try:
-                indexation_tokens += self.data_manager.add_str_elements(
-                    elements=[chunk.text.replace("\n", "").replace("'", "")],
-                    docs_name=[name_docs[k]],
-                    path_docs=[path_docs[k]],
-                    display_message=False,
-                )
-            except:
-                None
-        return indexation_tokens
+        tokens = self.data_manager.add_str_elements(
+            doc_chunks, path_docs, display_message=False
+        )
+        return tokens
 
     def run_pipeline(
-        self, chunk_size: int = 500, chunk_overlap: bool = True, batch: bool = True, config_server={}
+        self,
+        chunk_size: int = 500,
+        chunk_overlap: bool = True,
+        batch: bool = True,
+        config_server={},
     ) -> None:
         """
         Split texts from self.data_path, embed them and save them in a vector base.
@@ -133,42 +131,40 @@ class NaiveRagIndexation:
         for i, path_doc in enumerate(docs_to_process):
             doc_tokens = 0
             progress_bar.set_description(f"Embbeding chunks - {path_doc}")
-            doc = DocumentText(path=path_doc,
-                                   doc_index=i,
-                                   config_server=config_server,
-                                   splitter=self.splitter
+            doc = DocumentText(
+                path=path_doc,
+                doc_index=i,
+                config_server=config_server,
+                splitter=self.splitter,
             )
-            doc_chunks = doc.chunks(
-                    chunk_size=chunk_size, chunk_overlap=chunk_overlap
-            )
+            doc_chunks = doc.chunks(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
             name_docs = [str(Path(path_doc).name) for i in range(len(doc_chunks))]
             path_docs = [str(Path(path_doc).parent) for i in range(len(doc_chunks))]
-            try:
-                data = self.processor_chunks.process_chunk(
-                        chunks=doc_chunks, doc_content=doc.content, batch=batch
-                    )
-                doc_chunks = data["chunks"]
-                doc_tokens+=np.sum(data["nb_output_tokens"])
-                if batch:
-                    doc_tokens += self.__batch_indexation__(
-                            doc_chunks=doc_chunks, name_docs=name_docs, path_docs=path_docs
-                        )
+            # try:
+            data = self.processor_chunks.process_chunk(
+                chunks=doc_chunks, doc_content=doc.content, batch=batch
+            )
+            doc_chunks = data["chunks"]
+            doc_tokens += np.sum(data["nb_output_tokens"])
+            if batch:
+                doc_tokens += self.__batch_indexation__(
+                    doc_chunks=doc_chunks, path_docs=path_docs
+                )
 
-                else:
-                    doc_tokens += self.__serial_indexation__(
-                            doc_chunks=doc_chunks, name_docs=name_docs, path_docs=path_docs
-                        )
-            except Exception:
-                print("Failed indexing: {}".format(path_doc))
+            else:
+                doc_tokens += self.__serial_indexation__(
+                    doc_chunks=doc_chunks, path_docs=path_docs
+                )
+            # except Exception:
+            #     print("Failed indexing: {}".format(path_doc))
 
             new_doc = Document(
-                    name=str(Path(path_doc).name),
-                    path=str(Path(path_doc)),
-                    embedding_tokens=doc_tokens,
-                    input_tokens=0,
-                    output_tokens=0,
-                )
-            self.data_manager.add_instance(new_doc,
-                                               path=str(Path(path_doc).parent))
+                name=str(Path(path_doc).name),
+                path=str(Path(path_doc)),
+                embedding_tokens=doc_tokens,
+                input_tokens=0,
+                output_tokens=0,
+            )
+            self.data_manager.add_instance(new_doc, path=str(Path(path_doc).parent))
             progress_bar.update(i)
         progress_bar.clear()
