@@ -11,6 +11,7 @@ from ...utils.factory_vectorbase import get_vectorbase
 from ...utils.agent_functions import get_system_prompt
 from ...database.database_class import get_management_data
 from ...utils.agent import get_Agent
+from ...utils.chunk_lists_merger import merge_chunk_lists
 from .prompts import prompts
 import numpy as np
 from sqlalchemy import func
@@ -72,6 +73,8 @@ class NaiveRagAgent(RagAgent):
                 agent=self.agent, language=self.language
             )
 
+        self.chunk_lists_merger = merge_chunk_lists
+
     def get_nb_token_embeddings(self):
         return self.data_manager.get_nb_token_embeddings()
 
@@ -116,7 +119,8 @@ class NaiveRagAgent(RagAgent):
             chunk_size=self.chunk_size,
             chunk_overlap=overlap,
             batch=self.params_vectorbase["batch"],
-            config_server=self.config_server)
+            config_server=self.config_server,
+        )
 
         return None
 
@@ -135,10 +139,9 @@ class NaiveRagAgent(RagAgent):
         # print(chunk_lists)
         return chunk_lists
 
-    def build_final_prompt(self, chunk_lists: list[list[Chunk]], query: str):
-        # Remplacer par :
+    def build_final_prompt(self, chunk_list: list[Chunk], query: str):
 
-        context = concat_chunks(chunk_lists)
+        context = concat_chunks(chunk_list)
 
         prompt = self.prompts["smooth_generation"]["QUERY_TEMPLATE"].format(
             context=context, query=query
@@ -170,9 +173,10 @@ class NaiveRagAgent(RagAgent):
             nb_input_tokens += input_t
             nb_output_tokens = output_t
 
-        # Building the prompt in 2 steps
+        # Building the prompt in 3 steps
         chunk_lists = self.get_rag_context(query=query, nb_chunks=nb_chunks)
-        prompt = self.build_final_prompt(chunk_lists, query)
+        merged_chunk_list = self.chunk_lists_merger(chunk_lists)
+        prompt = self.build_final_prompt(merged_chunk_list, query)
 
         chunks = [chunk for chunk_list in chunk_lists for chunk in chunk_list]
 

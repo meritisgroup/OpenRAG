@@ -1,10 +1,11 @@
 from ..advanced_rag.agent import AdvancedRag
 from ..naive_rag.agent import NaiveRagAgent
-from ..advanced_rag.query import NaiveSearch
+from ..naive_rag.query import NaiveSearch
 from ..naive_rag.indexation import contexts_to_prompts
 import numpy as np
 from itertools import chain
 from backend.database.rag_classes import Chunk
+from ...utils.chunk_lists_merger import merge_chunk_lists
 
 
 class RerankerRag(AdvancedRag):
@@ -89,7 +90,7 @@ class RerankerRag(AdvancedRag):
         # Building the prompt in several steps
         chunk_lists = self.get_rag_context(query=queries[0], nb_chunks=nb_chunks)
 
-        chunk_list = [chunk for chunk_list in chunk_lists for chunk in chunk_list]
+        chunk_list = self.chunk_lists_merger(chunk_lists)
         docs_name = [chunk.document for chunk in chunk_list]
 
         if len(chunk_list) > 0 and self.rerank:
@@ -103,7 +104,7 @@ class RerankerRag(AdvancedRag):
         else:
             rerank_chunk_list = chunk_list
 
-        prompt = self.build_final_prompt([rerank_chunk_list], query)
+        prompt = self.build_final_prompt(rerank_chunk_list, query)
 
         if options_generation is None:
             options_generation = self.config_server["options_generation"]
