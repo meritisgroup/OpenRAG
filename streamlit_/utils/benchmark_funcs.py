@@ -108,25 +108,46 @@ def get_report_path():
 
     return report_dir
 
-def generate_answers(rag_names, rag_agents):
+def generate_answers(rag_names, rag_agents, report_dir):
     dataframe_preparator = DataFramePreparator(
         rag_agents=rag_agents,
         rags_available=rag_names,
         input_path=os.path.join("data", "queries", 
                                 st.session_state["benchmark"]["queries_doc_name"]),
     )
-    dataframe_preparator.run_all_queries(options_generation={"type_generation": "simple_generation"})
+    
+    log_file = os.path.join(report_dir, "logs.json")
+    if not os.path.exists(log_file):
+        with open(log_file, "w") as f:
+            json.dump({"indexation": 0.0,
+                       "answers": 0.0,
+                        "Arena Battles": 0.0,
+                        "Ground Truth comparison": 0.0,
+                        "Context faithfulness": 0.0,
+                        "context relevance": 0.0}, f)
+    dataframe_preparator.run_all_queries(options_generation={"type_generation": "simple_generation"},
+                                         log_file=log_file)
     df = dataframe_preparator.get_dataframe()
     df.to_csv(os.path.join(get_report_path(), "bench_df.csv"), index=False)
        
-def generate_contexts(rag_names, rag_agents):
+def generate_contexts(rag_names, rag_agents, report_dir):
     dataframe_preparator = DataFramePreparator(
         rag_agents=rag_agents,
         rags_available=rag_names,
         input_path=os.path.join("data", "queries",
                                 st.session_state["benchmark"]["queries_doc_name"]),
     )
-    dataframe_preparator.run_all_queries(options_generation={"type_generation": "no_generation"})
+    log_file = os.path.join(report_dir, "logs.json")
+    if not os.path.exists(log_file):
+        with open(log_file, "w") as f:
+            json.dump({"indexation": 0.0,
+                       "answers": 0.0,
+                        "Arena Battles": 0.0,
+                        "Ground Truth comparison": 0.0,
+                        "Context faithfulness": 0.0,
+                        "context relevance": 0.0}, f)
+    dataframe_preparator.run_all_queries(options_generation={"type_generation": "no_generation"},
+                                         log_file=log_file)
     df = dataframe_preparator.get_dataframe()
     df.to_csv(os.path.join(get_report_path(), "contexts_df.csv"), index=False)
 
