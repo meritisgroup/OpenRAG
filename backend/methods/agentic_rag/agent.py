@@ -5,6 +5,7 @@ Created on Thu Feb  6 16:37:47 2025
 @author: chardy
 """
 from ...base_classes import RagAgent
+from ..naive_rag.agent import NaiveRagAgent
 from ..advanced_rag.agent import AdvancedRag
 from ...database.database_class import get_management_data
 from ...utils.agent import get_Agent
@@ -17,14 +18,12 @@ from ..query_reformulation.query_reformulation import query_reformulation
 class CompareQueryAnswer(BaseModel):
     Decision: bool
 
+
 class AgenticRagAgent(NaiveRagAgent):
     "Iterative RAG"
 
     def __init__(
-        self,
-        config_server: dict,
-        dbs_name: list[str],
-        data_folders_name: list[str]
+        self, config_server: dict, dbs_name: list[str], data_folders_name: list[str]
     ) -> None:
         """
         Args:
@@ -40,10 +39,12 @@ class AgenticRagAgent(NaiveRagAgent):
             type_retrieval (str) : How documents will be retrieved (embeddings, BM25, vlm_embeddings are available plus hybrid if using elasticsearch)
         """
 
-        super().__init__(config_server=config_server,
-                         dbs_name = dbs_name,
-                         data_folders_name = data_folders_name)
-        
+        super().__init__(
+            config_server=config_server,
+            dbs_name=dbs_name,
+            data_folders_name=data_folders_name,
+        )
+
         self.prompts = prompts[self.language]
 
     def get_nb_token_embeddings(self):
@@ -62,12 +63,16 @@ class AgenticRagAgent(NaiveRagAgent):
             bool: True if the answer is judged to be complete and correct, False otherwise.
         """
         system_prompt = self.prompts["evaluate"]["SYSTEM_PROMPT"]
-        user_prompt = self.prompts["evaluate"]["QUERY_TEMPLATE"].format(query=query, answer=answer)
+        user_prompt = self.prompts["evaluate"]["QUERY_TEMPLATE"].format(
+            query=query, answer=answer
+        )
 
-        result = agent.predict_json(system_prompt=system_prompt,
-                                    prompt=user_prompt,
-                                    json_format=CompareQueryAnswer)
-        
+        result = agent.predict_json(
+            system_prompt=system_prompt,
+            prompt=user_prompt,
+            json_format=CompareQueryAnswer,
+        )
+
         return result.Decision
 
     def reformulate(self, query: str, answer: str, agent) -> str:
@@ -83,15 +88,23 @@ class AgenticRagAgent(NaiveRagAgent):
         Returns:
             str: A new query focused solely on the missing elements.
         """
-        
+
         system_prompt = self.prompts["reformulate"]["SYSTEM_PROMPT"]
-        user_prompt = self.prompts["reformulate"]["QUERY_TEMPLATE"].format(query=query, answer=answer)
+        user_prompt = self.prompts["reformulate"]["QUERY_TEMPLATE"].format(
+            query=query, answer=answer
+        )
         new_query = agent.predict(system_prompt=system_prompt, prompt=user_prompt)
 
         return new_query
-    
 
-    def concatene(self, answer_init: str, answer_add: str, query: str, agent, options_generation = None) -> str:
+    def concatene(
+        self,
+        answer_init: str,
+        answer_add: str,
+        query: str,
+        agent,
+        options_generation=None,
+    ) -> str:
         """
         Combines the initial and additional answers into a single, complete response
         that best answers the original user query.
@@ -107,23 +120,20 @@ class AgenticRagAgent(NaiveRagAgent):
         """
 
         system_prompt = self.prompts["concatenete"]["SYSTEM_PROMPT"]
-        user_prompt = self.prompts["concatenete"]["QUERY_TEMPLATE"].format(query=query,
-                                                                           answer_init=answer_init,
-                                                                           answer_add=answer_add)
-        
-        final_answer = agent.predict(system_prompt=system_prompt, 
-                                     prompt=user_prompt,
-                                     options_generation=options_generation)
+        user_prompt = self.prompts["concatenete"]["QUERY_TEMPLATE"].format(
+            query=query, answer_init=answer_init, answer_add=answer_add
+        )
 
-        return final_answer['texts']
+        final_answer = agent.predict(
+            system_prompt=system_prompt,
+            prompt=user_prompt,
+            options_generation=options_generation,
+        )
 
-    
+        return final_answer["texts"]
+
     def generate_answer(
-        self,
-        query: str,
-        nb_chunks: int = 5,
-        max_iter=0,
-        options_generation = None
+        self, query: str, nb_chunks: int = 5, max_iter=0, options_generation=None
     ) -> str:
         """
         Takes a query, retrieves appropriated context and generates an answer
@@ -136,13 +146,13 @@ class AgenticRagAgent(NaiveRagAgent):
             answer (str) : The answer to the query given the retrieved context
         """
         agent = self.agent
-        
+
         iter = 0
-        info = super().generate_answer(query, 
-                                       nb_chunks=nb_chunks,
-                                       options_generation=options_generation)
+        info = super().generate_answer(
+            query, nb_chunks=nb_chunks, options_generation=options_generation
+        )
         answer = info["answer"]
-        
+
         nb_input_tokens = info["nb_input_tokens"]
         nb_output_tokens = info["nb_output_tokens"]
         context_tot = info["context"]
@@ -151,13 +161,14 @@ class AgenticRagAgent(NaiveRagAgent):
 
         while iter <= max_iter and not self.evaluate(query, answer, agent):
             iter += 1
-            query_additional = self.reformulate(query, answer, agent)['texts']
+            query_additional = self.reformulate(query, answer, agent)["texts"]
 
-            info = super().generate_answer(query_additional,
-                                           nb_chunks=nb_chunks,
-                                           options_generation=options_generation)
+            info = super().generate_answer(
+                query_additional,
+                nb_chunks=nb_chunks,
+                options_generation=options_generation,
+            )
             answer_additional = info["answer"]
-            
 
             nb_input_tokens += info["nb_input_tokens"]
             nb_output_tokens += info["nb_output_tokens"]
@@ -165,18 +176,20 @@ class AgenticRagAgent(NaiveRagAgent):
             docs_name += info["docs_name"]
 
             impacts[0] += info["impacts"][0]
-            impacts[1] += info["impacts"][1] 
+            impacts[1] += info["impacts"][1]
             impacts[2] = info["impacts"][2]
 
             energies[0] += info["energy"][0]
             energies[1] += info["energy"][1]
             energies[2] = info["energy"][2]
 
-            answer = self.concatene(answer, 
-                                    answer_additional,
-                                    query, 
-                                    agent,
-                                    options_generation=options_generation)
+            answer = self.concatene(
+                answer,
+                answer_additional,
+                query,
+                agent,
+                options_generation=options_generation,
+            )
 
         return {
             "answer": answer,
@@ -191,21 +204,22 @@ class AgenticRagAgent(NaiveRagAgent):
     def release_gpu_memory(self):
         self.agent.release_memory()
 
-    def get_rag_contexts(self,
-                         queries: list[str],
-                         nb_chunks: int = 5):
+    def get_rag_contexts(self, queries: list[str], nb_chunks: int = 5):
         contexts = []
         names_docs = []
         for query in queries:
-            context, name_docs = self.get_rag_context(
-                query=query, nb_chunks=nb_chunks)
+            context, name_docs = self.get_rag_context(query=query, nb_chunks=nb_chunks)
             contexts.append(context)
             names_docs.append(name_docs)
         return contexts, names_docs
 
-    def generate_answers(self, queries: list[str], nb_chunks: int = 2, options_generation = None):
+    def generate_answers(
+        self, queries: list[str], nb_chunks: int = 2, options_generation=None
+    ):
         answers = []
         for query in queries:
-            answer = self.generate_answer(query=query, nb_chunks=nb_chunks, options_generation=options_generation)
+            answer = self.generate_answer(
+                query=query, nb_chunks=nb_chunks, options_generation=options_generation
+            )
             answers.append(answer)
         return answers

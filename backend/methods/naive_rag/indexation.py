@@ -64,7 +64,7 @@ class NaiveRagIndexation:
                 )
             )
             progress_bar_chunks.update(j)
-            j+=1
+            j += 1
         progress_bar_chunks.clear()
         return tokens
 
@@ -121,36 +121,38 @@ class NaiveRagIndexation:
         for i, path_doc in enumerate(docs_to_process):
             doc_indexation_tokens = 0
             progress_bar.set_description(f"Embbeding chunks - {path_doc}")
-            doc = DocumentText(path=path_doc, 
-                                doc_index=i,
-                                config_server=config_server,
-                                splitter=self.splitter)
-                
-            doc_chunks = doc.chunks(chunk_size=chunk_size,
-                                        chunk_overlap=chunk_overlap)
-    
+            doc = DocumentText(
+                path=path_doc,
+                doc_index=i,
+                config_server=config_server,
+                splitter=self.splitter,
+            )
+
+            doc_chunks = doc.chunks(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+
             name_docs = [str(Path(path_doc).name) for i in range(len(doc_chunks))]
             path_docs = [str(Path(path_doc).parent) for i in range(len(doc_chunks))]
 
             if batch:
-                doc_indexation_tokens += self.__batch_indexation__(doc_chunks=doc_chunks,
-                                                                            name_docs=name_docs,
-                                                                            path_docs=path_docs)
+                doc_indexation_tokens += self.__batch_indexation__(
+                    doc_chunks=doc_chunks, path_docs=path_docs
+                )
 
             else:
-                doc_indexation_tokens += self.__serial_indexation__(doc_chunks=doc_chunks, 
-                                                                                name_docs=name_docs,
-                                                                                path_docs=path_docs)
+                doc_indexation_tokens += self.__serial_indexation__(
+                    doc_chunks=doc_chunks, path_docs=path_docs
+                )
 
             new_doc = Document(
-                                    name=str(Path(path_doc).name),
-                                    path=str(Path(path_doc)),
-                                    embedding_tokens=int(doc_indexation_tokens),
-                                    input_tokens=0,
-                                    output_tokens=0,
-                                )
-            self.data_manager.add_instance(instance=new_doc,
-                                                path=str(Path(path_doc).parent))
+                name=str(Path(path_doc).name),
+                path=str(Path(path_doc)),
+                embedding_tokens=int(doc_indexation_tokens),
+                input_tokens=0,
+                output_tokens=0,
+            )
+            self.data_manager.add_instance(
+                instance=new_doc, path=str(Path(path_doc).parent)
+            )
             progress_bar.update(i)
         progress_bar.clear()
 
@@ -170,13 +172,11 @@ def contexts_to_prompts(contexts, docs_name):
         return context[:-7]
 
 
-def concat_chunks(chunk_lists: list[list[Chunk]]):
-
-    texts = [chunk.text for chunk_list in chunk_lists for chunk in chunk_list]
+def concat_chunks(chunk_list: list[Chunk]) -> str:
 
     context = ""
-    for i in range(len(texts)):
-        if texts[i] not in context:
-            context += texts[i] + "\n[...]\n"
+    for chunk in chunk_list:
+        if chunk.text not in context:
+            context += chunk.text + "\n[...]\n"
 
     return context

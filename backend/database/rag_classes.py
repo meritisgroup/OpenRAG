@@ -1,7 +1,8 @@
 from sqlalchemy import String, Integer, JSON, Float
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-
-
+from ..utils.open_doc import Opener
+from ..utils.splitter import TextSplitter
+from ..utils.base_classes import Splitter
 
 
 class Base(DeclarativeBase):

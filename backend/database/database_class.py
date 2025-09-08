@@ -562,19 +562,12 @@ class DataBase:
 
     def get_list_path_documents(self):
         all_files = os.listdir(self.path_data)
-<<<<<<< HEAD
-        if "metadatas.json" in all_files:
-            all_files.remove("metadatas.json")
-        all_files = [os.path.join(self.path_data, doc_name) for doc_name in all_files]
-        all_docs = [f for f in all_files if f != "metadatas.json"]
-=======
         all_files = [
             os.path.join(self.path_data, doc_name)
             for doc_name in all_files
             if doc_name != "metadatas.json"
         ]
         all_docs = [f for f in all_files]
->>>>>>> 7befb5eec622f12a7637258fa5a5265ed4ea683e
         return all_docs
 
 
