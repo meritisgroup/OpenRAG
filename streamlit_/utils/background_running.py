@@ -18,21 +18,23 @@ def task(reset_index, report_dir, type_bench, config_server,
          background=False):
         
         rag_agents, rag_names = run_indexation_benchmark(
-                reset_index=reset_index,
-                databases=databases,
-                report_dir=report_dir,
-                session_state=session_state
-            )
+                                    reset_index=reset_index,
+                                    databases=databases,
+                                    report_dir=report_dir,
+                                    session_state=session_state
+                                )
         with st.spinner(
                 f"**Generating benchmark for the following RAGs:** {rag_names}",
                 show_time=True,
             ):
             if len(rag_agents) > 1:
                 if type_bench=="answers":
-                    generate_answers(rag_names, rag_agents)
+                    generate_answers(rag_names, rag_agents,
+                                    report_dir=report_dir)
                 elif type_bench=="contexts":
                     generate_contexts(rag_names=rag_names,
-                                    rag_agents=rag_agents)
+                                    rag_agents=rag_agents,
+                                    report_dir=report_dir)
                 elif type_bench=="full_bench":
                     generate_benchmark(rag_names,
                                     rag_agents,
@@ -52,7 +54,6 @@ def task(reset_index, report_dir, type_bench, config_server,
             st.session_state["benchmark_clicked"] = False
             st.set_option("client.showSidebarNavigation", True)
             st.rerun()
-
 
 
 def run_benchmark(type_bench, reset_index=False, background=False):
