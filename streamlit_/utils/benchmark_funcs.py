@@ -46,8 +46,11 @@ def get_folder_saved_benchmark():
 
 
 
-def run_indexation_benchmark(reset_index, databases, 
-                             report_dir, session_state=None):
+def run_indexation_benchmark(reset_index,
+                             reset_preprocess, 
+                             databases, 
+                             report_dir,
+                             session_state=None):
     if session_state is None:
         session_state = st.session_state
 
@@ -80,7 +83,11 @@ def run_indexation_benchmark(reset_index, databases,
                 rag_agent = get_chat_agent(rag,
                                            databases_name=databases,
                                            session_state=session_state)
-                rag_agent.indexation_phase(reset_index=reset_index)
+                rag_agent.indexation_phase(reset_index=reset_index,
+                                           reset_preprocess=reset_preprocess)
+                if reset_preprocess:
+                    reset_preprocess = False
+
                 rag_agents.append(rag_agent)
                 rag_names.append(rag)
                 indexation_progress_bar.update(i)

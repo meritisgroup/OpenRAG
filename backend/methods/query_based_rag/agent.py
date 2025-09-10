@@ -27,22 +27,9 @@ class QueryBasedRagAgent(AdvancedRag):
         super().__init__(config_server=config_server,
                         dbs_name = dbs_name,
                         data_folders_name = data_folders_name)
-        self.dbs_name = dbs_name
-        self.data_folders_name = data_folders_name
-        self.embedding_model = config_server["embedding_model"]
-
-        self.language = config_server["language"]
+        
         self.prompts = prompts[self.language]
         self.system_prompt = get_system_prompt(config_server, self.prompts)
-
-        self.chunk_size = config_server["chunk_length"]
-
-        self.type_text_splitter = config_server["TextSplitter"]
-        self.type_retrieval = config_server["type_retrieval"]
-        self.nb_chunks = config_server["nb_chunks"]
-        self.storage_path = config_server["storage_path"]
-        self.config_server = config_server
-        self.agent = get_Agent(config_server)
         self.data_manager = get_management_data(dbs_name=self.dbs_name,
                                                 data_folders_name=self.data_folders_name,
                                                 storage_path=self.storage_path,
@@ -51,19 +38,16 @@ class QueryBasedRagAgent(AdvancedRag):
         self.data_manager.add_table(Question)
         self.data_manager.add_table(Chunk)
 
-        self.params_vectorbase = config_server["params_vectorbase"]
-        self.reformulate_query = config_server["reformulate_query"]
-        if self.reformulate_query:
-            self.reformulater = query_reformulation(
-                agent=self.agent, language=self.language
-            )
-
     def indexation_phase(
         self,
         reset_index: bool = False,
-        overlap: bool = True,
+        reset_preprocess: bool = False,
+        overlap: bool = True
     ) -> None:
         """Indexation phase for QB Rag"""
+
+        if reset_preprocess:
+            reset_index = True
         if reset_index:
             self.data_manager.delete_collection()
             self.data_manager.clean_database()
@@ -77,7 +61,9 @@ class QueryBasedRagAgent(AdvancedRag):
         )
 
         qb_index.run_pipeline(chunk_size=self.chunk_size,
-                              chunk_overlap=overlap,)
+                              config_server=self.config_server,
+                              chunk_overlap=overlap,
+                              reset_preprocess=reset_preprocess)
 
     def get_rag_context(
         self,

@@ -181,6 +181,8 @@ system_prompt_selected = st.selectbox(
 
 
 reset_index = st.checkbox(label="Reset indexing", value=False)
+reset_preprocess = st.checkbox(label="Reset preprocessing", value=False)
+
 
 if "benchmark_clicked" not in st.session_state:
     st.session_state["benchmark_clicked"] = False
@@ -253,6 +255,7 @@ if col1.button(
     else:
         run_benchmark(type_bench="contexts", 
                       reset_index=reset_index,
+                      reset_preprocess=reset_preprocess,
                       background=False)
 
 if col2.button(
@@ -268,6 +271,7 @@ if col2.button(
     else:
         run_benchmark(type_bench="answers", 
                       reset_index=reset_index,
+                      reset_preprocess=reset_preprocess,
                       background=False)
         
 
@@ -284,6 +288,7 @@ if col3.button(
     else:
         run_benchmark(type_bench="full_bench", 
                       reset_index=reset_index,
+                      reset_preprocess=reset_preprocess,
                       background=background_running)
     put_default_local_parameters()
 

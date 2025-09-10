@@ -10,7 +10,7 @@ from .graph_creation import Graph
 from .community_description import CommunityDescription
 from ...utils.splitter import get_splitter
 from ...utils.agent import Agent
-from ...database.rag_classes import Document, Tokens
+from ...database.rag_classes import Document, Tokens, Chunk
 
 from pathlib import Path
 from tqdm import tqdm
@@ -60,9 +60,13 @@ class GraphRagIndexation:
             need_extraction = True
         return need_extraction, docs_to_process
 
-    def extract_entities(self, db_name: str, to_process_norm, 
-                         chunk_size: int = 500, overlap: bool = True,
-                         config_server = {}):
+    def extract_entities(self, 
+                         db_name: str, 
+                         to_process_norm, 
+                         config_server,
+                         reset_preprocess,
+                         chunk_size: int = 500,
+                         overlap: bool = True):
         """
         Extract entities and relations from texts located in the folder self.data_path and save all the results in the data base self.db
         """
@@ -77,14 +81,17 @@ class GraphRagIndexation:
             document = DocumentText(path=path_doc,
                                     doc_index=k,
                                     config_server=config_server,
-                                    splitter=self.splitter)
+                                    splitter=self.splitter,
+                                    reset_preprocess=reset_preprocess)
             chunks = document.chunks(chunk_size=chunk_size,
                                      chunk_overlap=overlap)
             name_docs = [str(Path(path_doc).name) for i in range(len(chunks))]
             path_docs = [str(Path(path_doc).parent) for i in range(len(chunks))]
+            """
             for chunk in chunks:
                 self.data_manager.add_instance(chunk,
                                                path=str(Path(path_doc).parent))
+            """
 
             entities, relations, input_tokens, output_tokens = (
                     extract_entities_relations(agent=self.agent,
@@ -164,7 +171,7 @@ class GraphRagIndexation:
         Save entities' names in a vector base
         """
         entities_nb_tokens = 0
-
+    
         self.data_manager.create_collection(name="local_search",
                                             vb_name=db_name)
         entities = [res[0] for res in self.data_manager.query(MergeEntityOverall.name,
@@ -180,9 +187,14 @@ class GraphRagIndexation:
                 if truncated_entities != []:
                     nb_tokens = 0
                     taille_batch = 500
+                    for i in range(len(truncated_entities)):
+                        truncated_entities[i] = Chunk(text=truncated_entities[i], 
+                                                      document="",
+                                                       id=i + 1)
+
                     for j in range(0, len(truncated_entities), taille_batch):
                         nb_tokens = np.sum(self.data_manager.add_str_batch_elements(collection_name="local_search",
-                                                                                    elements=truncated_entities[j:j + taille_batch],
+                                                                                    chunks=truncated_entities[j:j + taille_batch],
                                                                                     display_message=False,
                                                                                     vb_name=db_name
                                                                                     ))
@@ -220,10 +232,14 @@ class GraphRagIndexation:
                 if truncated_communities != []:
                     nb_tokens = 0
                     taille_batch = 500
+                    for i in range(len(truncated_communities)):
+                        truncated_communities[i] = Chunk(text=truncated_communities[i], 
+                                                             document="",
+                                                                id=i + 1)
                     for j in range(0, len(truncated_communities), taille_batch):
                         nb_tokens = np.sum(self.data_manager.add_str_batch_elements(
                                            collection_name="global_search",
-                                           elements=truncated_communities[j:j + taille_batch],
+                                           chunks=truncated_communities[j:j + taille_batch],
                                            display_message=False,
                                            vb_name=db_name))
 
@@ -238,7 +254,8 @@ class GraphRagIndexation:
                                        db=db)
 
 
-    def run_pipeline(self, chunk_size: int = 500, overlap: bool = True, config_server= {}):
+    def run_pipeline(self, config_server, chunk_size: int = 500,
+                     overlap: bool = True, reset_preprocess: bool = False):
         """
         Indexation phase for graph rag, from entities extraction to community description.
         """        
@@ -253,7 +270,8 @@ class GraphRagIndexation:
                                       to_process_norm=docs_to_process, 
                                         overlap=overlap,
                                         db_name=db_name,
-                                        config_server=config_server)
+                                        config_server=config_server,
+                                        reset_preprocess=reset_preprocess)
                 progress_bar.update(1, text="Merging muliples entities of entities")
                 self.clean_entities(db_name=db_name)
                 progress_bar.update(2, text="Creation of the graph")

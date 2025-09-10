@@ -1,4 +1,3 @@
-from .indexation import SemanticChunkingRagIndexation
 from ...base_classes import RagAgent
 from ...utils.factory_vectorbase import get_vectorbase
 from ...utils.agent_functions import get_system_prompt
@@ -37,147 +36,14 @@ class SemanticChunkingRagAgent(AdvancedRag):
         Returns:
             None
         """
-        self.dbs_name = dbs_name
-        self.data_folders_name = data_folders_name
-        self.storage_path = config_server["storage_path"]
-        self.nb_chunks = config_server["nb_chunks"]
-        self.language = config_server["language"]
-        self.type_retrieval = config_server["type_retrieval"]
-        self.config_server = config_server
-
-        self.agent = get_Agent(config_server)
-        self.data_manager = get_management_data(dbs_name=self.dbs_name,
-                                                data_folders_name=self.data_folders_name,
-                                                storage_path=self.storage_path,
-                                                config_server=config_server,
-                                                agent=self.agent)
-        self.params_vectorbase = config_server["params_vectorbase"]
-
-        self.prompts = prompts[self.language]
-        self.system_prompt = get_system_prompt(config_server, self.prompts)
-
-        self.chunk_size = config_server["chunk_length"]
-
-        self.reformulate_query = config_server["reformulate_query"]
-        if self.reformulate_query:
-            self.reformulater = query_reformulation(
-                agent=self.agent, language=self.language
-            )
-
-    def indexation_phase(
-        self,
-        reset_index: bool = False,
-        overlap: bool = True,
-    ) -> None:
-        """
-        Does the indexation of a given knowledge base, full process is located in indexation.py
-        Args:
-            path_input (str) : where the documents to be processed are stored
-            overlap (bool) : Wether chunks overlap each other
-
-        Returns:
-            None
-        """
-        if reset_index:
-            self.data_manager.delete_collection()
-            self.data_manager.clean_database()
-
-        index = SemanticChunkingRagIndexation(
-            data_manager=self.data_manager,
-            dbs_name=self.dbs_name,
-            data_folders_name=self.data_folders_name,
-            config_server=self.config_server,
-            breakpoint_method="percentile",
-            threshold=90,
-        )
-        if not overlap:
-            index.run_pipeline(batch=True, 
-                               chunk_size=self.chunk_size,
-                               overlap_size=0,
-                               config_server=self.config_server)
-        else:
-            index.run_pipeline(batch=True,
-                               chunk_size=self.chunk_size,
-                               config_server=self.config_server)
-
-        return None
-
-    def get_nb_token_embeddings(self):
-        return self.data_manager.get_nb_token_embeddings()
-
-    def generate_answer(
-        self,
-        query: str,
-        nb_chunks: str = 5,
-        options_generation = None
-    ) -> str:
-        """
-        Takes a query, retrieves appropriated context and generates an answer
-        Args:
-            query (str) : The query that needs answering
-            method_parameter (int): Number of chunks to be retrieved
-        Output:
-            answer (str) : The answer to the query given the retrieved context
-        """
-        nb_input_tokens = 0
-        nb_output_tokens = 0
-        impacts, energies = [0, 0, ""], [0, 0, ""]
-        if self.reformulate_query:
-            query, input_t, output_t, impacts, energies = self.reformulater.reformulate(
-                query=query, nb_reformulation=1
-            )
-            query[0]
-            nb_input_tokens += input_t
-            nb_output_tokens += output_t
-
-        agent = self.agent
-        context, docs_name = self.get_rag_context(query=query,
-                                                  nb_chunks=nb_chunks)
+        config_server["TextSplitter"] = "Semantic_TextSplitter"
+        config_server["ProcessorChunks"] = []
+        config_server["reranker_model"] = None
+        config_server["reformulate_query"] = False
         
-        prompt = self.prompts["smooth_generation"]["QUERY_TEMPLATE"].format(context=context, 
-                                                                            query=query)
-
-        if options_generation is None:
-            options_generation = self.config_server["options_generation"]
-
-        answer = agent.predict(prompt=prompt, 
-                               system_prompt=self.system_prompt,
-                               options_generation=options_generation)
-        nb_input_tokens += np.sum(answer["nb_input_tokens"])
-        nb_output_tokens += np.sum(answer["nb_output_tokens"])
-        impacts[2] = answer["impacts"][2]
-        impacts[0] += answer["impacts"][0]
-        impacts[1] += answer["impacts"][1]
-        energies[2] = answer["energy"][2]
-        energies[0] += answer["energy"][0]
-        energies[1] += answer["energy"][1]
-        return {
-            "answer": answer["texts"],
-            "doc_names": docs_name,
-            "nb_input_tokens": nb_input_tokens,
-            "nb_output_tokens": nb_output_tokens,
-            "context": context,
-            "impacts": impacts,
-            "energy": energies,
-        }
-
-    def release_gpu_memory(self):
-        self.agent.release_memory()
-
-    def get_rag_contexts(self, queries: list[str], nb_chunks: int = 5):
-        contexts = []
-        names_docs = []
-        for query in queries:
-            context, name_docs = self.get_rag_context(query=query, nb_chunks=nb_chunks)
-            contexts.append(context)
-            names_docs.append(name_docs)
-        return contexts, names_docs
-
-    def generate_answers(self, queries: list[str], nb_chunks: int = 2, options_generation = None):
-        answers = []
-        for query in queries:
-            answer = self.generate_answer(query=query,
-                                          nb_chunks=nb_chunks,
-                                          options_generation=options_generation)
-            answers.append(answer)
-        return answers
+        super().__init__(
+            config_server=config_server,
+            dbs_name=dbs_name,
+            data_folders_name=data_folders_name,
+        )
+        self.system_prompt = get_system_prompt(self.config_server, self.prompts)  

@@ -35,6 +35,8 @@ class RerankerRag(AdvancedRag):
             type_retrieval (str) : How documents will be retrieved (embeddings, BM25, vlm_embeddings are available plus hybrid if using elasticsearch)
         """
         config_server["reformulate_query"] = False
+        config_server["ProcessorChunks"] = []
+        
         super().__init__(
             config_server=config_server,
             dbs_name=dbs_name,

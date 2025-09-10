@@ -37,7 +37,7 @@ class GlobalSearch(Search):
         for title in top_k_communities[0]:
                 community = (
                     self.data_manager.query_filter(table_class=Community,
-                                                   filter=(Community.title == title["text"]))
+                                                   filter=(Community.title == title.text))
                     [0]
                 )
                 useful_communities[community.title] = community.description
