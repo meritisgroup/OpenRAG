@@ -10,16 +10,13 @@ from backend.factory_RagAgent import (
 )
 import json
 from streamlit_.utils.benchmark_funcs import (
-    generate_benchmark,
-    generate_answers,
-    generate_contexts,
     display_plot,
     match_name_cleaner,
     clean_bench_df,
     run_indexation_benchmark,
     get_folder_saved_benchmark,
     show_already_done_benchmark,
-    get_report_path
+    get_report_path,
 )
 from streamlit_.utils.chat_funcs import get_chat_agent, change_default_prompt
 
@@ -132,10 +129,10 @@ if st.session_state["benchmark"]["load"]:
 
 st.markdown("## Choose database to perfom benchmark on")
 st.multiselect(
-        label="Choose database",
-        options=st.session_state["all_databases"],
-        key="benchmark_database",
-    )
+    label="Choose database",
+    options=st.session_state["all_databases"],
+    key="benchmark_database",
+)
 
 
 if "all_system_prompt" not in st.session_state:
@@ -229,6 +226,7 @@ def handle_click():
         icon="📖",
     )
 
+
 benchmark_already_done = ["None"] + get_folder_saved_benchmark()
 st.markdown("## Benchmark already done")
 system_prompt_selected = st.selectbox(
@@ -241,7 +239,7 @@ system_prompt_selected = st.selectbox(
 col1, col2, col3, col4, col5 = st.columns([0.20, 0.20, 0.20, 0.25, 0.15])
 with col5:
     background_running = st.checkbox("Run in background", value=False)
-    
+
 if col1.button(
     "Generate Contexts",
     on_click=handle_click,
@@ -294,7 +292,7 @@ if col3.button(
 
 
 if "report_path" in st.session_state["benchmark"]:
-    databases = st.session_state['benchmark_database']
+    databases = st.session_state["benchmark_database"]
     markdown_text = "**Benchmark runned on the following database:**\n"
     for db in databases:
         markdown_text += f"- {db}\n"
@@ -303,7 +301,6 @@ if "report_path" in st.session_state["benchmark"]:
     st.success(
         "***Benchmark terminé !***",
     )
-    
 
     with open(
         st.session_state["benchmark"]["report_path"] + "/plot_report.pdf", "rb"
