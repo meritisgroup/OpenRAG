@@ -18,6 +18,7 @@ import json
 import subprocess
 from backend.methods.graph_rag.agent import GraphRagAgent
 from ..utils.progress import ProgressBar
+from ..methods.naive_rag.indexation import concat_chunks
 
 
 class AgentEvaluator:
@@ -55,7 +56,9 @@ class AgentEvaluator:
         arena_matrix = self.arena.run_battles_scores(log_file=log_file)
         print("Arena battles done  - ✅")
         print("Running Ground Truth comparison ...")
-        ground_truth_evaluations = self.ground_truth_comparator.run_evaluations(log_file=log_file)
+        ground_truth_evaluations = self.ground_truth_comparator.run_evaluations(
+            log_file=log_file
+        )
         print("Ground Truth comparison done  - ✅")
         print("Running context faithfulness ...")
         context_faithfulness_evaluations = (
@@ -226,6 +229,16 @@ class DataFramePreparator:
     def get_dataframe(self) -> pd.DataFrame:
         return self.dataframe
 
+    def get_dataframe_to_save(self) -> pd.DataFrame:
+        dataframe_to_save = self.dataframe
+
+        for rag_available in self.rags_available:
+            dataframe_to_save[rag_available] = self.dataframe[rag_available].apply(
+                lambda d: d["ANSWER"]
+            )
+
+        return dataframe_to_save
+
     def get_queries(self) -> list[str]:
         queries = []
         ground_truths = []
@@ -237,7 +250,7 @@ class DataFramePreparator:
 
         return queries, ground_truths
 
-    def run_all_queries(self, options_generation = None, log_file = str) -> None:
+    def run_all_queries(self, options_generation=None, log_file: str = "") -> None:
 
         with open(log_file, "r") as f:
             data_logs = json.load(f)
@@ -245,13 +258,16 @@ class DataFramePreparator:
         progress_bar = ProgressBar(
             zip(self.rags_available, self.rag_agents),
             total=len(self.rags_available),
-            desc="Generating RAG answers")
+            desc="Generating RAG answers",
+        )
         indexation_tokens = self.indexation_tokens
         n = len(self.rags_available)
         for i, (rag_available, rag_agent) in enumerate(progress_bar.iterable):
-            progress_bar.update(i - 1,
-                                text=f"Generating RAG Answers for {rag_available} rag ({i+1}/{n})")
-            
+            progress_bar.update(
+                i - 1,
+                text=f"Generating RAG Answers for {rag_available} rag ({i+1}/{n})",
+            )
+
             indexation_tokens[rag_available] = rag_agent.get_infos_embeddings()
             start_time = time.time()
             rag_results = rag_agent.generate_answers(
@@ -289,7 +305,8 @@ class DataFramePreparator:
                     energies,
                 )
             ]
-            data_logs["answers"] = int(((i+1)/n)*100)
+
+            data_logs["answers"] = int(((i + 1) / n) * 100)
             with open(log_file, "w") as f:
                 json.dump(data_logs, f)
             self.context_database.complete_context_database(
