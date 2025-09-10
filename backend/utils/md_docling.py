@@ -288,14 +288,10 @@ class DoclingConverter:
                         except Exception as e:
                             logger.warning(f"Unable to find the header for image '{img_index}' : {e}")
 
-                    print(stack)
                     title = getattr(header_node, "text", None) if header_node else None
-                    print(title)
-
                     
                     description = self.analyzer.analyze_bytes(buffer.getvalue(), context=title)
 
-                   
                     final_lines.append(f"<!-- IMAGE {img_index} -->\n")
                     final_lines.extend(json_to_markdown(description, img_index))
 

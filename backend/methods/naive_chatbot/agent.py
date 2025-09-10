@@ -50,6 +50,7 @@ class NaiveChatbot(RagAgent):
         self,
         reset_index: bool = False,
         overlap: bool = True,
+        reset_preprocess = False
     ) -> None:
         return None
 

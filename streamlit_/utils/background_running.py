@@ -13,12 +13,13 @@ import pickle
 import platform
 
 
-def task(reset_index, report_dir, type_bench, config_server,
+def task(reset_index, reset_preprocess, report_dir, type_bench, config_server,
          queries_doc_name, databases, session_state=None,
          background=False):
         
         rag_agents, rag_names = run_indexation_benchmark(
                                     reset_index=reset_index,
+                                    reset_preprocess=reset_preprocess,
                                     databases=databases,
                                     report_dir=report_dir,
                                     session_state=session_state
@@ -56,7 +57,7 @@ def task(reset_index, report_dir, type_bench, config_server,
             st.rerun()
 
 
-def run_benchmark(type_bench, reset_index=False, background=False):
+def run_benchmark(type_bench, reset_index=False, reset_preprocess=False, background=False):
     rag_to_run = [
             rag
             for rag in st.session_state["benchmark"]["rags"].keys()
@@ -94,6 +95,7 @@ def run_benchmark(type_bench, reset_index=False, background=False):
                 python_exe,
                 script_path,
                 "--reset_index", str(reset_index),
+                "--reset_preprocess", str(reset_preprocess),
                 "--report_dir", report_dir,
                 "--type_bench", type_bench,
                 "--config_server", config_server_str,
@@ -125,6 +127,7 @@ def run_benchmark(type_bench, reset_index=False, background=False):
                 )
         else:
             task(reset_index=reset_index,
+                 reset_preprocess=reset_preprocess,
                  report_dir=report_dir,
                  type_bench=type_bench,
                  config_server=config_server,
@@ -144,6 +147,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Run benchmark task in background.")
     parser.add_argument("--reset_index", type=str, default="False")
+    parser.add_argument("--reset_preprocess", type=str, default="False")
     parser.add_argument("--report_dir", type=str, required=True)
     parser.add_argument("--type_bench", type=str, required=True)
     parser.add_argument("--config_server", type=str, required=True)

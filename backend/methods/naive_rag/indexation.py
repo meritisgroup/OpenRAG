@@ -86,10 +86,11 @@ class NaiveRagIndexation:
 
     def run_pipeline(
         self,
+        config_server,
+        reset_preprocess: bool = False,
         chunk_size: int = 500,
         chunk_overlap: bool = True,
-        batch: bool = True,
-        config_server={},
+        batch: bool = True        
     ) -> None:
         """
         Split texts from self.data_path, embed them and save them in a vector base.
@@ -126,6 +127,7 @@ class NaiveRagIndexation:
                 doc_index=i,
                 config_server=config_server,
                 splitter=self.splitter,
+                reset_preprocess=reset_preprocess
             )
 
             doc_chunks = doc.chunks(chunk_size=chunk_size, chunk_overlap=chunk_overlap)

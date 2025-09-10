@@ -94,6 +94,7 @@ class NaiveRagAgent(RagAgent):
     def indexation_phase(
         self,
         reset_index: bool = False,
+        reset_preprocess: bool = False,
         overlap: bool = True,
     ) -> None:
         """
@@ -103,7 +104,9 @@ class NaiveRagAgent(RagAgent):
             overlap (bool) : Wether chunks overlap each other
 
         """
-
+        if reset_preprocess:
+            reset_index = True
+            
         if reset_index:
             self.data_manager.delete_collection()
             self.data_manager.clean_database()
@@ -120,6 +123,7 @@ class NaiveRagAgent(RagAgent):
             chunk_overlap=overlap,
             batch=self.params_vectorbase["batch"],
             config_server=self.config_server,
+            reset_preprocess=reset_preprocess
         )
 
         return None

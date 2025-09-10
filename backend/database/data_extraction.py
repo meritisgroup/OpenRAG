@@ -2,6 +2,7 @@ from typing import List
 import os
 import json
 import re
+from pathlib import Path
 from ..utils.open_doc import Opener
 from ..utils.open_markdown_doc import MarkdownOpener
 from ..utils.splitter import TextSplitter
@@ -97,25 +98,52 @@ class DocumentText:
         path: str,
         config_server: dict,
         splitter: Splitter = TextSplitter(),
+        reset_preprocess = False
     ):
 
         self.data_preprocessing = config_server["data_preprocessing"]
-        self.name_with_extension = path.split("/")[-1]
+        self.name_with_extension = Path(path).name
         self.config_server = config_server
         self.doc_index = doc_index
+        self.path = path
+        self.reset_preprocess = reset_preprocess
+
+        if self.data_preprocessing == "md_with_images":
+                if self.reset_preprocess or not self.load_md__():
+                    self.content = MarkdownOpener(
+                        config_server=self.config_server,
+                        image_description=True
+                    ).open_doc(path_file=path)
+                    self.save_md__()
+        elif self.data_preprocessing == "md_without_images":
+                print("ok")
+                if self.reset_preprocess or not self.load_md__():
+                    self.content = MarkdownOpener(
+                        config_server=self.config_server,
+                        image_description=False
+                    ).open_doc(path_file=path)
+                    self.save_md__()
+        else:
+                self.content = Opener(save=False).open_doc(path)
 
         try:
             if self.data_preprocessing == "md_with_images":
-                self.content = MarkdownOpener(
-                    config_server=self.config_server
-                ).open_doc(path_file=path)
+                if self.reset_preprocess or not self.load_md__():
+                    self.content = MarkdownOpener(
+                        config_server=self.config_server,
+                        image_description=True
+                    ).open_doc(path_file=path)
+                    self.save_md__()
             elif self.data_preprocessing == "md_without_images":
-                self.content = MarkdownOpener(
-                    config_server=self.config_server, image_description=False
-                ).open_doc(path_file=path)
+                if self.reset_preprocess or not self.load_md__():
+                    self.content = MarkdownOpener(
+                        config_server=self.config_server,
+                        image_description=False
+                    ).open_doc(path_file=path)
+                    self.save_md__()
             else:
                 self.content = Opener(save=False).open_doc(path)
-
+            
         except Exception as e:
             self.content = ""
             print(f'Error "{e}" while trying to open doc {self.name_with_extension}')
@@ -129,7 +157,29 @@ class DocumentText:
             self.text_splitter = TextSplitter()
         else:
             self.text_splitter = splitter
+    
+    def load_md__(self):
+        file = os.path.join(Path(self.path).parent,
+                            self.data_preprocessing,
+                            Path(self.name_with_extension).with_suffix(".md").name)
+        if os.path.exists(file):
+            with open(file, "r", encoding="utf-8") as f:
+                self.content = f.read()  
+            return True
+        else:
+            return False
 
+    def save_md__(self):
+        file_save = os.path.join(Path(self.path).parent, self.data_preprocessing)
+        os.makedirs(file_save, exist_ok=True)
+        file_save = os.path.join(file_save,
+                                Path(self.name_with_extension).with_suffix(".md").name)
+        with open(file_save, "w", encoding="utf-8") as f:
+            f.write(self.content)
+
+    def get_content(self):
+        return self.content
+    
     def chunks(self, chunk_size: int = 500, chunk_overlap: bool = True) -> list[Chunk]:
 
         results = []
@@ -207,6 +257,7 @@ class DocumentText:
     def convert_in_base(self) -> Document:
         return Document(
             name=self.name_with_extension,
+            path=str(self.path),
             embedding_tokens=0,
             input_tokens=0,
             output_tokens=0,

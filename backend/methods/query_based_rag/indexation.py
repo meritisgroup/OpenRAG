@@ -65,7 +65,8 @@ class QbRagIndexation:
 
         return outputs
 
-    def __batch_indexation__(self, doc_chunks, name_docs, path_docs):
+
+    def __batch_indexation__(self, doc_chunks, path_docs):
         """
         Adds a batch of chunks from doc_chunks to the indexation verctorbase
         Args:
@@ -85,33 +86,30 @@ class QbRagIndexation:
         input_tokens += np.sum(list_questions["nb_input_tokens"])
         output_tokens += np.sum(list_questions["nb_output_tokens"])
 
-        final_name_docs = []
         final_path_docs = []
         metadatas = []
+        final_chunks = []
         questions_docs = []
         success = False
         nb_try = 1
         for i in range(1):
             elements_to_retry = []
-            name_docs_to_retry = []
             for k, questions in enumerate(list_questions["texts"]):
                 try:
                     questions1 = ast.literal_eval(questions)
                     for i in range(len(questions1)):
                         metadatas.append({"chunk_text": elements[k]})
-                        final_name_docs.append(name_docs[k])
                         final_path_docs.append(path_docs[k])
                         questions_docs.append(questions1[i])
+                        final_chunks.append(doc_chunks[k])
                 except Exception:
                     elements_to_retry.append(elements[k])
-                    name_docs_to_retry.append(name_docs[k])
 
             if len(elements_to_retry)>0:
                 list_questions = self.generates_questions(chunks=elements_to_retry,
                                                           temperature=1,
                                                           text_to_show="Regenerate fail questions")
                 elements = elements_to_retry
-                name_docs = name_docs_to_retry
                 input_tokens += np.sum(list_questions["nb_input_tokens"])
                 output_tokens += np.sum(list_questions["nb_output_tokens"])
 
@@ -119,12 +117,13 @@ class QbRagIndexation:
         for i in range(0, len(elements), taille_batch):
             embedding_tokens += np.sum(self.data_manager.add_str_batch_elements(elements=questions_docs[i:i + taille_batch],
                                                                                 display_message=False,
+                                                                                chunks = final_chunks[i:i + taille_batch],
                                                                                 metadata=metadatas[i:i + taille_batch],
-                                                                                docs_name=final_name_docs[i:i + taille_batch],
                                                                                 path_docs=final_path_docs[i:i + taille_batch]))
         return embedding_tokens, input_tokens, output_tokens
 
-    def __serial_indexation__(self, doc_chunks, name_docs, path_docs):
+
+    def __serial_indexation__(self, doc_chunks, path_docs):
         """
         Adds a batch of chunks from doc_chunks to the indexation verctorbase
         Args:
@@ -164,14 +163,19 @@ class QbRagIndexation:
                                 elements=[question],
                                 display_message=False,
                                 metadata=[{"chunk_text": chunk.text}],
-                                docs_name=[name_docs[k]],
+                                chunks=[doc_chunks[k]],
                                 path_docs=[path_docs[k]]
                             )
                 except Exception:
                     None
         return embedding_tokens, input_tokens, output_tokens
 
-    def run_pipeline(self, chunk_size, chunk_overlap: bool = True, batch: bool = True):
+    def run_pipeline(self, 
+                     config_server,
+                     chunk_size, 
+                     chunk_overlap: bool = True,
+                     batch: bool = True,
+                     reset_preprocess: bool = False):
         add_fields = [
             {
                 "field_name": "chunk_text",
@@ -200,15 +204,16 @@ class QbRagIndexation:
             progress_bar.update(
                 i - 1, f"Creating question cache for document : {path_doc}"
             )
-            doc = DocumentText(path=path_doc, doc_index=i, config_server={"data_preprocessing" : "pdf_text_extraction"},
-                                splitter=self.splitter)
+            doc = DocumentText(path=path_doc, doc_index=i, 
+                               config_server=config_server,
+                               reset_preprocess=reset_preprocess,
+                               splitter=self.splitter)
             doc_chunks = doc.chunks(chunk_size=chunk_size, 
                                     chunk_overlap=chunk_overlap)
             name_docs = [str(Path(path_doc).name) for i in range(len(doc_chunks))]
             path_docs = [str(Path(path_doc).parent) for i in range(len(doc_chunks))]
             if batch:
                 embedding_t, input_t, output_t = self.__batch_indexation__(doc_chunks=doc_chunks,
-                                                                           name_docs=name_docs,
                                                                            path_docs=path_docs)
                 
                 embedding_tokens += embedding_t
@@ -216,7 +221,6 @@ class QbRagIndexation:
                 output_tokens += output_t
             else:
                 embedding_t, input_t, output_t = self.__serial_indexation__(doc_chunks=doc_chunks,
-                                                                            name_docs=name_docs,
                                                                             path_docs=path_docs)
                 embedding_tokens += embedding_t
                 input_tokens += input_t
