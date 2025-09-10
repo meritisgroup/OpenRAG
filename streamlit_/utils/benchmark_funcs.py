@@ -129,10 +129,25 @@ def generate_only_answers(rag_names, rag_agents, report_dir):
             "data", "queries", st.session_state["benchmark"]["queries_doc_name"]
         ),
     )
+
+    log_file = os.path.join(report_dir, "logs.json")
+    if not os.path.exists(log_file):
+        with open(log_file, "w") as f:
+            json.dump(
+                {
+                    "indexation": 0.0,
+                    "answers": 0.0,
+                    "Arena Battles": 0.0,
+                    "Ground Truth comparison": 0.0,
+                    "Context faithfulness": 0.0,
+                    "context relevance": 0.0,
+                },
+                f,
+            )
     dataframe_preparator.run_all_queries(
         options_generation={"type_generation": "simple_generation"}, log_file=log_file
     )
-    df = dataframe_preparator.get_dataframe_to_save()
+    df = dataframe_preparator.get_dataframe()
     df.to_csv(os.path.join(get_report_path(), "bench_df.csv"), index=False)
 
 
@@ -160,6 +175,20 @@ def generate_only_contexts(rag_names, rag_agents, report_dir):
             "data", "queries", st.session_state["benchmark"]["queries_doc_name"]
         ),
     )
+    log_file = os.path.join(report_dir, "logs.json")
+    if not os.path.exists(log_file):
+        with open(log_file, "w") as f:
+            json.dump(
+                {
+                    "indexation": 0.0,
+                    "answers": 0.0,
+                    "Arena Battles": 0.0,
+                    "Ground Truth comparison": 0.0,
+                    "Context faithfulness": 0.0,
+                    "context relevance": 0.0,
+                },
+                f,
+            )
     dataframe_preparator.run_all_queries(
         options_generation={"type_generation": "no_generation"}, log_file=log_file
     )
