@@ -4,6 +4,7 @@ import numpy as np
 import re
 from ..utils.agent import Agent
 from .prompts import PROMPTS
+from backend.database.rag_classes import Chunk
 
 
 class ContextRelevanceEvaluator(Evaluator):
