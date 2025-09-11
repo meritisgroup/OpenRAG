@@ -289,7 +289,8 @@ class Merger_Database_Vectorbase:
         filters: dict = None,
         collection_name=None,
         vb_name: str = None,
-    ) -> list[list[Chunk]]:
+        type_output = Chunk
+    ):
         if vb_name is not None:
             if collection_name is not None:
                 collection_name = vb_name + "_" + collection_name
@@ -299,6 +300,7 @@ class Merger_Database_Vectorbase:
                 output_fields=output_fields,
                 filters=filters,
                 collection_name=collection_name,
+                type_output=type_output
             )
         else:
             n = len(self.vectorbases)
@@ -322,6 +324,7 @@ class Merger_Database_Vectorbase:
                     k=k_per_db_list[i],
                     output_fields=output_fields,
                     collection_name=collection_name_search,
+                    type_output=type_output
                 )
                 if len(chunks) == 0:
                     chunks = result
@@ -625,7 +628,8 @@ class ContextDatabase:
 
             if result is None:
                 # Insert only if not present
-                ins = rag_table.insert().values(query=query, context=dict_chunks)
+                ins = rag_table.insert().values(query=query, 
+                                                context=dict_chunks)
                 conn.execute(ins)
             else:
                 print(

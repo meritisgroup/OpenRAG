@@ -281,21 +281,23 @@ class VectorBase_embeddings_elasticsearch(VectorBase):
         output_fields: list[str] = ["text"],
         filters: dict = None,
         collection_name=None,
-    ) -> list[Chunk]:
+        type_output = Chunk
+    ):
 
         if collection_name is None:
             collection_name = self.vb_name
         data = self.agent.embeddings(texts=queries, model=self.embedding_model)
 
         res = []
+        num_candidates = max(500, k*5)
         for i in range(len(data["embeddings"])):
             body = {
                 "size": k,
                 "knn": {
                     "field": "vector",
                     "query_vector": data["embeddings"][i],
-                    "k": k,  # Number of nearest neighbors to retrieve
-                    "num_candidates": 500,  # Number of candidates to consider
+                    "k": k,  
+                    "num_candidates": num_candidates, 
                 },
             }
 
@@ -307,7 +309,7 @@ class VectorBase_embeddings_elasticsearch(VectorBase):
             result = []
             for i in range(np.min([len(res[l]["hits"]["hits"]), k])):
                 source = res[l]["hits"]["hits"][i]["_source"]
-                result.append(reconstruct_chunk_after_k_search(source, Chunk))
+                result.append(reconstruct_chunk_after_k_search(source, type_output))
             results.append(result)
         return results
 
@@ -452,7 +454,8 @@ class VectorBase_BM25_elasticsearch(VectorBase):
         output_fields: list[str] = ["text"],
         filters: dict = None,
         collection_name=None,
-    ) -> list[Chunk]:
+        type_output = Chunk
+    ):
         # if type(queries) is str:
         #     queries = [queries]
         if collection_name is None:
@@ -470,7 +473,7 @@ class VectorBase_BM25_elasticsearch(VectorBase):
             result = []
             for i in range(np.min([len(res[l]["hits"]["hits"]), k])):
                 source = res[l]["hits"]["hits"][i]["_source"]
-                result.append(reconstruct_chunk_after_k_search(source, Chunk))
+                result.append(reconstruct_chunk_after_k_search(source, type_output))
             results.append(result)
         return results
 
@@ -505,6 +508,7 @@ class VectorBase_hybrid_elasticsearch(VectorBase_embeddings_elasticsearch):
         output_fields: list[str] = ["text"],
         filters: dict = None,
         collection_name=None,
+        type_output = Chunk
     ) -> list[Chunk]:
 
         if type(queries) is type(""):
@@ -514,6 +518,7 @@ class VectorBase_hybrid_elasticsearch(VectorBase_embeddings_elasticsearch):
 
         data = self.agent.embeddings(texts=queries, model=self.embedding_model)
         res = []
+        num_candidates = max(500, k*5)
         for i in range(len(queries)):
             response = self.client.search(
                 index=collection_name,
@@ -532,7 +537,7 @@ class VectorBase_hybrid_elasticsearch(VectorBase_embeddings_elasticsearch):
                                                 "field": "vector",
                                                 "query_vector": data["embeddings"][i],
                                                 "k": k,
-                                                "num_candidates": 200,
+                                                "num_candidates": num_candidates,
                                             }
                                         },  # Recherche Vectorielle
                                     ]
@@ -553,7 +558,7 @@ class VectorBase_hybrid_elasticsearch(VectorBase_embeddings_elasticsearch):
             # print("res", res[l]["hits"]["hits"], len(res[l]["hits"]["hits"]))
             for i in range(np.min([len(res[l]["hits"]["hits"]), k])):
                 source = res[l]["hits"]["hits"][i]["_source"]
-                result.append(reconstruct_chunk_after_k_search(source, Chunk))
+                result.append(reconstruct_chunk_after_k_search(source, type_output))
             results.append(result)
         return results
 
@@ -713,6 +718,7 @@ class VectorBaseVlm_elasticsearch:
         )
 
         res = []
+        num_candidates = max(500, k*5)
         for i in range(len(data["embeddings"])):
             response = self.client.search(
                 index=collection_name,
@@ -722,7 +728,7 @@ class VectorBaseVlm_elasticsearch:
                         "field": "vector",
                         "query_vector": data["embeddings"][i],
                         "k": k,  # Number of nearest neighbors to retrieve
-                        "num_candidates": 100,  # Number of candidates to consider
+                        "num_candidates": num_candidates,  # Number of candidates to consider
                     },
                 },
             )

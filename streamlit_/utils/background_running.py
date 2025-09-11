@@ -32,10 +32,10 @@ def task(reset_index, reset_preprocess, report_dir, type_bench, config_server,
             ):
             if len(rag_agents) > 1:
                 if type_bench=="answers":
-                    generate_answers(rag_names, rag_agents,
+                    generate_only_answers(rag_names, rag_agents,
                                     report_dir=report_dir)
                 elif type_bench=="contexts":
-                    generate_contexts(rag_names=rag_names,
+                    generate_only_contexts(rag_names=rag_names,
                                     rag_agents=rag_agents,
                                     report_dir=report_dir)
                 elif type_bench=="full_bench":
@@ -53,10 +53,10 @@ def task(reset_index, reset_preprocess, report_dir, type_bench, config_server,
                             markdown_text += f"- {db}\n"
                         st.markdown(markdown_text)
 
-    if not background:
-        st.session_state["benchmark_clicked"] = False
-        st.set_option("client.showSidebarNavigation", True)
-        st.rerun()
+        if not background:
+            st.session_state["benchmark_clicked"] = False
+            st.set_option("client.showSidebarNavigation", True)
+            st.rerun()
 
 
 def run_benchmark(type_bench, reset_index=False, reset_preprocess=False, background=False):

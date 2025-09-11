@@ -87,10 +87,13 @@ def prepare_show_context(chunks: list[Chunk]):
     blocks = []
     for chunk in chunks:
         cleaned_context = clean_markdown(chunk.text)
-        block = f"source : {chunk.document}\n\n{cleaned_context}"
+        block = ""
+        if chunk.document != None:
+            block += f"source : {chunk.document}\n\n"
+        block = f"{cleaned_context}"
         if chunk.rerank_score != None:
             block += f"\n\n Rerank score : {chunk.rerank_score}"
         blocks.append(block)
 
-    output = "\n\n---\n\n".join(blocks)
+    output = "\n\n" + ("-" * 10) + "\n\n".join(blocks)
     return output

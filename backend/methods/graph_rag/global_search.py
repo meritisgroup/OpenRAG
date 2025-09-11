@@ -2,9 +2,8 @@ from ...utils.agent import Agent
 
 from ...base_classes import Search
 from ...database.database_class import DataBase
-from ...database.rag_classes import MergeEntityOverall, Community
+from ...database.rag_classes import MergeEntityOverall, Community, Chunk
 from .prompts import PROMPTS
-
 import json
 import numpy as np
 
@@ -56,9 +55,9 @@ class GlobalSearch(Search):
             dic_communities = useful_communities
 
         # dic_communities = useful_communities
-        context = self._build_context(dic_communities, useful_entities)
+        context, chunks = self._build_context(dic_communities, useful_entities)
 
-        return context, tokens_counter
+        return context, chunks, tokens_counter
 
     def _build_context(self, dic_communities: dict, useful_entities: dict):
         context = "-- Context --\n"
@@ -79,10 +78,18 @@ class GlobalSearch(Search):
 
         sorted_entities = sorted(entities, key=lambda x: int(x.degree), reverse=True)
 
+        chunks = []
+        i = 0
+        for entity in sorted_entities:
+            new_chunk = Chunk(text=f"{entity.name} : {entity.description}",
+                                    id=i)
+            chunks.append(new_chunk)
+            i+=1
+
         for entity in sorted_entities:
             context += f"{entity.name} : {entity.description}\n\n"
 
-        return context
+        return context, chunks
 
     def _evaluate_communities(self, query, context):
 

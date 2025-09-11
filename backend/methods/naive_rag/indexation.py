@@ -175,7 +175,6 @@ def contexts_to_prompts(contexts, docs_name):
 
 
 def concat_chunks(chunk_list: list[Chunk]) -> str:
-
     context = ""
     for chunk in chunk_list:
         if chunk.text not in context:

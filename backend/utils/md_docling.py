@@ -10,6 +10,8 @@ from docling.document_converter import DocumentConverter, PdfFormatOption
 from docling.datamodel.pipeline_options import PdfPipelineOptions
 from docling_core.types.doc import PictureItem, TextItem, GroupItem, DocItemLabel
 from docling.exceptions import ConversionError
+from docling.datamodel.accelerator_options import AcceleratorDevice, AcceleratorOptions
+
 from ..utils.agent import get_Agent
 
 logging.basicConfig(level=logging.INFO)
@@ -209,12 +211,15 @@ class DoclingConverter:
             export_images=False,
             image_dpi=1200,
             images_scale=5,
+            accelerator_options=AcceleratorOptions(
+                                num_threads=4, 
+                                device=AcceleratorDevice.AUTO
+                            )
         )
         return DocumentConverter(
             format_options={
                 InputFormat.PDF: PdfFormatOption(
-                    pipeline_options=pipeline_options,
-                    accelerator="cpu:4",
+                    pipeline_options=pipeline_options
                 )
             }
         )

@@ -29,6 +29,7 @@ class Reranker:
             additional_data (np.array[dict]) : Metadata for top chunks
 
         """
+        
         scores = self.agent.reranking(
             query=query, chunk_list=chunk_list, model=self.reranking_model
         )

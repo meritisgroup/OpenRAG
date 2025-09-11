@@ -168,12 +168,14 @@ if prompt := st.chat_input(
             .streamlit-expanderHeader {
                 background-color: #4CAF50;  /* vert */
                 color: white !important;
-                font-weight: bold;
+                font-weight: normal !important;
                 border-radius: 8px;
                 padding: 8px;
+                text-transform: lowercase !important;
             }
             .streamlit-expanderHeader:hover {
-                background-color: #45a049; /* vert un peu plus foncé au hover */
+                background-color: #45a049;
+                  /* vert un peu plus foncé au hover */
             }
             </style>
             """,
@@ -181,7 +183,7 @@ if prompt := st.chat_input(
         )
 
         with st.expander("💡 Voir le contexte utilisé"):
-            st.write(context)
+            st.text(str(context))
 
         formated_answer += (
             f"{answer['answer']} \n\n"

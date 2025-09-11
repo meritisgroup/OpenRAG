@@ -1,6 +1,6 @@
 from ...utils.agent import Agent
 from ...database.database_class import DataBase
-from ...database.rag_classes import MergeEntityOverall, Relation
+from ...database.rag_classes import MergeEntityOverall, Relation, Chunk
 from .prompts import PROMPTS
 
 import ast
@@ -109,9 +109,9 @@ class LocalSearch:
             else:
                 pass
 
-        context = self._build_context(entities, both_relations, single_relations)
+        context, chunks = self._build_context(entities, both_relations, single_relations)
 
-        return context, self.tokens_counter
+        return context, chunks, self.tokens_counter
 
     def _build_context(self, entities, both_relations, single_relations) -> str:
 
@@ -122,6 +122,7 @@ class LocalSearch:
         adding_entity = PROMPTS[self.language]["unique_entity"]
         adding_relation = PROMPTS[self.language]["unique_relation"]
 
+        chunks = []
         for entity in entities:
             adding_entities += (
                 adding_entity.replace("{entity}", entity.name).replace(
@@ -129,14 +130,24 @@ class LocalSearch:
                 )
                 + "\n\n"
             )
+            new_chunk = Chunk(text=adding_entity.replace("{entity}", entity.name).replace("{entity_description}",
+                                                                                                 entity.description.replace("\n", "")),
+                                                id=i)
+            chunks.append(new_chunk)
+            i+=1
 
         for relation in both_relations:
             adding_relations += (
-                adding_relation.replace("{source}", relation.source)
-                .replace("{target}", relation.target)
-                .replace("{relation_description}", relation.description)
+                adding_relation.replace("{source}", relation.source).replace("{target}", relation.target).replace("{relation_description}", relation.description)
                 + "\n\n"
             )
+            new_chunk = Chunk(text=adding_relation.replace("{source}",
+                                                                  relation.source).replace("{target}",
+                                                                                            relation.target).replace("{relation_description}",
+                                                                                                                      relation.description),
+                                    id=i)
+            chunks.append(new_chunk)
+            i+=1
 
         for relation in single_relations:
             adding_relations += (
@@ -145,9 +156,15 @@ class LocalSearch:
                 .replace("{relation_description}", relation.description)
                 + "\n\n"
             )
-
+            new_chunk = Chunk(text=adding_relation.replace("{entity_source}",
+                                                                  relation.source).replace("{entity_target}",
+                                                                                            relation.target).replace("{relation_description}", 
+                                                                                                                     relation.description),
+                                    id=i)
+            chunks.append(new_chunk)
+            i+=1
         context = context_template.replace("{entities}", adding_entities).replace(
             "{relations}", adding_relations
         )
 
-        return context
+        return context, chunks
