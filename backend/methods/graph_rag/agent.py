@@ -47,7 +47,6 @@ class GraphRagAgent(RagAgent):
                                                 storage_path=self.storage_path,
                                                 config_server=config_server,
                                                 agent=self.agent)
-        self.data_manager.add_table(Chunk)
         self.data_manager.add_table(Entity)
         self.data_manager.add_table(Relation)
         self.data_manager.add_table(Tokens)
@@ -67,10 +66,15 @@ class GraphRagAgent(RagAgent):
         self,
         reset_index: bool = False,
         overlap: bool = True,
+        reset_preprocess = False
     ) -> None:
 
+        if reset_preprocess:
+            reset_index = True
+            
         if reset_index:
-            self.data_manager.delete_collection()
+            self.data_manager.delete_collection(name="local_search")
+            self.data_manager.delete_collection(name="global_search")
             self.data_manager.clean_database()
 
         index = GraphRagIndexation(
@@ -84,7 +88,8 @@ class GraphRagAgent(RagAgent):
 
         index.run_pipeline(chunk_size=self.chunk_size, 
                            overlap=overlap,
-                           config_server=self.config_server)
+                           config_server=self.config_server,
+                           reset_preprocess=reset_preprocess)
 
     def get_infos_embeddings(self):
         infos = {}
@@ -142,7 +147,9 @@ class GraphRagAgent(RagAgent):
             query = query[0]
         prompt_template: str = self.prompts["smooth_generation"]["QUERY_TEMPLATE"]
 
-        context_base = dict(context=context, language=self.language, query=query)
+        context_base = dict(context=context, 
+                            language=self.language,
+                            query=query)
 
         prompt = prompt_template.format(**context_base)
 
@@ -164,7 +171,6 @@ class GraphRagAgent(RagAgent):
             "nb_input_tokens": np.sum(answer["nb_input_tokens"] + input_t),
             "nb_output_tokens": np.sum(answer["nb_output_tokens"] + output_t),
             "context": context,
-            "docs_name": [],
             "impacts": impacts,
             "energy": energies,
         }

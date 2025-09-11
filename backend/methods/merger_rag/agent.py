@@ -55,6 +55,7 @@ class MergerRagAgent(RagAgent):
         self,
         reset_index: bool = False,
         overlap: bool = True,
+        reset_preprocess = False
     ) -> None:
         """
         Does the indexation of a given knowledge base, full process is located in indexation.py
@@ -64,14 +65,21 @@ class MergerRagAgent(RagAgent):
             overlap (bool) : Wether chunks overlap each other
 
         """
-
-        for rag_name in self.rag_list:
-            self.rag_agents[rag_name].indexation_phase(reset_index = reset_index,
-                                                       overlap = overlap)
+        if reset_preprocess:
+            reset_index = True
+            
         if reset_index:
             for rag_name in self.rag_list:
                 self.rag_agents[rag_name].data_manager.delete_collection()
                 self.rag_agents[rag_name].data_manager.clean_database()
+
+        for rag_name in self.rag_list:
+            self.rag_agents[rag_name].indexation_phase(reset_index = reset_index,
+                                                       overlap = overlap,
+                                                       reset_preprocess = reset_preprocess)
+            if reset_preprocess:
+                reset_preprocess = False
+        
 
 
     def merge_answers(self, answers: list[str], query: str, agent, options_generation=None) -> str:
@@ -109,10 +117,9 @@ class MergerRagAgent(RagAgent):
         self.list_answers={}
         full_response={
                 "answer": "",
-                "docs_name": [],
                 "nb_input_tokens": 0,
                 "nb_output_tokens": 0,
-                "context": "",
+                "context": [],
                 "impacts": [0,0,""],
                 "energy": [0,0,""],
             }
@@ -124,8 +131,7 @@ class MergerRagAgent(RagAgent):
             self.list_answers[rag_name] = response["answer"]
             full_response["nb_input_tokens"]+=response["nb_input_tokens"]
             full_response["nb_output_tokens"]+=response["nb_output_tokens"]
-            full_response["context"]= full_response["context"]+"\n[...]\n"+response["context"]
-            full_response["docs_name"]+=response["docs_name"]
+            full_response["context"] += response["context"]
             full_response["impacts"][0]+=response["impacts"][0]
             full_response["impacts"][1]+=response["impacts"][1]
             full_response["impacts"][2]+=response["impacts"][2]
@@ -155,7 +161,6 @@ class MergerRagAgent(RagAgent):
         
         return {
                 "answer": full_response["answer"],
-                "docs_name": full_response["docs_name"],
                 "nb_input_tokens": full_response["nb_input_tokens"],
                 "nb_output_tokens": full_response["nb_output_tokens"],
                 "context": full_response["context"],
@@ -163,17 +168,3 @@ class MergerRagAgent(RagAgent):
                 "energy": full_response["energy"],
             }
     
-
-    def release_gpu_memory(self):
-        self.agent.release_memory()
-
-    
-
-    def generate_answers(self, queries: list[str], nb_chunks: int = 2, options_generation = None):
-        answers = []
-        for query in queries:
-            answer = self.generate_answer(query=query, 
-                                          nb_chunks=nb_chunks,
-                                          options_generation=options_generation)
-            answers.append(answer)
-        return answers

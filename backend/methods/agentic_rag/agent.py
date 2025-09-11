@@ -5,7 +5,7 @@ Created on Thu Feb  6 16:37:47 2025
 @author: chardy
 """
 from ...base_classes import RagAgent
-from ..naive_rag.agent import NaiveRagAgent
+from ..advanced_rag.agent import AdvancedRag
 from ..advanced_rag.agent import AdvancedRag
 from ...database.database_class import get_management_data
 from ...utils.agent import get_Agent
@@ -19,7 +19,7 @@ class CompareQueryAnswer(BaseModel):
     Decision: bool
 
 
-class AgenticRagAgent(NaiveRagAgent):
+class AgenticRagAgent(AdvancedRag):
     "Iterative RAG"
 
     def __init__(
@@ -46,9 +46,6 @@ class AgenticRagAgent(NaiveRagAgent):
         )
 
         self.prompts = prompts[self.language]
-
-    def get_nb_token_embeddings(self):
-        return self.vb.get_nb_token_embeddings()
 
     def evaluate(self, query: str, answer: str, agent) -> bool:
         """
@@ -156,7 +153,6 @@ class AgenticRagAgent(NaiveRagAgent):
         nb_input_tokens = info["nb_input_tokens"]
         nb_output_tokens = info["nb_output_tokens"]
         context_tot = info["context"]
-        docs_name = info["docs_name"]
         impacts, energies = info["impacts"], info["energy"]
 
         while iter <= max_iter and not self.evaluate(query, answer, agent):
@@ -196,30 +192,6 @@ class AgenticRagAgent(NaiveRagAgent):
             "nb_input_tokens": nb_input_tokens,
             "nb_output_tokens": nb_output_tokens,
             "context": context_tot,
-            "docs_name": docs_name,
             "impacts": impacts,
             "energy": energies,
         }
-
-    def release_gpu_memory(self):
-        self.agent.release_memory()
-
-    def get_rag_contexts(self, queries: list[str], nb_chunks: int = 5):
-        contexts = []
-        names_docs = []
-        for query in queries:
-            context, name_docs = self.get_rag_context(query=query, nb_chunks=nb_chunks)
-            contexts.append(context)
-            names_docs.append(name_docs)
-        return contexts, names_docs
-
-    def generate_answers(
-        self, queries: list[str], nb_chunks: int = 2, options_generation=None
-    ):
-        answers = []
-        for query in queries:
-            answer = self.generate_answer(
-                query=query, nb_chunks=nb_chunks, options_generation=options_generation
-            )
-            answers.append(answer)
-        return answers

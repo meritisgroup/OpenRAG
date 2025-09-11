@@ -311,12 +311,14 @@ class VectorBase_embeddings_elasticsearch(VectorBase):
             results.append(result)
         return results
 
-    def delete_collection(self):
-        if not self.check_collection_exist(self.vb_name):
+    def delete_collection(self, vb_name = None):
+        if vb_name is None:
+            vb_name = self.vb_name
+        if not self.check_collection_exist(vb_name):
             print("The collection does not exist")
 
         try:
-            self.client.indices.delete(index=self.vb_name)
+            self.client.indices.delete(index=vb_name)
             print("the collection have been deleted")
         except Exception as e:
             print(f"Error while deleting the collection : {e}")

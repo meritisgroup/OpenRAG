@@ -1,6 +1,7 @@
 /volumes/*
 /storage/*
 /data/custom_rags/*
+/data/merge/*
 /data/report/*
 /data/databases/*
 /data/queries/*
@@ -10,3 +11,4 @@
 /docker/*
 venv
 .env
+chunks_output.jsonl

@@ -29,13 +29,10 @@ color_discrete_sequence = [
     "#FECB52",
 ]
 
+
 def get_folder_saved_benchmark():
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    report_dir = os.path.normpath(os.path.join(BASE_DIR,
-                                                "..",
-                                                "..",
-                                                "data",
-                                                "report"))
+    report_dir = os.path.normpath(os.path.join(BASE_DIR, "..", "..", "data", "report"))
     folder_bench = []
     for foldername in os.listdir(report_dir):
         folder = os.path.join(report_dir, foldername)
@@ -47,8 +44,11 @@ def get_folder_saved_benchmark():
 
 
 
-def run_indexation_benchmark(reset_index, databases, 
-                             report_dir, session_state=None):
+def run_indexation_benchmark(reset_index,
+                             reset_preprocess, 
+                             databases, 
+                             report_dir,
+                             session_state=None):
     if session_state is None:
         session_state = st.session_state
 
@@ -66,7 +66,7 @@ def run_indexation_benchmark(reset_index, databases,
     else:
         with open(log_file, "r") as f:
             data_logs = json.load(f)
-            
+
     rag_agents = []
     rag_names = []
     with st.spinner("**Indexation Running**", show_time=True):
@@ -82,13 +82,16 @@ def run_indexation_benchmark(reset_index, databases,
                 rag_agent = get_chat_agent(rag,
                                            databases_name=databases,
                                            session_state=session_state)
-                rag_agent.indexation_phase(reset_index=reset_index)
+                rag_agent.indexation_phase(reset_index=reset_index,
+                                           reset_preprocess=reset_preprocess)
+                if reset_preprocess:
+                    reset_preprocess = False
+
                 rag_agents.append(rag_agent)
                 rag_names.append(rag)
                 indexation_progress_bar.update(i)
 
-
-            data_logs["indexation"] = int(((i+1)/n)*100)
+            data_logs["indexation"] = int(((i + 1) / n) * 100)
             with open(log_file, "w") as f:
                 json.dump(data_logs, f)
 
@@ -104,20 +107,38 @@ def get_report_path():
     timestamp = datetime.now()
     timestamp = timestamp.strftime("%m-%d_%H-%M-%S")
     report_dir = os.path.normpath(
-            os.path.join(BASE_DIR, "..", "..", "data", "report", timestamp)
+        os.path.join(BASE_DIR, "..", "..", "data", "report", timestamp)
     )
     os.makedirs(report_dir, exist_ok=True)
 
     return report_dir
 
-def generate_answers(rag_names, rag_agents, report_dir):
+
+def generate_only_answers(rag_names, rag_agents, report_dir):
+
+    log_file = os.path.join(report_dir, "logs.json")
+    if not os.path.exists(log_file):
+        with open(log_file, "w") as f:
+            json.dump(
+                {
+                    "indexation": 0.0,
+                    "answers": 0.0,
+                    "Arena Battles": 0.0,
+                    "Ground Truth comparison": 0.0,
+                    "Context faithfulness": 0.0,
+                    "context relevance": 0.0,
+                },
+                f,
+            )
+
     dataframe_preparator = DataFramePreparator(
         rag_agents=rag_agents,
         rags_available=rag_names,
-        input_path=os.path.join("data", "queries", 
-                                st.session_state["benchmark"]["queries_doc_name"]),
+        input_path=os.path.join(
+            "data", "queries", st.session_state["benchmark"]["queries_doc_name"]
+        ),
     )
-    
+
     log_file = os.path.join(report_dir, "logs.json")
     if not os.path.exists(log_file):
         with open(log_file, "w") as f:
@@ -132,13 +153,31 @@ def generate_answers(rag_names, rag_agents, report_dir):
                                          log_file=log_file)
     df = dataframe_preparator.get_dataframe()
     df.to_csv(os.path.join(get_report_path(), "bench_df.csv"), index=False)
-       
-def generate_contexts(rag_names, rag_agents, report_dir):
+
+
+def generate_only_contexts(rag_names, rag_agents, report_dir):
+
+    log_file = os.path.join(report_dir, "logs.json")
+    if not os.path.exists(log_file):
+        with open(log_file, "w") as f:
+            json.dump(
+                {
+                    "indexation": 0.0,
+                    "answers": 0.0,
+                    "Arena Battles": 0.0,
+                    "Ground Truth comparison": 0.0,
+                    "Context faithfulness": 0.0,
+                    "context relevance": 0.0,
+                },
+                f,
+            )
+
     dataframe_preparator = DataFramePreparator(
         rag_agents=rag_agents,
         rags_available=rag_names,
-        input_path=os.path.join("data", "queries",
-                                st.session_state["benchmark"]["queries_doc_name"]),
+        input_path=os.path.join(
+            "data", "queries", st.session_state["benchmark"]["queries_doc_name"]
+        ),
     )
     log_file = os.path.join(report_dir, "logs.json")
     if not os.path.exists(log_file):
@@ -157,25 +196,24 @@ def generate_contexts(rag_names, rag_agents, report_dir):
 
 
 def show_already_done_benchmark():
-    if st.session_state["benchmark_done"]=="None":
+    if st.session_state["benchmark_done"] == "None":
         return
-    
+
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    report_dir = os.path.normpath(os.path.join(BASE_DIR,
-                                                "..",
-                                                "..",
-                                                "data",
-                                                "report",
-                                                st.session_state["benchmark_done"]))
+    report_dir = os.path.normpath(
+        os.path.join(
+            BASE_DIR, "..", "..", "data", "report", st.session_state["benchmark_done"]
+        )
+    )
     file_eval_save = os.path.join(report_dir, "results_bench.pkl")
     with open(file_eval_save, "rb") as f:
         results = pickle.load(f)
     plots, impact, energy = show_benchmark(results=results)
     st.session_state["benchmark"]["plots"] = plots
     st.session_state["benchmark"]["report_path"] = report_dir
-    st.session_state['benchmark_database'] = results["databases"]
+    st.session_state["benchmark_database"] = results["databases"]
 
-     
+
 def show_benchmark(results, session_state=None):
     if session_state is None:
         session_state = st.session_state
@@ -190,7 +228,7 @@ def show_benchmark(results, session_state=None):
     session_state["benchmark"]["ground_truth"] = results["ground_truth_scores"]
     session_state["benchmark"]["arena_matrix"] = results["arena_scores"]
     session_state["benchmark"]["all_queries"] = results["df"]
-    session_state["benchmark"]["indexation_tokens"] = results["indexations_tokens"] 
+    session_state["benchmark"]["indexation_tokens"] = results["indexations_tokens"]
 
     impact = extract_impact(results["df"])
     energy = extract_energy(results["df"])
@@ -198,12 +236,15 @@ def show_benchmark(results, session_state=None):
     session_state["benchmark"]["impacts"] = impact
     session_state["benchmark"]["energy"] = energy
     session_state["time"] = time
-    
+
     arena_graph = arena_graphs(session_state=session_state)
-    if session_state["config_server"]["params_host_llm"]["type"] in ["openai", "mistral"]:
+    if session_state["config_server"]["params_host_llm"]["type"] in [
+        "openai",
+        "mistral",
+    ]:
         impacts_graph = impact_graph(session_state=session_state)
         energies_graph = energy_graph(session_state=session_state)
-    
+
     else:
         impacts_graph = None
         energies_graph = None
@@ -213,24 +254,28 @@ def show_benchmark(results, session_state=None):
         "ground_truth_graph": ground_truth_graph(session_state=session_state),
         "context_graph": context_graph(session_state=session_state),
         "arena_graphs": arena_graph,
-        "report_arena_graph": report_arena_graph(arena_graph, session_state=session_state),
-        "impact_graph" : impacts_graph,
-        "energy_graph" : energies_graph,
-        "time_graph" : time_graph(session_state=session_state)
+        "report_arena_graph": report_arena_graph(
+            arena_graph, session_state=session_state
+        ),
+        "impact_graph": impacts_graph,
+        "energy_graph": energies_graph,
+        "time_graph": time_graph(session_state=session_state),
     }
     return plots, impact, energy
 
 
-def generate_benchmark(rag_names, 
-                       rag_agents,
-                       databases,
-                       queries_doc_mane,
-                       config_server,
-                       report_dir,
-                       session_state=None):
+def generate_benchmark(
+    rag_names,
+    rag_agents,
+    databases,
+    queries_doc_mane,
+    config_server,
+    report_dir,
+    session_state=None,
+):
     if session_state is None:
         session_state = st.session_state
-        
+
     log_file = os.path.join(report_dir, "logs.json")
     if not os.path.exists(log_file):
         with open(log_file, "w") as f:
@@ -242,44 +287,56 @@ def generate_benchmark(rag_names,
                         "context relevance": 0.0,
                         "nDCG score": 0.0}, f)
 
-    dataframe_preparator = DataFramePreparator(rag_agents=rag_agents,
-                                               rags_available=rag_names,
-                                               input_path=os.path.join("data", "queries",
-                                                                        queries_doc_mane))
-    dataframe_preparator.run_all_queries(options_generation={"type_generation": "simple_generation"},
-                                         log_file=log_file)
+    dataframe_preparator = DataFramePreparator(
+        rag_agents=rag_agents,
+        rags_available=rag_names,
+        input_path=os.path.join("data", "queries", queries_doc_mane),
+    )
+    dataframe_preparator.run_all_queries(
+        options_generation={"type_generation": "simple_generation"}, log_file=log_file
+    )
 
     df = dataframe_preparator.get_dataframe()
-    evaluation_agent = AgentEvaluator(dataframe=df,
-                                      rags_available=rag_names,
-                                      config_server=config_server)
+    evaluation_agent = AgentEvaluator(
+        dataframe=df, rags_available=rag_names, config_server=config_server
+    )
 
     evals = evaluation_agent.get_evals(log_file=log_file)
 
-    results_bench = {"df":df,
-                     "evals": evals,
-                     "ground_truth_scores": evaluation_agent.ground_truth_comparator.all_scores_dict,
-                     "arena_scores": evaluation_agent.arena.all_scores_dict,
-                     "indexations_tokens": dataframe_preparator.indexation_tokens,
-                     "databases": databases}
-    
+    results_bench = {
+        "df": df,
+        "evals": evals,
+        "ground_truth_scores": evaluation_agent.ground_truth_comparator.all_scores_dict,
+        "arena_scores": evaluation_agent.arena.all_scores_dict,
+        "indexations_tokens": dataframe_preparator.indexation_tokens,
+        "databases": databases,
+    }
+
     file_eval_save = os.path.join(report_dir, "results_bench.pkl")
     with open(file_eval_save, "wb") as f:
         pickle.dump(results_bench, f)
 
-    plots, impact, energy = show_benchmark(results=results_bench,
-                                           session_state=session_state)
+    plots, impact, energy = show_benchmark(
+        results=results_bench, session_state=session_state
+    )
 
     session_state["benchmark"]["plots"] = plots
-    session_state["benchmark"]["report_path"] = evaluation_agent.create_plot_report(plots=plots,
-                                                                                       report_dir=report_dir)
-    
-    df.to_csv(os.path.join(session_state["benchmark"]["report_path"], "bench_df.csv"), index=False)
-    with open(os.path.join(session_state["benchmark"]["report_path"], "impact.json"), "w") as file:
-        json.dump(impact,file,indent=4)
-    with open(os.path.join(session_state["benchmark"]["report_path"], "energy.json"), "w") as file:
-        json.dump(energy,file,indent=4)
-
+    session_state["benchmark"]["report_path"] = evaluation_agent.create_plot_report(
+        plots=plots, report_dir=report_dir
+    )
+    df_to_save = dataframe_preparator.get_dataframe_to_save()
+    df_to_save.to_csv(
+        os.path.join(session_state["benchmark"]["report_path"], "bench_df.csv"),
+        index=False,
+    )
+    with open(
+        os.path.join(session_state["benchmark"]["report_path"], "impact.json"), "w"
+    ) as file:
+        json.dump(impact, file, indent=4)
+    with open(
+        os.path.join(session_state["benchmark"]["report_path"], "energy.json"), "w"
+    ) as file:
+        json.dump(energy, file, indent=4)
 
 
 def display_plot():
@@ -581,8 +638,8 @@ def match_name_cleaner(match_name):
     mid = match_name.find("_v_")
 
     rag_a = match_name[:mid]
-    rag_b = match_name[mid+3:]
-    host  = st.session_state["config_server"]["params_host_llm"]["type"]
+    rag_b = match_name[mid + 3 :]
+    host = st.session_state["config_server"]["params_host_llm"]["type"]
     try:
         new_rag_name = f"{st.session_state['all_rags'][host][rag_a]} - {st.session_state['all_rags'][host][rag_b]}"
     except Exception:
@@ -595,38 +652,41 @@ def extract_impact(df: pd.DataFrame):
     list_rags = list(df.columns)[2:]
     impacts = {}
     for rag in list_rags:
-        impact = [0,0,"gCO2eq"]
+        impact = [0, 0, "gCO2eq"]
         for query in df[rag]:
             if type(query) is not dict:
                 q = eval(query)
             else:
                 q = query
-            impact[0] += q["IMPACTS"][0]*1000
-            impact[1] += q["IMPACTS"][1]*1000
+            impact[0] += q["IMPACTS"][0] * 1000
+            impact[1] += q["IMPACTS"][1] * 1000
         impacts[rag] = impact
     return impacts
+
 
 def extract_energy(df: pd.DataFrame):
     list_rags = list(df.columns)[2:]
     energies = {}
     for rag in list_rags:
-        energy = [0,0,"wH"]
+        energy = [0, 0, "wH"]
         for query in df[rag]:
             if type(query) is not dict:
                 q = eval(query)
             else:
                 q = query
-            energy[0] += q["ENERGY"][0]*1000
-            energy[1] += q["ENERGY"][1]*1000
+            energy[0] += q["ENERGY"][0] * 1000
+            energy[1] += q["ENERGY"][1] * 1000
         energies[rag] = energy
     return energies
 
-def extract_time(df : pd.DataFrame):
+
+def extract_time(df: pd.DataFrame):
     list_rags = list(df.columns)[2:]
     time = {}
     for rag in list_rags:
-        time[rag] = df[rag][0]['TIME']
+        time[rag] = df[rag][0]["TIME"]
     return time
+
 
 def impact_graph(session_state=None):
     if session_state is None:
@@ -638,24 +698,31 @@ def impact_graph(session_state=None):
     for rag in impacts.keys():
         data.append(
             {
-                "RAG Method" : session_state["all_rags"][host][rag],
-                "center" : (impacts[rag][0] + impacts[rag][1]) / 2,
-                "error" : (impacts[rag][0] - impacts[rag][1]) / 2
+                "RAG Method": session_state["all_rags"][host][rag],
+                "center": (impacts[rag][0] + impacts[rag][1]) / 2,
+                "error": (impacts[rag][0] - impacts[rag][1]) / 2,
             }
         )
-    
+
     fig = px.scatter(
         data,
         x="RAG Method",
         y="center",
         error_y="error",
         color="RAG Method",
-        color_discrete_sequence=color_discrete_sequence
+        color_discrete_sequence=color_discrete_sequence,
     )
-    fig.update_traces(marker=dict(size=16, symbol="square", line=dict(width=1, color="black")))
-    fig.update_layout(yaxis_title="Greenhouse gas emissions (gCO2eq)",
-                      title=dict(text="Greenhouse gas emissions estimations", x=0.5, xanchor="center"))
+    fig.update_traces(
+        marker=dict(size=16, symbol="square", line=dict(width=1, color="black"))
+    )
+    fig.update_layout(
+        yaxis_title="Greenhouse gas emissions (gCO2eq)",
+        title=dict(
+            text="Greenhouse gas emissions estimations", x=0.5, xanchor="center"
+        ),
+    )
     return fig
+
 
 def energy_graph(session_state=None):
     if session_state is None:
@@ -667,24 +734,29 @@ def energy_graph(session_state=None):
     for rag in energies.keys():
         data.append(
             {
-                "RAG Method" : session_state["all_rags"][host][rag],
-                "center" : (energies[rag][0] + energies[rag][1]) / 2,
-                "error" : (energies[rag][0] - energies[rag][1]) / 2
+                "RAG Method": session_state["all_rags"][host][rag],
+                "center": (energies[rag][0] + energies[rag][1]) / 2,
+                "error": (energies[rag][0] - energies[rag][1]) / 2,
             }
         )
-    
+
     fig = px.scatter(
         data,
         x="RAG Method",
         y="center",
         error_y="error",
         color="RAG Method",
-        color_discrete_sequence=color_discrete_sequence
+        color_discrete_sequence=color_discrete_sequence,
     )
-    fig.update_traces(marker=dict(size=16, symbol="square", line=dict(width=1, color="black")))
-    fig.update_layout(yaxis_title="Power used (kWh)",
-                      title=dict(text="Energy consumption estimations", x=0.5, xanchor="center"))
+    fig.update_traces(
+        marker=dict(size=16, symbol="square", line=dict(width=1, color="black"))
+    )
+    fig.update_layout(
+        yaxis_title="Power used (kWh)",
+        title=dict(text="Energy consumption estimations", x=0.5, xanchor="center"),
+    )
     return fig
+
 
 def time_graph(session_state=None):
     if session_state is None:
@@ -694,40 +766,35 @@ def time_graph(session_state=None):
     data = []
     host = session_state["config_server"]["params_host_llm"]["type"]
     for rag in raw_data:
-        rag_data = {"RAG Method" : session_state["all_rags"][host][rag],
-                    "Answering Time" : raw_data[rag]}
+        rag_data = {
+            "RAG Method": session_state["all_rags"][host][rag],
+            "Answering Time": raw_data[rag],
+        }
         data.append(rag_data)
 
     fig = px.bar(
         data,
-        x= "RAG Method",
+        x="RAG Method",
         y="Answering Time",
         color="RAG Method",
-        color_discrete_sequence=color_discrete_sequence
-
+        color_discrete_sequence=color_discrete_sequence,
     )
 
     fig.update_layout(
-            title=dict(text="Answering Time comparison", x=0.5, xanchor="center"),
-            legend={"title": {"text": ""}},
-            yaxis={"title": {"text": "Answering Time (s)"}}
-        )
+        title=dict(text="Answering Time comparison", x=0.5, xanchor="center"),
+        legend={"title": {"text": ""}},
+        yaxis={"title": {"text": "Answering Time (s)"}},
+    )
 
     return fig
 
+
 def clean_bench_df():
-    answers = pd.read_csv(st.session_state["benchmark"]["report_path"] + "/bench_df.csv")
-    rags = list(answers.columns[2:])
-    for rag in rags:
-        for i, query in enumerate(answers[rag]):
-            try:
-                query_dict = ast.literal_eval(query)
-                answers.loc[i, rag] = query_dict.get("ANSWER", "")
-            except Exception:
-                # fallback if parsing fails
-                answers.loc[i, rag] = ""
+    answers = pd.read_csv(
+        st.session_state["benchmark"]["report_path"] + "/bench_df.csv"
+    )
     return answers.to_excel(
         excel_writer=st.session_state["benchmark"]["report_path"] + "/answers.xlsx",
         sheet_name="answers",
-        engine="openpyxl"
+        engine="openpyxl",
     )

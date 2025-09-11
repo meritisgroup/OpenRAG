@@ -1,4 +1,5 @@
 import streamlit as st
+import re
 from backend.factory_RagAgent import (
     get_rag_agent,
     get_custom_rag_agent,
@@ -79,11 +80,13 @@ def reset_success_button():
     st.session_state["success"] = False
 
 
-def prepare_show_context(chunks: list[Chunk]):
+def clean_markdown(text: str) -> str:
+    return re.sub(r"\*{1,2}", "", text)
 
+def prepare_show_context(chunks: list[Chunk]):
     blocks = []
     for chunk in chunks:
-        cleaned_context = chunk.text
+        cleaned_context = clean_markdown(chunk.text)
         block = f"source : {chunk.document}\n\n{cleaned_context}"
         if chunk.rerank_score != None:
             block += f"\n\n Rerank score : {chunk.rerank_score}"

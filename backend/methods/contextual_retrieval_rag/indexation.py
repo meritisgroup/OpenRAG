@@ -42,7 +42,7 @@ class ContextualRetrievalIndexation:
         self.input_tokens = 0
         self.output_tokens = 0
 
-    def __batch_indexation__(self, doc_chunks: list[str], name_docs, path_docs):
+    def __batch_indexation__(self, doc_chunks: list[str], path_docs):
         """
         Adds a batch of chunks from doc_chunks to the indexation verctorbase
         Args:
@@ -55,7 +55,7 @@ class ContextualRetrievalIndexation:
         doc_tokens = 0
         elements = []
         for k, chunk in enumerate(doc_chunks):
-            elements.append(chunk.replace("\n", "").replace("'", ""))
+            elements.append(chunk.text.replace("\n", "").replace("'", ""))
 
         taille_batch = 500
         range_chunks = range(0, len(elements), taille_batch)
@@ -63,8 +63,7 @@ class ContextualRetrievalIndexation:
         j = 0
         for i in range_chunks:
             doc_tokens += np.sum(self.data_manager.add_str_batch_elements(
-                    elements=elements[i:i + taille_batch],
-                    docs_name=name_docs[i : i + taille_batch],
+                    chunks=doc_chunks[i : i + taille_batch],
                     path_docs=path_docs[i : i + taille_batch],
                     display_message=False
             ))
@@ -86,15 +85,15 @@ class ContextualRetrievalIndexation:
         doc_tokens = 0
         for k, chunk in enumerate(doc_chunks):
                 doc_tokens += self.data_manager.add_str_elements(
-                    elements=[chunk.replace("\n", "").replace("'", "")],
-                    docs_name=[name_docs[k]],
+                    chunks=[doc_chunks[k]],
                     path_docs=[path_docs[k]],
                     display_message=False,
                 )   
         return doc_tokens
 
     def run_pipeline(
-        self, batch: bool = True, size_limit : int = 16000
+        self, batch: bool = True, size_limit : int = 16000,
+        reset_preprocess: bool = False
     ) -> None:
         """
         Split texts from self.data_path, embed them and save them in a vector base.
@@ -123,8 +122,9 @@ class ContextualRetrievalIndexation:
             output_tokens = 0
             doc = DocumentText(path=path_doc,
                                doc_index=i,
-                               config_server={"data_preprocessing" : "pdf_text_extraction"},
-                               splitter=self.splitter)
+                               config_server=config_server,
+                               splitter=self.splitter,
+                               reset_preprocess=reset_preprocess)
             doc_content = doc.content
             size_limit_doc = []
             left = 0
@@ -138,14 +138,14 @@ class ContextualRetrievalIndexation:
 
             progress_bar_doc = ProgressBar(total=len(size_limit_doc))
             for j, little_doc in enumerate(size_limit_doc):
-                doc_chunks = []
-                name_docs = []
+                    doc_chunks = []
+                    name_docs = []
 
-                chunked_docs = splitter.split_text(little_doc)
-                for k in range(len(chunked_docs)):
-                    doc_chunks.append(Chunk(text=chunked_docs[k], document=path_doc+f"_{j}", id=k))
-                    name_docs.append(str(Path(path_doc).name)+f"_{j}")
-                try:
+                    chunked_docs = splitter.split_text(little_doc)
+                    for k in range(len(chunked_docs)):
+                        doc_chunks.append(Chunk(text=chunked_docs[k], document=path_doc+f"_{j}", id=k))
+                        name_docs.append(str(Path(path_doc).name)+f"_{j}")
+
                     name_docs = [str(Path(path_doc).name) for i in range(len(doc_chunks))]
                     path_docs = [str(Path(path_doc).parent) for i in range(len(doc_chunks))]
                     if batch:
@@ -157,7 +157,7 @@ class ContextualRetrievalIndexation:
                         input_tokens += chunk_with_context["nb_input_tokens"]
                         output_tokens += chunk_with_context["nb_output_tokens"]
                         embedding_tokens += self.__batch_indexation__(doc_chunks=chunk_with_context["texts"],
-                                                        name_docs=name_docs, path_docs=path_docs
+                                                                       path_docs=path_docs
                                 )
 
                     else:
@@ -172,9 +172,8 @@ class ContextualRetrievalIndexation:
                                     doc_chunks=chunk_with_context["texts"],
                                     name_docs=name_docs, path_docs=path_docs
                                 )
-                except:
-                    None
-                progress_bar_doc.update(j, text="Indexing {}, {}% done".format(path_doc,
+
+                    progress_bar_doc.update(j, text="Indexing {}, {}% done".format(path_doc,
                                                                                 np.round((j/len(size_limit_doc)*100), 2)))
             new_doc = Document(name=str(Path(path_doc).name),
                                path=str(Path(path_doc)),

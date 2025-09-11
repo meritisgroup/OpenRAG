@@ -195,12 +195,40 @@ class Merger_Database_Vectorbase:
     def find_vb_name(self, path_docs):
         return self.find_db_name_path(path=path_docs[0])
 
-    def delete_collection(self, vb_name: str = None) -> None:
+    def delete_collection(self, vb_name: str = None, name: str = None) -> None:
         if vb_name is not None:
-            self.vectorbases[vb_name]["vectorbase"].delete_collection()
+            if name is not None:
+                name_delete = vb_name + "_" + name
+            else:
+                name_delete = None
+            self.vectorbases[vb_name]["vectorbase"].delete_collection(vb_name=name_delete)
         else:
             for vb_name in self.vectorbases.keys():
-                self.vectorbases[vb_name]["vectorbase"].delete_collection()
+                if name is not None:
+                    name_delete = vb_name + "_" + name
+                else:
+                    name_delete = None
+                self.vectorbases[vb_name]["vectorbase"].delete_collection(vb_name=name_delete)
+
+    def create_collection(self, vb_name: str = None, name: str = None, add_fields=[]) -> None:
+        if vb_name is not None:
+            if name is not None:
+                name_create = vb_name + "_" + name
+            else:
+                name_create = vb_name
+            self.vectorbases[vb_name]["vectorbase"].create_collection(
+                name=name_create, add_fields=add_fields
+            )
+        else:
+            for vb_name in self.vectorbases.keys():
+                if name is not None:
+                    name_create = vb_name + "_" + name
+                else:
+                    name_create = vb_name
+
+                self.vectorbases[vb_name]["vectorbase"].create_collection(
+                    name=name_create, add_fields=add_fields
+                )
 
     def get_nb_token_embeddings(self, vb_name: str = None) -> None:
         if vb_name is not None:
@@ -212,18 +240,6 @@ class Merger_Database_Vectorbase:
                     "vectorbase"
                 ].get_nb_token_embeddings()
             return nb_token_embeddings
-
-    def create_collection(self, vb_name: str = None, name=None, add_fields=[]) -> None:
-        if vb_name is not None:
-            name = vb_name + "_" + name
-            self.vectorbases[vb_name]["vectorbase"].create_collection(
-                name=name, add_fields=add_fields
-            )
-        else:
-            for vb_name in self.vectorbases.keys():
-                self.vectorbases[vb_name]["vectorbase"].create_collection(
-                    name=name, add_fields=add_fields
-                )
 
     def add_str_elements(
         self,
@@ -565,7 +581,7 @@ class DataBase:
         all_files = [
             os.path.join(self.path_data, doc_name)
             for doc_name in all_files
-            if doc_name != "metadatas.json"
+            if doc_name != "metadatas.json" and not Path(os.path.join(self.path_data, doc_name)).is_dir()
         ]
         all_docs = [f for f in all_files]
         return all_docs

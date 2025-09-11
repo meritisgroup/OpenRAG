@@ -1,9 +1,11 @@
 import streamlit as st
-from streamlit_.utils.benchmark_funcs import (get_report_path,
-                                              run_indexation_benchmark,
-                                              generate_benchmark,
-                                              generate_answers,
-                                              generate_contexts)
+from streamlit_.utils.benchmark_funcs import (
+    get_report_path,
+    run_indexation_benchmark,
+    generate_benchmark,
+    generate_only_answers,
+    generate_only_contexts,
+)
 import subprocess
 import json
 import sys
@@ -13,12 +15,13 @@ import pickle
 import platform
 
 
-def task(reset_index, report_dir, type_bench, config_server,
+def task(reset_index, reset_preprocess, report_dir, type_bench, config_server,
          queries_doc_name, databases, session_state=None,
          background=False):
         
         rag_agents, rag_names = run_indexation_benchmark(
                                     reset_index=reset_index,
+                                    reset_preprocess=reset_preprocess,
                                     databases=databases,
                                     report_dir=report_dir,
                                     session_state=session_state
@@ -50,20 +53,20 @@ def task(reset_index, report_dir, type_bench, config_server,
                             markdown_text += f"- {db}\n"
                         st.markdown(markdown_text)
 
-        if not background:     
-            st.session_state["benchmark_clicked"] = False
-            st.set_option("client.showSidebarNavigation", True)
-            st.rerun()
+    if not background:
+        st.session_state["benchmark_clicked"] = False
+        st.set_option("client.showSidebarNavigation", True)
+        st.rerun()
 
 
-def run_benchmark(type_bench, reset_index=False, background=False):
+def run_benchmark(type_bench, reset_index=False, reset_preprocess=False, background=False):
     rag_to_run = [
-            rag
-            for rag in st.session_state["benchmark"]["rags"].keys()
-            if st.session_state["benchmark"]["rags"][rag]
-        ]
-    if len(rag_to_run)>1 or type_bench!="full_bench":
-        databases = st.session_state['benchmark_database']
+        rag
+        for rag in st.session_state["benchmark"]["rags"].keys()
+        if st.session_state["benchmark"]["rags"][rag]
+    ]
+    if len(rag_to_run) > 1 or type_bench != "full_bench":
+        databases = st.session_state["benchmark_database"]
         report_dir = get_report_path()
         config_server = st.session_state["config_server"]
         queries_doc_name = st.session_state["benchmark"]["queries_doc_name"]
@@ -78,14 +81,17 @@ def run_benchmark(type_bench, reset_index=False, background=False):
             session_state = dict(st.session_state)
 
             script_path = os.path.abspath(__file__)
-            session_state_file = os.path.join(os.path.dirname(script_path), 
-                                              "session_state_background.pkl")
+            session_state_file = os.path.join(
+                os.path.dirname(script_path), "session_state_background.pkl"
+            )
             with open(session_state_file, "wb") as f:
                 pickle.dump(session_state, f)
-            
+
             python_exe = sys.executable
-            
-            project_root = os.path.dirname(os.path.dirname(os.path.dirname(script_path)))
+
+            project_root = os.path.dirname(
+                os.path.dirname(os.path.dirname(script_path))
+            )
             env = os.environ.copy()
             env["PYTHONUTF8"] = "1"
             env["PYTHONPATH"] = project_root + os.pathsep + env.get("PYTHONPATH", "")
@@ -94,6 +100,7 @@ def run_benchmark(type_bench, reset_index=False, background=False):
                 python_exe,
                 script_path,
                 "--reset_index", str(reset_index),
+                "--reset_preprocess", str(reset_preprocess),
                 "--report_dir", report_dir,
                 "--type_bench", type_bench,
                 "--config_server", config_server_str,
@@ -108,8 +115,8 @@ def run_benchmark(type_bench, reset_index=False, background=False):
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                     stdin=subprocess.DEVNULL,
-                    preexec_fn=os.setpgrp, 
-                    close_fds=True
+                    preexec_fn=os.setpgrp,
+                    close_fds=True,
                 )
 
             elif system == "Windows":
@@ -121,10 +128,11 @@ def run_benchmark(type_bench, reset_index=False, background=False):
                     stderr=log_f,
                     stdin=subprocess.DEVNULL,
                     close_fds=True,
-                    creationflags=DETACHED_PROCESS 
+                    creationflags=DETACHED_PROCESS,
                 )
         else:
             task(reset_index=reset_index,
+                 reset_preprocess=reset_preprocess,
                  report_dir=report_dir,
                  type_bench=type_bench,
                  config_server=config_server,
@@ -139,18 +147,19 @@ def run_benchmark(type_bench, reset_index=False, background=False):
         st.error("Choose at least 2 rags methods")
 
 
-
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Run benchmark task in background.")
     parser.add_argument("--reset_index", type=str, default="False")
+    parser.add_argument("--reset_preprocess", type=str, default="False")
     parser.add_argument("--report_dir", type=str, required=True)
     parser.add_argument("--type_bench", type=str, required=True)
     parser.add_argument("--config_server", type=str, required=True)
     parser.add_argument("--session_state_file", type=str, required=True)
     parser.add_argument("--queries_doc_name", type=str, required=True)
-    parser.add_argument("--databases", type=str, required=True,
-                         help="Comma-separated list of databases")
+    parser.add_argument(
+        "--databases", type=str, required=True, help="Comma-separated list of databases"
+    )
 
     args = parser.parse_args()
 
@@ -163,11 +172,13 @@ if __name__ == "__main__":
     with open(args.session_state_file, "rb") as f:
         session_state = pickle.load(f)
 
-    task(reset_index=reset_index,
+    task(
+        reset_index=reset_index,
         report_dir=args.report_dir,
         type_bench=args.type_bench,
         config_server=config_server,
         queries_doc_name=args.queries_doc_name,
         databases=databases,
         session_state=session_state,
-        background=True)
+        background=True,
+    )

@@ -1,4 +1,0 @@
-{"model": "gemma2:9b",
-"embedding_model": "mxbai-embed-large:latest",
-"language": "EN",
-"type_retrieval": "embeddings"}

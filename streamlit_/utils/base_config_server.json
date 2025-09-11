@@ -2,7 +2,7 @@
     "storage_path": "./storage",
     "storage_data_path": "./data/databases",
     "params_host_llm": {
-        "url": "http://localhost:11436/v1",
+        "url": null,
         "type": "ollama",
         "api_key": null
     },
@@ -23,7 +23,7 @@
     "type_retrieval": "embeddings",
     "TextSplitter": "TextSplitter",
     "reformulate_query": false,
-    "reranker_model": "gemma3:12b",
+    "reranker_model": "gemma3:1b",
     "max_attempts": 5,
     "nb_chunks": 30,
     "nb_chunks_reranker": 20,
@@ -34,7 +34,7 @@
         "type": "ollama",
         "api_key": null
     },
-    "data_preprocessing": "pdf_text_extraction",
+    "data_preprocessing": "md_with_images",
     "local_params": {
         "forced_system_prompt": false,
         "generation_system_prompt_name": "default"
