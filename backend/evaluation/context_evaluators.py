@@ -1,9 +1,12 @@
-from .base_classes import Evaluator, StatementSupported
+from .base_classes import Evaluator, StatementSupported, ChunkRelevanceAnswer
 from .utils import process_prompt, process_prompt_to_json
 import numpy as np
 import re
 from ..utils.agent import Agent
 from .prompts import PROMPTS
+from ..database.rag_classes import Chunk
+from statistics import fmean
+
 
 
 class ContextRelevanceEvaluator(Evaluator):
@@ -94,16 +97,16 @@ class ContextFaithfulnessEvaluator(Evaluator):
     def __init__(
         self,
         agent: Agent,
-        max_attemps: int = 5,
+        max_attempts: int = 5,
         batch_size: int = 10,
     ) -> None:
         """
         This class enables to rate RAG agents thanks to LLM as a judge method from given question where answers are already known.
         model : LLM used to judge the RAG
         """
-        super().__init__(agent, max_attemps, batch_size)
+        super().__init__(agent, max_attempts, batch_size)
         self.agent = agent
-        self.max_attempts = max_attemps
+        self.max_attempts = max_attempts
 
         # Templates to retrieve statements from queries and their answers
         self.system_prompt_statements: str = PROMPTS[self.language]["get_statements"][
@@ -239,3 +242,113 @@ class ContextFaithfulnessEvaluator(Evaluator):
                     return None
 
         return int(mean_score * 100) if valid_queries > 0 else None
+
+
+
+
+
+
+class nDCGEvaluator(Evaluator):
+
+    def __init__(self, agent: Agent, max_attempts=5, batch_size: int = 10) -> None:
+
+        super().__init__(agent=agent, max_attempts=max_attempts, batch_size=batch_size)
+        self.language = agent.language
+        self.system_prompt = PROMPTS[self.language]["rate_chunk_relevance"][
+            "SYSTEM_PROMPT"
+        ]
+        self.prompt_template = PROMPTS[self.language]["rate_chunk_relevance"][
+            "QUERY_TEMPLATE"]
+
+    def _get_prompts(
+        self,
+        queries: list[str],
+        answers: list[str],
+        contexts: list[list[Chunk]],
+    ) -> list[list[tuple[str, str]]]:
+        
+
+        system_prompt = self.system_prompt
+        template = self.prompt_template
+
+
+        all_prompts: list[list[tuple[str, str]]] = []
+        
+        for query, answer, chunk_list in zip(queries, answers, contexts):
+            per_query: list[tuple[str, str]] = []
+            for chunk in chunk_list:
+                prompt = (
+                    template
+                    .replace("{query}", str(query))
+                    .replace("{answer}", str(answer))
+                    .replace("{chunk}", chunk.text))
+                per_query.append((prompt, system_prompt))
+            all_prompts.append(per_query)
+            
+
+        return all_prompts
+
+
+    def rate_context(self, queries: list[str], answers: list[str], contexts: list[list[Chunk]]) -> list[list[int | None]]:
+
+       
+        
+        scores=[]
+        all_prompts=self._get_prompts(queries, answers, contexts)
+        for per_query in all_prompts:
+            per_query_score=[]
+            for (prompt, system_prompt) in per_query:
+                score_chunk=process_prompt_to_json(
+                prompt, system_prompt, self.max_attempts, self.agent, ChunkRelevanceAnswer).score
+                per_query_score.append(score_chunk)
+            scores.append(per_query_score)
+
+
+        return scores
+    
+
+
+    
+    def _dcg(self,vals: list[int]) -> float:
+            total = 0.0
+            for i, rel in enumerate(vals, start=1):
+                r = 0 if rel is None else int(rel)
+                total += (2**r - 1) / np.log2(i + 1)
+            return total
+
+
+
+
+
+
+    def calculate_dcg(self, scores:list[list[int | None]] ) -> list[float]:
+
+
+
+        ndcgs: list[float] = []
+        for rels in scores:
+            if not rels:
+                ndcgs.append(0.0)
+                continue
+            num = self._dcg(rels)
+            ideal = self._dcg(sorted((0 if r is None else int(r) for r in rels), reverse=True))
+            ndcgs.append(num / ideal if ideal > 0 else 0.0)
+
+        return ndcgs
+
+      
+
+       
+
+    def run_evaluation_pipeline(
+
+        self, queries: list[str], answers: list[str], contexts: list[list[Chunk]]
+
+    ) -> float :
+
+       
+
+        scores=self.rate_context(queries=queries, answers=answers, contexts=contexts)
+
+        ndcgs=self.calculate_dcg(scores=scores)
+        return fmean(ndcgs) if ndcgs else 0.0

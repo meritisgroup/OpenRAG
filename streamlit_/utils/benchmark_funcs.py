@@ -10,6 +10,7 @@ import os
 from datetime import datetime
 import json
 import numpy as np
+import ast
 
 from streamlit_.utils.chat_funcs import get_chat_agent
 from backend.utils.progress import ProgressBar
@@ -58,7 +59,8 @@ def run_indexation_benchmark(reset_index, databases,
                      "Arena Battles": 0.0,
                      "Ground Truth comparison": 0.0,
                      "Context faithfulness": 0.0,
-                     "context relevance": 0.0}
+                     "context relevance": 0.0,
+                     "nDCG score": 0.0}
         with open(log_file, "w") as f:
             json.dump(data_logs, f)
     else:
@@ -124,7 +126,8 @@ def generate_answers(rag_names, rag_agents, report_dir):
                         "Arena Battles": 0.0,
                         "Ground Truth comparison": 0.0,
                         "Context faithfulness": 0.0,
-                        "context relevance": 0.0}, f)
+                        "context relevance": 0.0,
+                        "nDCG score": 0.0}, f)
     dataframe_preparator.run_all_queries(options_generation={"type_generation": "simple_generation"},
                                          log_file=log_file)
     df = dataframe_preparator.get_dataframe()
@@ -145,7 +148,8 @@ def generate_contexts(rag_names, rag_agents, report_dir):
                         "Arena Battles": 0.0,
                         "Ground Truth comparison": 0.0,
                         "Context faithfulness": 0.0,
-                        "context relevance": 0.0}, f)
+                        "context relevance": 0.0,
+                        "nDCG score": 0.0}, f)
     dataframe_preparator.run_all_queries(options_generation={"type_generation": "no_generation"},
                                          log_file=log_file)
     df = dataframe_preparator.get_dataframe()
@@ -181,6 +185,7 @@ def show_benchmark(results, session_state=None):
         session_state["benchmark"]["ground_truth"],
         session_state["benchmark"]["context_faithfulness"],
         session_state["benchmark"]["context_relevance"],
+        session_state["benchmark"]["ndcg_score"]
     ) = results["evals"]
     session_state["benchmark"]["ground_truth"] = results["ground_truth_scores"]
     session_state["benchmark"]["arena_matrix"] = results["arena_scores"]
@@ -234,7 +239,8 @@ def generate_benchmark(rag_names,
                         "Arena Battles": 0.0,
                         "Ground Truth comparison": 0.0,
                         "Context faithfulness": 0.0,
-                        "context relevance": 0.0}, f)
+                        "context relevance": 0.0,
+                        "nDCG score": 0.0}, f)
 
     dataframe_preparator = DataFramePreparator(rag_agents=rag_agents,
                                                rags_available=rag_names,
@@ -375,6 +381,7 @@ def context_graph(session_state=None):
 
     faithfulness = session_state["benchmark"]["context_faithfulness"]
     relevance = session_state["benchmark"]["context_relevance"]
+    ndcg= session_state["benchmark"]["ndcg_score"]
 
     ticksval = []
     data = []
@@ -389,6 +396,14 @@ def context_graph(session_state=None):
                 "RAG Method": rag,
                 "Score": faithfulness[rag],
                 "Metric": "Context Faithfulness",
+            }
+        )
+    for rag in ndcg.keys():
+        data.append(
+            {
+                "RAG Method": rag,
+                "Score": ndcg[rag],
+                "Metric": "Context nDCG Score",
             }
         )
     host = session_state["config_server"]["params_host_llm"]["type"]
@@ -704,7 +719,15 @@ def clean_bench_df():
     answers = pd.read_csv(st.session_state["benchmark"]["report_path"] + "/bench_df.csv")
     rags = list(answers.columns[2:])
     for rag in rags:
-        for i,query in enumerate(answers[rag]):
-            query = eval(query)
-            answers.loc[i, rag] = query["ANSWER"]
-    return answers.to_excel(excel_writer=st.session_state["benchmark"]["report_path"] +"/answers.xlsx", sheet_name="answers", engine="openpyxl")
+        for i, query in enumerate(answers[rag]):
+            try:
+                query_dict = ast.literal_eval(query)
+                answers.loc[i, rag] = query_dict.get("ANSWER", "")
+            except Exception:
+                # fallback if parsing fails
+                answers.loc[i, rag] = ""
+    return answers.to_excel(
+        excel_writer=st.session_state["benchmark"]["report_path"] + "/answers.xlsx",
+        sheet_name="answers",
+        engine="openpyxl"
+    )
