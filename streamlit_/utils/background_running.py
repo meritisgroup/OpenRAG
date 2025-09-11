@@ -15,43 +15,52 @@ import pickle
 import platform
 
 
-def task(reset_index, reset_preprocess, report_dir, type_bench, config_server,
-         queries_doc_name, databases, session_state=None,
-         background=False):
-        
-        rag_agents, rag_names = run_indexation_benchmark(
-                                    reset_index=reset_index,
-                                    reset_preprocess=reset_preprocess,
-                                    databases=databases,
-                                    report_dir=report_dir,
-                                    session_state=session_state
-                                )
-        with st.spinner(
-                f"**Generating benchmark for the following RAGs:** {rag_names}",
-                show_time=True,
-            ):
-            if len(rag_agents) > 1:
-                if type_bench=="answers":
-                    generate_answers(rag_names, rag_agents,
-                                    report_dir=report_dir)
-                elif type_bench=="contexts":
-                    generate_contexts(rag_names=rag_names,
-                                    rag_agents=rag_agents,
-                                    report_dir=report_dir)
-                elif type_bench=="full_bench":
-                    generate_benchmark(rag_names,
-                                    rag_agents,
-                                    databases=databases,
-                                    config_server=config_server,
-                                    report_dir=report_dir,
-                                    queries_doc_mane=queries_doc_name,
-                                    session_state=session_state)
-                    if not background:
-                        databases = st.session_state['benchmark_database']
-                        markdown_text = "Benchmark runned on the following database:\n"
-                        for db in databases:
-                            markdown_text += f"- {db}\n"
-                        st.markdown(markdown_text)
+def task(
+    reset_index,
+    reset_preprocess,
+    report_dir,
+    type_bench,
+    config_server,
+    queries_doc_name,
+    databases,
+    session_state=None,
+    background=False,
+):
+
+    rag_agents, rag_names = run_indexation_benchmark(
+        reset_index=reset_index,
+        reset_preprocess=reset_preprocess,
+        databases=databases,
+        report_dir=report_dir,
+        session_state=session_state,
+    )
+    with st.spinner(
+        f"**Generating benchmark for the following RAGs:** {rag_names}",
+        show_time=True,
+    ):
+        if len(rag_agents) > 1:
+            if type_bench == "answers":
+                generate_only_answers(rag_names, rag_agents, report_dir=report_dir)
+            elif type_bench == "contexts":
+                generate_only_contexts(
+                    rag_names=rag_names, rag_agents=rag_agents, report_dir=report_dir
+                )
+            elif type_bench == "full_bench":
+                generate_benchmark(
+                    rag_names,
+                    rag_agents,
+                    databases=databases,
+                    config_server=config_server,
+                    report_dir=report_dir,
+                    queries_doc_mane=queries_doc_name,
+                    session_state=session_state,
+                )
+                if not background:
+                    databases = st.session_state["benchmark_database"]
+                    markdown_text = "Benchmark runned on the following database:\n"
+                    for db in databases:
+                        markdown_text += f"- {db}\n"
+                    st.markdown(markdown_text)
 
     if not background:
         st.session_state["benchmark_clicked"] = False
@@ -59,7 +68,9 @@ def task(reset_index, reset_preprocess, report_dir, type_bench, config_server,
         st.rerun()
 
 
-def run_benchmark(type_bench, reset_index=False, reset_preprocess=False, background=False):
+def run_benchmark(
+    type_bench, reset_index=False, reset_preprocess=False, background=False
+):
     rag_to_run = [
         rag
         for rag in st.session_state["benchmark"]["rags"].keys()
@@ -99,14 +110,22 @@ def run_benchmark(type_bench, reset_index=False, reset_preprocess=False, backgro
             args = [
                 python_exe,
                 script_path,
-                "--reset_index", str(reset_index),
-                "--reset_preprocess", str(reset_preprocess),
-                "--report_dir", report_dir,
-                "--type_bench", type_bench,
-                "--config_server", config_server_str,
-                "--queries_doc_name", queries_doc_name,
-                "--databases", databases_str,
-                "--session_state_file", session_state_file
+                "--reset_index",
+                str(reset_index),
+                "--reset_preprocess",
+                str(reset_preprocess),
+                "--report_dir",
+                report_dir,
+                "--type_bench",
+                type_bench,
+                "--config_server",
+                config_server_str,
+                "--queries_doc_name",
+                queries_doc_name,
+                "--databases",
+                databases_str,
+                "--session_state_file",
+                session_state_file,
             ]
             if system in ("Linux", "Darwin"):
                 process = subprocess.Popen(
@@ -131,14 +150,16 @@ def run_benchmark(type_bench, reset_index=False, reset_preprocess=False, backgro
                     creationflags=DETACHED_PROCESS,
                 )
         else:
-            task(reset_index=reset_index,
-                 reset_preprocess=reset_preprocess,
-                 report_dir=report_dir,
-                 type_bench=type_bench,
-                 config_server=config_server,
-                 queries_doc_name=queries_doc_name,
-                 databases=databases)
-            
+            task(
+                reset_index=reset_index,
+                reset_preprocess=reset_preprocess,
+                report_dir=report_dir,
+                type_bench=type_bench,
+                config_server=config_server,
+                queries_doc_name=queries_doc_name,
+                databases=databases,
+            )
+
         st.session_state["benchmark_clicked"] = False
         st.set_option("client.showSidebarNavigation", True)
         st.rerun()
