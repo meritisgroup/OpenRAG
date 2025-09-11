@@ -1,10 +1,14 @@
 from ..utils.agent import Agent
 from .end_to_end_evaluators import MetricComparaison, GroundTruthComparison
-from .context_evaluators import ContextFaithfulnessEvaluator, ContextRelevanceEvaluator
+from .context_evaluators import ContextFaithfulnessEvaluator, ContextRelevanceEvaluator, nDCGEvaluator
 from .prompts import PROMPTS
 from ..utils.progress import ProgressBar
 from ..methods.naive_rag.indexation import concat_chunks
 from backend.database.rag_classes import Chunk
+from ..database.rag_classes import Chunk
+
+from ..methods.naive_rag.indexation import concat_chunks
+
 import pandas as pd
 import json
 import numpy as np
@@ -289,7 +293,7 @@ class ContextFaithfulnessComparator:
 
         self.agent = agent
         self.evaluator = ContextFaithfulnessEvaluator(
-            agent=self.agent, max_attemps=max_attempts, batch_size=batch_size
+            agent=self.agent, max_attempts=max_attempts, batch_size=batch_size
         )
         self.eval_number = eval_number
 
@@ -303,9 +307,13 @@ class ContextFaithfulnessComparator:
         ]
         self.ground_truth = dataframe["GROUND_TRUTH"].tolist()
 
-    def process_evaluation(self, answers: list[str], contexts: list[Chunk]):
+    def process_evaluation(self, answers: list[str], contexts: list[list[Chunk]]):
         final_scores = 0
         mean = 0
+
+        model_contexts = [concat_chunks(context) for context in contexts]
+
+        model_contexts = [concat_chunks(context) for context in contexts]
 
         model_contexts = [concat_chunks(context) for context in contexts]
         for eval_idx in range(self.eval_number):
@@ -347,3 +355,82 @@ class ContextFaithfulnessComparator:
 
         progress_bar.success("Context faithfulness evaluations done")
         return all_scores
+    
+
+class nDCGComparator:
+
+    def __init__(
+        self,
+        dataframe: pd.DataFrame,
+        agent: Agent,
+        eval_number=1,
+        max_attempts=5,
+        batch_size=10,
+    ):
+
+        self.agent = agent
+        self.evaluator = nDCGEvaluator(
+            agent=self.agent, max_attempts=max_attempts, batch_size=batch_size
+        )
+        self.eval_number = eval_number
+
+        self.dataframe = dataframe
+        self.queries = dataframe["QUERIES"].tolist()
+
+        self.rag_list = [
+            col
+            for col in dataframe.columns
+            if col != "QUERIES" and col != "GROUND_TRUTH"
+        ]
+        self.ground_truth = dataframe["GROUND_TRUTH"].tolist()
+
+    def process_evaluation(self, answers: list[str], contexts: list[list[dict]]):
+        final_scores = 0
+        mean = 0
+
+        for eval_idx in range(self.eval_number):
+
+            result = self.evaluator.run_evaluation_pipeline(
+                self.queries, answers, contexts
+            )
+
+            try:
+                final_scores = (result + mean * eval_idx) / (eval_idx + 1)
+            except Exception:
+                continue
+
+        return final_scores
+
+    def run_evaluations(self, log_file):
+        with open(log_file, "r") as f:
+            data_logs = json.load(f)
+
+        num_rags = len(self.rag_list)
+        all_scores = {f"{rag}": 0.0 for rag in self.rag_list}
+
+        progress_bar = ProgressBar(
+            total=num_rags, desc="nDCG comparison progress"
+        )
+        n = len(self.rag_list)
+        for i, rag in enumerate(self.rag_list):
+            progress_bar.update(
+                i - 1,
+                text=f"Processing nDCG evaluations for {rag} rag ({i+1} / {n})",
+            )
+            contexts = [row["CONTEXT"] for row in self.dataframe[rag]]
+            
+            if all(context == [] for context in contexts): #to deal with the empty contexts of the naive chatbot 
+                score=0
+            else:
+                score = self.process_evaluation(self.ground_truth, contexts)
+            all_scores[rag] = score*100
+
+            data_logs["nDCG score"] = int(((i+1)/n)*100)
+            with open(log_file, "w") as f:
+                json.dump(data_logs, f)
+
+        progress_bar.success("nDCG evaluations done")
+        return all_scores
+
+
+
