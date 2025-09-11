@@ -42,25 +42,23 @@ def get_folder_saved_benchmark():
     return folder_bench
 
 
-
-
-def run_indexation_benchmark(reset_index,
-                             reset_preprocess, 
-                             databases, 
-                             report_dir,
-                             session_state=None):
+def run_indexation_benchmark(
+    reset_index, reset_preprocess, databases, report_dir, session_state=None
+):
     if session_state is None:
         session_state = st.session_state
 
     log_file = os.path.join(report_dir, "logs.json")
     if not os.path.exists(log_file):
-        data_logs = {"indexation": 0.0,
-                     "answers": 0.0,
-                     "Arena Battles": 0.0,
-                     "Ground Truth comparison": 0.0,
-                     "Context faithfulness": 0.0,
-                     "context relevance": 0.0,
-                     "nDCG score": 0.0}
+        data_logs = {
+            "indexation": 0.0,
+            "answers": 0.0,
+            "Arena Battles": 0.0,
+            "Ground Truth comparison": 0.0,
+            "Context faithfulness": 0.0,
+            "context relevance": 0.0,
+            "nDCG score": 0.0,
+        }
         with open(log_file, "w") as f:
             json.dump(data_logs, f)
     else:
@@ -79,11 +77,12 @@ def run_indexation_benchmark(reset_index,
         indexation_progress_bar = ProgressBar(progress_bar_iterable)
         for i, rag in enumerate(indexation_progress_bar.iterable):
             if session_state["benchmark"]["rags"][rag]:
-                rag_agent = get_chat_agent(rag,
-                                           databases_name=databases,
-                                           session_state=session_state)
-                rag_agent.indexation_phase(reset_index=reset_index,
-                                           reset_preprocess=reset_preprocess)
+                rag_agent = get_chat_agent(
+                    rag, databases_name=databases, session_state=session_state
+                )
+                rag_agent.indexation_phase(
+                    reset_index=reset_index, reset_preprocess=reset_preprocess
+                )
                 if reset_preprocess:
                     reset_preprocess = False
 
@@ -142,15 +141,21 @@ def generate_only_answers(rag_names, rag_agents, report_dir):
     log_file = os.path.join(report_dir, "logs.json")
     if not os.path.exists(log_file):
         with open(log_file, "w") as f:
-            json.dump({"indexation": 0.0,
-                       "answers": 0.0,
-                        "Arena Battles": 0.0,
-                        "Ground Truth comparison": 0.0,
-                        "Context faithfulness": 0.0,
-                        "context relevance": 0.0,
-                        "nDCG score": 0.0}, f)
-    dataframe_preparator.run_all_queries(options_generation={"type_generation": "simple_generation"},
-                                         log_file=log_file)
+            json.dump(
+                {
+                    "indexation": 0.0,
+                    "answers": 0.0,
+                    "Arena Battles": 0.0,
+                    "Ground Truth comparison": 0.0,
+                    "Context faithfulness": 0.0,
+                    "context relevance": 0.0,
+                    "nDCG score": 0.0,
+                },
+                f,
+            )
+    dataframe_preparator.run_all_queries(
+        options_generation={"type_generation": "simple_generation"}, log_file=log_file
+    )
     df = dataframe_preparator.get_dataframe()
     df.to_csv(os.path.join(get_report_path(), "bench_df.csv"), index=False)
 
@@ -182,15 +187,21 @@ def generate_only_contexts(rag_names, rag_agents, report_dir):
     log_file = os.path.join(report_dir, "logs.json")
     if not os.path.exists(log_file):
         with open(log_file, "w") as f:
-            json.dump({"indexation": 0.0,
-                       "answers": 0.0,
-                        "Arena Battles": 0.0,
-                        "Ground Truth comparison": 0.0,
-                        "Context faithfulness": 0.0,
-                        "context relevance": 0.0,
-                        "nDCG score": 0.0}, f)
-    dataframe_preparator.run_all_queries(options_generation={"type_generation": "no_generation"},
-                                         log_file=log_file)
+            json.dump(
+                {
+                    "indexation": 0.0,
+                    "answers": 0.0,
+                    "Arena Battles": 0.0,
+                    "Ground Truth comparison": 0.0,
+                    "Context faithfulness": 0.0,
+                    "context relevance": 0.0,
+                    "nDCG score": 0.0,
+                },
+                f,
+            )
+    dataframe_preparator.run_all_queries(
+        options_generation={"type_generation": "no_generation"}, log_file=log_file
+    )
     df = dataframe_preparator.get_dataframe()
     df.to_csv(os.path.join(get_report_path(), "contexts_df.csv"), index=False)
 
@@ -223,7 +234,7 @@ def show_benchmark(results, session_state=None):
         session_state["benchmark"]["ground_truth"],
         session_state["benchmark"]["context_faithfulness"],
         session_state["benchmark"]["context_relevance"],
-        session_state["benchmark"]["ndcg_score"]
+        session_state["benchmark"]["ndcg_score"],
     ) = results["evals"]
     session_state["benchmark"]["ground_truth"] = results["ground_truth_scores"]
     session_state["benchmark"]["arena_matrix"] = results["arena_scores"]
@@ -279,13 +290,18 @@ def generate_benchmark(
     log_file = os.path.join(report_dir, "logs.json")
     if not os.path.exists(log_file):
         with open(log_file, "w") as f:
-            json.dump({"indexation": 0.0,
-                       "answers": 0.0,
-                        "Arena Battles": 0.0,
-                        "Ground Truth comparison": 0.0,
-                        "Context faithfulness": 0.0,
-                        "context relevance": 0.0,
-                        "nDCG score": 0.0}, f)
+            json.dump(
+                {
+                    "indexation": 0.0,
+                    "answers": 0.0,
+                    "Arena Battles": 0.0,
+                    "Ground Truth comparison": 0.0,
+                    "Context faithfulness": 0.0,
+                    "context relevance": 0.0,
+                    "nDCG score": 0.0,
+                },
+                f,
+            )
 
     dataframe_preparator = DataFramePreparator(
         rag_agents=rag_agents,
@@ -438,7 +454,7 @@ def context_graph(session_state=None):
 
     faithfulness = session_state["benchmark"]["context_faithfulness"]
     relevance = session_state["benchmark"]["context_relevance"]
-    ndcg= session_state["benchmark"]["ndcg_score"]
+    ndcg = session_state["benchmark"]["ndcg_score"]
 
     ticksval = []
     data = []
