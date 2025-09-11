@@ -29,6 +29,11 @@ class GroundTruthAnswer(BaseModel):
     score: int
 
 
+
+class ChunkRelevanceAnswer(BaseModel):
+    score: int
+
+
 class ContextFaithfulnessAnswer(BaseModel):
     statements: list[str]
 
