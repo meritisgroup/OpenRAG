@@ -3,6 +3,8 @@ from .end_to_end_evaluators import MetricComparaison, GroundTruthComparison
 from .context_evaluators import ContextFaithfulnessEvaluator, ContextRelevanceEvaluator, nDCGEvaluator
 from .prompts import PROMPTS
 from ..utils.progress import ProgressBar
+from ..methods.naive_rag.indexation import concat_chunks
+from backend.database.rag_classes import Chunk
 from ..database.rag_classes import Chunk
 
 from ..methods.naive_rag.indexation import concat_chunks
@@ -113,7 +115,9 @@ class ArenaBattle:
                     text=f"Arena Battles Progress ({k+1} / {int(num_rags * int((num_rags - 1))/2)})",
                 )
                 k += 1
-                data_logs["Arena Battles"] = int(((k+1) / (int(num_rags * int((num_rags - 1))/2)))*100)
+                data_logs["Arena Battles"] = int(
+                    ((k + 1) / (int(num_rags * int((num_rags - 1)) / 2))) * 100
+                )
                 with open(log_file, "w") as f:
                     json.dump(data_logs, f)
         self.all_scores_dict = all_scores_dict
@@ -193,7 +197,7 @@ class GroundTruthComparator:
                 all_scores[metric][i] = scores[metric]
                 all_scores_dict[rag][metric] = scores[metric]
 
-            data_logs["Ground Truth comparison"] = int(((i+1)/n)*100)
+            data_logs["Ground Truth comparison"] = int(((i + 1) / n) * 100)
             with open(log_file, "w") as f:
                 json.dump(data_logs, f)
 
@@ -229,12 +233,11 @@ class ContextRelevanceComparator:
             if col != "QUERIES" and col != "GROUND_TRUTH"
         ]
 
-    def process_evaluation(self, contexts):
+    def process_evaluation(self, contexts: list[list[Chunk]]):
         final_scores = 0
         mean = 0
 
         model_contexts = [concat_chunks(context) for context in contexts]
-
         for eval_idx in range(self.eval_number):
 
             result = self.evaluator.run_evaluation_pipeline(
@@ -269,7 +272,7 @@ class ContextRelevanceComparator:
 
             all_scores[rag] = score
 
-            data_logs["context relevance"] = int(((i+1)/n)*100)
+            data_logs["context relevance"] = int(((i + 1) / n) * 100)
             with open(log_file, "w") as f:
                 json.dump(data_logs, f)
 
@@ -310,6 +313,9 @@ class ContextFaithfulnessComparator:
 
         model_contexts = [concat_chunks(context) for context in contexts]
 
+        model_contexts = [concat_chunks(context) for context in contexts]
+
+        model_contexts = [concat_chunks(context) for context in contexts]
         for eval_idx in range(self.eval_number):
 
             result = self.evaluator.run_evaluation_pipeline(
@@ -343,7 +349,7 @@ class ContextFaithfulnessComparator:
             score = self.process_evaluation(self.ground_truth, contexts)
             all_scores[rag] = score
 
-            data_logs["Context faithfulness"] = int(((i+1)/n)*100)
+            data_logs["Context faithfulness"] = int(((i + 1) / n) * 100)
             with open(log_file, "w") as f:
                 json.dump(data_logs, f)
 

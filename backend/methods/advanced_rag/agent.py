@@ -4,7 +4,7 @@ Created on Thu Feb  6 16:37:47 2025
 
 @author: chardy
 """
-from .indexation import NaiveRagIndexation
+from .indexation import AdvancedIndexation
 from ..naive_rag.indexation import contexts_to_prompts
 from ..naive_rag.agent import NaiveRagAgent
 from ..naive_rag.query import NaiveSearch
@@ -63,6 +63,7 @@ class AdvancedRag(NaiveRagAgent):
     def indexation_phase(
         self,
         reset_index: bool = False,
+        reset_preprocess: bool = False,
         overlap: bool = True,
     ) -> None:
         """
@@ -72,11 +73,14 @@ class AdvancedRag(NaiveRagAgent):
             overlap (bool) : Wether chunks overlap each other
 
         """
+        if reset_preprocess:
+            reset_index = True
+            
         if reset_index:
             self.data_manager.delete_collection()
             self.data_manager.clean_database()
 
-        index = NaiveRagIndexation(
+        index = AdvancedIndexation(
             data_manager=self.data_manager,
             type_text_splitter=self.type_text_splitter,
             agent=self.agent,
@@ -89,7 +93,8 @@ class AdvancedRag(NaiveRagAgent):
             chunk_size=self.chunk_size,
             chunk_overlap=overlap,
             batch=self.params_vectorbase["batch"],
-            config_server=self.config_server
+            config_server=self.config_server,
+            reset_preprocess=reset_preprocess
         )
 
         return None
@@ -186,15 +191,6 @@ class AdvancedRag(NaiveRagAgent):
             "impacts": impact,
             "energy": energies,
         }
-
-    # def get_rag_contexts(self, queries: list[str], nb_chunks: int = 5):
-    #     contexts = []
-    #     names_docs = []
-    #     for query in queries:
-    #         context, name_docs = self.get_rag_context(query=query, nb_chunks=nb_chunks)
-    #         contexts.append(context)
-    #         names_docs.append(name_docs)
-    #     return contexts, names_docs
 
     def generate_answers(
         self, queries: list[str], nb_chunks: int = 2, options_generation=None

@@ -1,6 +1,7 @@
 import streamlit as st
 import time
 import numpy as np
+import numpy as np
 from backend.factory_RagAgent import (
     change_local_parameters,
     put_default_local_parameters,
@@ -84,6 +85,7 @@ with st.sidebar:
     )
 
     reset_index = st.checkbox(label="Reset indexing", value=False)
+    reset_preprocess = st.checkbox(label="Reset preprocessing", value=False)
 
     if st.button(
         "Initialize RAG Agent",
@@ -101,6 +103,7 @@ with st.sidebar:
         with st.spinner("Indexation running", show_time=True):
             rag_agent.indexation_phase(
                 reset_index=reset_index,
+                reset_preprocess=reset_preprocess
             )
             st.session_state["success"] = True
             st.session_state["rag"] = rag_agent
@@ -154,8 +157,10 @@ if prompt := st.chat_input(
             )
             end_time = time.time()
 
-        context = prepare_show_context(chunks=answer["context"])
-
+        if type(answer["context"])==list or type(answer["context"])==np.ndarray:
+            context = prepare_show_context(chunks=answer["context"])
+        else:
+            context = answer["context"]
         st.markdown(
             """
             <style>
