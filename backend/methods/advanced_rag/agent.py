@@ -149,7 +149,6 @@ class AdvancedRag(NaiveRagAgent):
 
         # Building the prompt in several steps
         chunk_lists = self.get_rag_context(query=queries[0], nb_chunks=nb_chunks)
-
         chunk_list = [chunk for chunk_list in chunk_lists for chunk in chunk_list]
 
         if len(chunk_list) > 0 and self.rerank:

@@ -33,19 +33,49 @@ class Chunk(Base):
             # "metadata": self.metadata if you enable it
         }
 
-
-class ChunkPath(Base):
-    __tablename__ = "chunks_image"
+class Chunk_query(Base):
+    __tablename__ = "chunks_query"
 
     id: Mapped[str] = mapped_column(String())
     position_in_doc: Mapped[int] = mapped_column(Integer(), primary_key=True)
     document: Mapped[str] = mapped_column(String(), primary_key=True)
     text: Mapped[str] = mapped_column(String())
-    # metadata= Mapped[list[str]] = mapped_column(JSON())
-    path: Mapped[str] = mapped_column(String())
+    text_doc: Mapped[str] = mapped_column(String())
+    rerank_score: Mapped[str] = mapped_column(String(), default=None)
 
-    def __repr__(self) -> str:
-        return f"Chunk(id={self.id!r}, doc={self.document!r}, text={self.text!r}, position_in_doc={self.position_in_doc!r}, metadata={self.metadata!r},  path={self.path!r})"
+    def __init__(self, id: str, position_in_doc: int,
+                 document: str, text: str,
+                 text_doc: str, rerank_score: str = None):
+        self.id = id
+        self.position_in_doc = position_in_doc
+        self.document = document
+        self.text = text
+        self.text_doc = text_doc
+        self.rerank_score = rerank_score
+
+    @classmethod
+    def from_chunk(cls, chunk: Chunk, query: str):
+        return cls(
+            id=chunk.id,
+            position_in_doc=chunk.position_in_doc,
+            document=chunk.document,
+            text=query,
+            text_doc=chunk.text,
+            rerank_score=chunk.rerank_score
+        )
+
+    def to_dict(self) -> dict:
+
+        return {
+            "id": self.id,
+            "position_in_doc": self.position_in_doc,
+            "document": self.document,
+            "text": self.text,
+            "text_doc": self.text_doc,
+            "rerank_score": self.rerank_score,
+            # "metadata": self.metadata if you enable it
+        }
+
 
 
 class Document(Base):

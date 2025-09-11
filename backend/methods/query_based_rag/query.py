@@ -2,7 +2,7 @@ from ...utils.agent import Agent
 from ...base_classes import Search
 from ...database.database_class import DataBase
 from ..naive_rag.indexation import contexts_to_prompts
-
+from backend.database.rag_classes import Chunk_query
 
 class QbSearch(Search):
     def __init__(
@@ -20,21 +20,10 @@ class QbSearch(Search):
         self.data_manager = data_manager
 
 
-    def get_context(self, query: str, to_prompt=True) -> str:
-        search_res = self.data_manager.k_search(
-            queries=query,
-            k=self.nb_questions,
-            output_fields=["text", "doc_name", "chunk_text"],
-        )
-        chunks_id = sorted(
-            [(res["doc_name"]) for res in search_res[0]],
-            key=lambda x: x[0],
-        )
-        chunks = [res["chunk_text"] for res in search_res[0]]
-        docs_name = [res["doc_name"] for res in search_res[0]]
-        if to_prompt:
-            context, docs_name = contexts_to_prompts(contexts=chunks,
-                                                    docs_name=docs_name)
-            return context, docs_name
-        else:
-            return chunks, docs_name
+    def get_context(self, query: str) -> list[list[Chunk_query]]:
+        if type(query) is str:
+            query = [query]
+        search_res = self.data_manager.k_search(queries=query,
+                                                k=self.nb_questions,
+                                                type_output = Chunk_query)
+        return search_res

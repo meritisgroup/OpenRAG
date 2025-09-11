@@ -13,7 +13,6 @@ from ...database.database_class import get_management_data
 from ...database.rag_classes import Chunk, Entity, Relation, Tokens
 
 
-
 class GraphRagAgent(RagAgent):
     """
     This RAG method is inspired of Microsoft GrapRAG method. The indexation phase is performed thanks to knowledge graphs and utilisation phase is split
@@ -124,6 +123,7 @@ class GraphRagAgent(RagAgent):
 
         return search.get_context(query=query)
 
+
     def generate_answer(
         self,
         query: str,
@@ -131,7 +131,7 @@ class GraphRagAgent(RagAgent):
         nb_chunks: str = 2,
         options_generation = None
     ) -> str:
-        context, tokens_counter = self.get_rag_context(
+        context, chunks, tokens_counter = self.get_rag_context(
             query=query, method=method, nb_chunks=nb_chunks
         )
 
@@ -140,11 +140,6 @@ class GraphRagAgent(RagAgent):
         impacts = [0, 0, ""]
         energies = [0, 0, ""]
 
-        if self.reformulate_query:
-            query, input_t, output_t, impacts, energies = self.reformulater.reformulate(
-                query=query, nb_reformulation=1
-            )
-            query = query[0]
         prompt_template: str = self.prompts["smooth_generation"]["QUERY_TEMPLATE"]
 
         context_base = dict(context=context, 
@@ -156,7 +151,8 @@ class GraphRagAgent(RagAgent):
         if options_generation is None:
             options_generation = self.config_server["options_generation"]
 
-        answer = self.agent.predict(prompt=prompt, system_prompt=self.system_prompt,
+        answer = self.agent.predict(prompt=prompt,
+                                    system_prompt=self.system_prompt,
                                     options_generation=options_generation)
         impacts[2] = answer["impacts"][2]
         impacts[0] += answer["impacts"][0]
@@ -170,7 +166,7 @@ class GraphRagAgent(RagAgent):
             "answer": answer["texts"],
             "nb_input_tokens": np.sum(answer["nb_input_tokens"] + input_t),
             "nb_output_tokens": np.sum(answer["nb_output_tokens"] + output_t),
-            "context": context,
+            "context": chunks,
             "impacts": impacts,
             "energy": energies,
         }

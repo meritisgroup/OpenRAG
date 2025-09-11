@@ -1,5 +1,5 @@
 import ast
-from ...database.rag_classes import Document
+from ...database.rag_classes import Document, Chunk_query
 from ...database.data_extraction import DocumentText
 from ...utils.splitter import get_splitter
 from .prompts import prompts
@@ -101,7 +101,9 @@ class QbRagIndexation:
                         metadatas.append({"chunk_text": elements[k]})
                         final_path_docs.append(path_docs[k])
                         questions_docs.append(questions1[i])
-                        final_chunks.append(doc_chunks[k])
+                        new_chunk = Chunk_query.from_chunk(chunk=doc_chunks[k],
+                                                           query=questions1[i])
+                        final_chunks.append(new_chunk)
                 except Exception:
                     elements_to_retry.append(elements[k])
 
@@ -115,10 +117,8 @@ class QbRagIndexation:
 
         taille_batch = 500
         for i in range(0, len(elements), taille_batch):
-            embedding_tokens += np.sum(self.data_manager.add_str_batch_elements(elements=questions_docs[i:i + taille_batch],
-                                                                                display_message=False,
+            embedding_tokens += np.sum(self.data_manager.add_str_batch_elements(display_message=False,
                                                                                 chunks = final_chunks[i:i + taille_batch],
-                                                                                metadata=metadatas[i:i + taille_batch],
                                                                                 path_docs=final_path_docs[i:i + taille_batch]))
         return embedding_tokens, input_tokens, output_tokens
 
@@ -204,10 +204,11 @@ class QbRagIndexation:
             progress_bar.update(
                 i - 1, f"Creating question cache for document : {path_doc}"
             )
-            doc = DocumentText(path=path_doc, doc_index=i, 
+            doc = DocumentText(path=path_doc,
+                               doc_index=i,
                                config_server=config_server,
-                               reset_preprocess=reset_preprocess,
-                               splitter=self.splitter)
+                               splitter=self.splitter,
+                               reset_preprocess=reset_preprocess)
             doc_chunks = doc.chunks(chunk_size=chunk_size, 
                                     chunk_overlap=chunk_overlap)
             name_docs = [str(Path(path_doc).name) for i in range(len(doc_chunks))]

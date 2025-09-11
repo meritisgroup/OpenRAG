@@ -64,13 +64,23 @@ class QueryBasedRagAgent(AdvancedRag):
                               config_server=self.config_server,
                               chunk_overlap=overlap,
                               reset_preprocess=reset_preprocess)
-
+        
+    def remove_duplicate_chunks(self, chunks):
+        seen_texts = set()
+        unique_chunks = []
+        for chunk in chunks:
+            if chunk.text not in seen_texts:
+                seen_texts.add(chunk.text)
+                unique_chunks.append(chunk)
+        return chunks
+    
     def get_rag_context(
         self,
         query: str,
         nb_chunks: int = 5,
         model: str = None,
-        to_prompt = False
+        to_prompt = False,
+        nb_try=1
     ) -> str:
         """ """
         agent = self.agent
@@ -82,10 +92,16 @@ class QueryBasedRagAgent(AdvancedRag):
             language=self.language,
         )
 
-        context, docs_name = qs.get_context(query=query,
-                                            to_prompt=to_prompt)
-
-        return context, docs_name
+        chunk_lists = qs.get_context(query=query)[0]
+        for i in range(len(chunk_lists)):
+            chunk_lists[i].text = chunk_lists[i].text_doc
+        chunk_lists = self.remove_duplicate_chunks(chunks=chunk_lists)
+        if len(chunk_lists)<nb_chunks and nb_try<3:
+            return self.get_rag_context(nb_chunks=(nb_chunks*5),
+                                        query=query,
+                                        nb_try=(nb_try+1))
+        else:
+            return [chunk_lists[:nb_chunks]]
 
     def release_gpu_memory(self):
         self.agent.release_memory()
@@ -94,7 +110,8 @@ class QueryBasedRagAgent(AdvancedRag):
         contexts = []
         names_docs = []
         for query in queries:
-            context, name_docs = self.get_rag_context(query=query, nb_chunks=nb_chunks)
+            context, name_docs = self.get_rag_context(query=query,
+                                                      nb_chunks=nb_chunks)
             contexts.append(context)
             names_docs.append(name_docs)
         return contexts, names_docs
