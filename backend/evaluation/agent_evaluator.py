@@ -3,6 +3,7 @@ from .comparators import (
     GroundTruthComparator,
     ContextFaithfulnessComparator,
     ContextRelevanceComparator,
+    nDCGComparator
 )
 from sqlalchemy import func
 import numpy as np
@@ -49,9 +50,16 @@ class AgentEvaluator:
         self.context_relevance_comparator = ContextRelevanceComparator(
             dataframe=self.dataframe, agent=self.agent
         )
+        self.ndcg_comparator = nDCGComparator(
+            dataframe=self.dataframe, agent=self.agent
+
+        )
         self.rags_available = rags_available
 
     def get_evals(self, log_file):
+        print("Running nDCG ...")
+        context_ndcg_evaluations= (self.ndcg_comparator.run_evaluations(log_file=log_file))
+        print("nDCG done  - ✅")
         print("Running Arena Battles ...")
         arena_matrix = self.arena.run_battles_scores(log_file=log_file)
         print("Arena battles done  - ✅")
@@ -70,11 +78,13 @@ class AgentEvaluator:
             self.context_relevance_comparator.run_evaluations(log_file=log_file)
         )
         print("Context relevance done  - ✅")
+       
         return (
             arena_matrix,
             ground_truth_evaluations,
             context_faithfulness_evaluations,
             context_relevance_evaluations,
+            context_ndcg_evaluations
         )
 
     def create_plot_report(self, plots, report_dir) -> str:

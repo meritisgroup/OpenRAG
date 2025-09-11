@@ -42,13 +42,9 @@ def get_folder_saved_benchmark():
     return folder_bench
 
 
-
-
-def run_indexation_benchmark(reset_index,
-                             reset_preprocess, 
-                             databases, 
-                             report_dir,
-                             session_state=None):
+def run_indexation_benchmark(
+    reset_index, reset_preprocess, databases, report_dir, session_state=None
+):
     if session_state is None:
         session_state = st.session_state
 
@@ -61,6 +57,7 @@ def run_indexation_benchmark(reset_index,
             "Ground Truth comparison": 0.0,
             "Context faithfulness": 0.0,
             "context relevance": 0.0,
+            "nDCG score": 0.0,
         }
         with open(log_file, "w") as f:
             json.dump(data_logs, f)
@@ -80,11 +77,12 @@ def run_indexation_benchmark(reset_index,
         indexation_progress_bar = ProgressBar(progress_bar_iterable)
         for i, rag in enumerate(indexation_progress_bar.iterable):
             if session_state["benchmark"]["rags"][rag]:
-                rag_agent = get_chat_agent(rag,
-                                           databases_name=databases,
-                                           session_state=session_state)
-                rag_agent.indexation_phase(reset_index=reset_index,
-                                           reset_preprocess=reset_preprocess)
+                rag_agent = get_chat_agent(
+                    rag, databases_name=databases, session_state=session_state
+                )
+                rag_agent.indexation_phase(
+                    reset_index=reset_index, reset_preprocess=reset_preprocess
+                )
                 if reset_preprocess:
                     reset_preprocess = False
 
@@ -151,6 +149,7 @@ def generate_only_answers(rag_names, rag_agents, report_dir):
                     "Ground Truth comparison": 0.0,
                     "Context faithfulness": 0.0,
                     "context relevance": 0.0,
+                    "nDCG score": 0.0,
                 },
                 f,
             )
@@ -196,6 +195,7 @@ def generate_only_contexts(rag_names, rag_agents, report_dir):
                     "Ground Truth comparison": 0.0,
                     "Context faithfulness": 0.0,
                     "context relevance": 0.0,
+                    "nDCG score": 0.0,
                 },
                 f,
             )
@@ -234,6 +234,7 @@ def show_benchmark(results, session_state=None):
         session_state["benchmark"]["ground_truth"],
         session_state["benchmark"]["context_faithfulness"],
         session_state["benchmark"]["context_relevance"],
+        session_state["benchmark"]["ndcg_score"],
     ) = results["evals"]
     session_state["benchmark"]["ground_truth"] = results["ground_truth_scores"]
     session_state["benchmark"]["arena_matrix"] = results["arena_scores"]
@@ -297,6 +298,7 @@ def generate_benchmark(
                     "Ground Truth comparison": 0.0,
                     "Context faithfulness": 0.0,
                     "context relevance": 0.0,
+                    "nDCG score": 0.0,
                 },
                 f,
             )
@@ -452,6 +454,7 @@ def context_graph(session_state=None):
 
     faithfulness = session_state["benchmark"]["context_faithfulness"]
     relevance = session_state["benchmark"]["context_relevance"]
+    ndcg = session_state["benchmark"]["ndcg_score"]
 
     ticksval = []
     data = []
@@ -466,6 +469,14 @@ def context_graph(session_state=None):
                 "RAG Method": rag,
                 "Score": faithfulness[rag],
                 "Metric": "Context Faithfulness",
+            }
+        )
+    for rag in ndcg.keys():
+        data.append(
+            {
+                "RAG Method": rag,
+                "Score": ndcg[rag],
+                "Metric": "Context nDCG Score",
             }
         )
     host = session_state["config_server"]["params_host_llm"]["type"]

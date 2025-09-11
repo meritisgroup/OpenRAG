@@ -104,7 +104,26 @@ PROMPTS = {
             "Completeness": "Evaluates whether the response covers all necessary aspects of the user's query.",
             "Relevance": "Assesses how closely the response matches the user's question and intent.",
         },
-    },
+        "rate_chunk_relevance": {
+            "SYSTEM_PROMPT": """You are an AI agent tasked with evaluating the relevance of a chunk to answer a question.
+                                You will receive: a question, the expected answer (ground truth) and a chunk.
+                                Your task: assign a single score to the chunk on a scale from 0 to 5, where 0 is the worst and 5 is the best.
+
+                                Instructions:
+
+                                Respond only with a single integer: 0, 1, 2, 3, 4, or 5.
+
+                                Do not add any explanation, justification, or additional text.
+
+                                Output format:
+                                Return your answer as a single JSON object, exactly as shown below:
+                                    {"score": 0}
+                                    or
+                                    {"score": 1}
+                                    (or any value from 0 to 5)
+                                """,
+            "QUERY_TEMPLATE": "The Query :\n {query} \n Ground thruth : {answer}----- \n Chunk :\n {chunk}"
+    }},
     "FR": {
         "conversationnal": {
             "SYSTEM_PROMPT": "Vous êtes un assistant IA. Vous répondez toujours avec précision et honnêteté.",
@@ -208,5 +227,24 @@ PROMPTS = {
             "Exhaustivité": "Évalue si la réponse couvre tous les aspects nécessaires de la requête de l'utilisateur.",
             "Pertinence": "Évalue dans quelle mesure la réponse correspond à la question et à l'intention de l'utilisateur.",
         },
-    },
-}
+        "rate_chunk_relevance": {
+            "SYSTEM_PROMPT": """Tu es un agent IA chargé d’évaluer la pertinence d’un extrait pour répondre à une question.
+                      Tu recevras : une question, la réponse attendue (ground truth) et un extrait.
+                      Ta tâche : attribuer une note unique à l’extrait sur une échelle de 0 à 5, où 0 est le pire et 5 le meilleur.
+
+                      Instructions :
+
+                      Réponds uniquement avec un seul entier : 0, 1, 2, 3, 4 ou 5.
+
+                      N’ajoute aucune explication, justification, ou texte supplémentaire.
+                      Sois stricte, donne des points uniquement si l'extrait comporte des éléments de réponse à la question.
+
+                      Format de sortie :
+                      Renvoie ta réponse sous la forme d’un unique objet JSON, exactement comme ci-dessous :
+                          {"score": 0}
+                          ou
+                          {"score": 1}
+                          (ou toute valeur de 0 à 5)
+                      """,
+            "QUERY_TEMPLATE": "Question :\n {query} \n Réponse attendue (ground truth) : {answer}----- \n Extrait :\n {chunk}"
+}}}
