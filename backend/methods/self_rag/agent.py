@@ -1,4 +1,4 @@
-from .query import NaiveSearch
+from ..naive_rag.query import NaiveSearch
 from ..advanced_rag.agent import AdvancedRag
 from .prompts import prompts
 from ..naive_rag.indexation import contexts_to_prompts
@@ -40,7 +40,9 @@ class SelfRagAgent(AdvancedRag):
         # print(chunk_lists)
         return chunk_lists
 
-    def __run_batch_answer(self, query, agent, chunk_lists: list[list[Chunk]]):
+    def __run_batch_answer(self, query, agent, 
+                           chunk_lists: list[list[Chunk]],
+                           options_generation = None):
 
         chunk_list = merge_chunk_lists(chunk_lists)
         useful_chunks = []
@@ -154,6 +156,7 @@ class SelfRagAgent(AdvancedRag):
                     if int(answers_partially[i][1]) > best_rate:
                         best_rate = int(answers_partially[i][1])
                         answer = answers_partially[i][0]
+                        context = useful_chunks[i]
             else:
                 prompt = self.prompts["conversationnal"]["QUERY_TEMPLATE"].format(
                     query=query
@@ -168,6 +171,7 @@ class SelfRagAgent(AdvancedRag):
                 energies[0] += answer["energy"][0]
                 energies[1] += answer["energy"][1]
                 answer = answer["texts"]
+                context = []
 
         else:
             prompt = self.prompts["conversationnal"]["QUERY_TEMPLATE"].format(
@@ -185,152 +189,10 @@ class SelfRagAgent(AdvancedRag):
             energies[0] += answer["energy"][0]
             energies[1] += answer["energy"][1]
             answer = answer["texts"]
+            context = []
         return {
             "texts": final_answer,
-            "context": useful_chunks,
-            "nb_input_tokens": nb_input_tokens,
-            "nb_output_tokens": nb_output_tokens,
-            "impacts": impacts,
-            "energy": energies,
-        }
-
-    def __run_serial_answer(self, query, agent, chunk_lists: list[list[Chunk]]):
-        chunk_list = merge_chunk_lists(chunk_lists)
-        useful_chunks = []
-        impacts, energies = [0, 0, ""], [0, 0, ""]
-        for i, chunk in enumerate(chunk_list):
-            prompt = self.prompts["document_relevance"]["QUERY_TEMPLATE"].format(
-                context=chunk[i].text, query=query
-            )
-            system_prompt = self.prompts["document_relevance"]["SYSTEM_PROMPT"]
-            score = agent.predict(prompt=prompt, system_prompt=system_prompt)
-            impacts[2] = score["impacts"][2]
-            impacts[0] += score["impacts"][0]
-            impacts[1] += score["impacts"][1]
-
-            energies[2] = score["energy"][2]
-            energies[0] += score["energy"][0]
-            energies[1] += score["energy"][1]
-
-            nb_input_tokens = np.sum(score["nb_input_tokens"])
-            nb_output_tokens = np.sum(score["nb_output_tokens"])
-
-            impacts[0] += score["impacts"][0]
-            impacts[1] += score["impacts"][1]
-            impacts[2] = score["impacts"][2]
-
-            energies[0] += score["energy"][0]
-            energies[1] += score["energy"][1]
-            energies[2] = score["energy"][2]
-
-            score = score["texts"]
-            if "relevant" in score.lower():
-                useful_chunks.append(chunk)
-
-        if len(useful_chunks) > 0:
-            answers_fully = []
-            answers_partially = []
-            for i, chunk in enumerate(useful_chunks):
-                prompt = self.prompts["smooth_generation"]["QUERY_TEMPLATE"].format(
-                    context=chunk.text, query=query
-                )
-                system_prompt = self.prompts["smooth_generation"]["SYSTEM_PROMPT"]
-                answer = agent.predict(prompt=prompt, system_prompt=system_prompt)
-                impacts[0] += answer["impacts"][0]
-                impacts[1] += answer["impacts"][1]
-
-                energies[0] += answer["energy"][0]
-                energies[1] += answer["energy"][1]
-
-                nb_input_tokens += np.sum(answer["nb_input_tokens"])
-                nb_output_tokens += np.sum(answer["nb_output_tokens"])
-                answer = answer["texts"][0]
-
-                prompt = self.prompts["supported_generation"]["QUERY_TEMPLATE"].format(
-                    context=context, query=answer
-                )
-                system_prompt = self.prompts["supported_generation"]["SYSTEM_PROMPT"]
-                support = agent.predict(prompt=prompt, system_prompt=system_prompt)
-                nb_input_tokens += np.sum(support["nb_input_tokens"])
-                nb_output_tokens += np.sum(support["nb_output_tokens"])
-
-                impacts[0] += support["impacts"][0]
-                impacts[1] += support["impacts"][1]
-
-                energies[0] += support["energy"][0]
-                energies[1] += support["energy"][1]
-
-                support = support["texts"][0]
-
-                prompt = self.prompts["rate_generation"]["QUERY_TEMPLATE"].format(
-                    context=answer, query=query
-                )
-                system_prompt = self.prompts["rate_generation"]["SYSTEM_PROMPT"]
-                rate = agent.predict(prompt=prompt, system_prompt=system_prompt)
-
-                impacts[0] += rate["impacts"][0]
-                impacts[1] += rate["impacts"][1]
-
-                energies[0] += rate["energy"][0]
-                energies[1] += rate["energy"][1]
-
-                nb_input_tokens += np.sum(rate["nb_input_tokens"])
-                nb_output_tokens += np.sum(rate["nb_output_tokens"])
-                rate = rate["texts"][0]
-
-                if "fully supported" in support.lower():
-                    answers_fully.append([answer, rate])
-                elif "partially supported" in support.lower():
-                    answers_partially.append([answer, rate])
-
-            best_rate = 0
-            answer = ""
-            if len(answers_fully) > 0:
-                for i in range(len(answers_fully)):
-                    if int(answers_fully[i][1]) > best_rate:
-                        best_rate = int(answers_fully[i][1])
-                        answer = answers_fully[i][0]
-                        context = useful_chunks[i]
-            elif len(answers_partially) > 0:
-                for i in range(len(answers_partially)):
-                    if int(answers_partially[i][1]) > best_rate:
-                        best_rate = int(answers_partially[i][1])
-                        answer = answers_partially[i][0]
-                        context = useful_chunks[i]
-            else:
-                prompt = self.prompts["conversationnal"]["QUERY_TEMPLATE"].format(
-                    query=query
-                )
-
-                answer = agent.predict(prompt=prompt, system_prompt=self.system_prompt,
-                                       options_generation=options_generation)
-                nb_input_tokens += np.sum(answer["nb_input_tokens"])
-                nb_output_tokens += np.sum(answer["nb_output_tokens"])
-                impacts[0] += answer["impacts"][0]
-                impacts[1] += answer["impacts"][1]
-                energies[0] += answer["energy"][0]
-                energies[1] += answer["energy"][1]
-                context = ""
-                answer = answer["texts"][0]
-        else:
-            prompt = self.prompts["conversationnal"]["QUERY_TEMPLATE"].format(
-                query=query
-            )
-
-            answer = agent.predict(prompt=prompt, system_prompt=self.system_prompt,
-                                   options_generation=options_generation)
-            impacts[0] += answer["impacts"][0]
-            impacts[1] += answer["impacts"][1]
-
-            energies[0] += answer["energy"][0]
-            energies[1] += answer["energy"][1]
-            nb_input_tokens += np.sum(answer["nb_input_tokens"])
-            nb_output_tokens += np.sum(answer["nb_output_tokens"])
-            answer = answer["texts"][0]
-            context = ""
-        return {
-            "texts": answer,
-            "context": useful_chunks,
+            "context": context,
             "nb_input_tokens": nb_input_tokens,
             "nb_output_tokens": nb_output_tokens,
             "impacts": impacts,
@@ -384,16 +246,16 @@ class SelfRagAgent(AdvancedRag):
         if "yes" in retrieval_necessary.lower():
             chunk_lists = self.get_rag_context(query=query, nb_chunks=nb_chunks)
 
-            if batch:
-                answer = self.__run_batch_answer(
-                    query=query, agent=agent, chunk_lists=chunk_lists
-                )
-            else:
-                answer = self.__run_serial_answer(
-                    query=query, agent=agent, chunk_lists=chunk_lists
-                )
+
+            answer = self.__run_batch_answer(
+                                    query=query,
+                                    agent=agent, 
+                                    chunk_lists=chunk_lists,
+                                    options_generation = options_generation
+                                )
             nb_input_tokens += answer["nb_input_tokens"]
             nb_output_tokens += answer["nb_output_tokens"]
+            context = answer["context"]
 
         else:
             prompt = self.prompts["conversationnal"]["QUERY_TEMPLATE"].format(
@@ -402,9 +264,9 @@ class SelfRagAgent(AdvancedRag):
             answer = agent.predict(
                 prompt=prompt,
                 system_prompt=self.system_prompt,
-                options_generation=self.config_server["options_generation"],
+                options_generation=options_generation,
             )
-
+            context = []
             nb_input_tokens += np.sum(answer["nb_input_tokens"])
             nb_output_tokens += np.sum(answer["nb_output_tokens"])
 
@@ -415,12 +277,13 @@ class SelfRagAgent(AdvancedRag):
         energies[0] += answer["energy"][0]
         energies[1] += answer["energy"][1]
 
+        if type(context)!=list and type(context)!=np.ndarray:
+            context = [context]
         return {
             "answer": answer["texts"],
-            "docs_name": [],
             "nb_input_tokens": nb_input_tokens,
             "nb_output_tokens": nb_output_tokens,
-            "context": answer["context"],
+            "context": context,
             "impacts": impacts,
             "energy": energies,
         }

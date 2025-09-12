@@ -187,6 +187,7 @@ if __name__ == "__main__":
     config_server = json.loads(args.config_server)
     databases = json.loads(args.databases)
     reset_index = args.reset_index
+    reset_preprocess = args.reset_preprocess
     report_dir = args.report_dir
     type_bench = args.type_bench
 
@@ -196,6 +197,7 @@ if __name__ == "__main__":
     task(
         reset_index=reset_index,
         report_dir=args.report_dir,
+        reset_preprocess=reset_preprocess,
         type_bench=args.type_bench,
         config_server=config_server,
         queries_doc_name=args.queries_doc_name,
