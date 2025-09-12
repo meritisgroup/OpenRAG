@@ -169,7 +169,6 @@ class AgenticRagAgent(AdvancedRag):
             nb_input_tokens += info["nb_input_tokens"]
             nb_output_tokens += info["nb_output_tokens"]
             context_tot += info["context"]
-            docs_name += info["docs_name"]
 
             impacts[0] += info["impacts"][0]
             impacts[1] += info["impacts"][1]

@@ -40,6 +40,7 @@ class Reranker:
             chunk.rerank_score = scores[i]
         ranking_index = np.argsort(scores)[::-1][:max_contexts]
         rerank_chunk_list = np.array(chunk_list)[ranking_index]
+        rerank_chunk_list = rerank_chunk_list.tolist()
 
         for key in additional_data.keys():
             additional_data[key] = np.array(additional_data[key])[ranking_index]

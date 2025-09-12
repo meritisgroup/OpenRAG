@@ -1,5 +1,5 @@
 from ..naive_rag.agent import NaiveRagAgent
-from .query import NaiveSearch
+from ..naive_rag.query import NaiveSearch
 from .crawler import web_search
 from ...utils.splitter import get_splitter
 from tqdm import tqdm
@@ -49,8 +49,8 @@ class CragAgent(NaiveRagAgent):
     def get_rag_context(self, query: str, nb_chunks: int = 5) -> list[str]:
         """ """
         ns = NaiveSearch(data_manager=self.data_manager, nb_chunks=nb_chunks)
-        context, docs_name = ns.get_context(query=query)
-        return context, docs_name
+        context = ns.get_context(query=query)
+        return context
 
     def web_results_refinement(
         self, web_results, query, model=None, batch: bool = True
@@ -132,6 +132,13 @@ class CragAgent(NaiveRagAgent):
             results = []
         return results
 
+    def contexts_to_prompts(self, contexts):
+        context = ""
+        for i in range(len(contexts)):
+            context+="------------\n{}".format(contexts[i])
+        return context
+    
+
     def generate_answer(
         self,
         query: str,
@@ -154,8 +161,8 @@ class CragAgent(NaiveRagAgent):
             query = query[0]
             nb_input_tokens += input_t
             nb_output_tokens += output_t
-        context = ""
-        contexts, docs_name = self.get_rag_context(query=query, nb_chunks=nb_chunks)
+        contexts = self.get_rag_context(query=query, 
+                                        nb_chunks=nb_chunks)[0]
         useful_contexts = []
         ambiguous_contexts = []
         if batch:
@@ -163,7 +170,7 @@ class CragAgent(NaiveRagAgent):
             system_prompts = []
             for j in range(len(contexts)):
                 prompt = self.prompts["document_relevance2"]["QUERY_TEMPLATE"].format(
-                    context=contexts[j], query=query
+                    context=contexts[j].text, query=query
                 )
                 system_prompt = self.prompts["document_relevance2"]["SYSTEM_PROMPT"]
                 prompts.append(prompt)
@@ -190,13 +197,21 @@ class CragAgent(NaiveRagAgent):
                     "relevant" in scores[j].lower()
                     and "irrelevant" not in scores[j].lower()
                 ):
-                    useful_contexts.append(contexts[j])
+                    useful_contexts.append(contexts[j].text)
                 elif "ambiguous" in scores[j].lower():
-                    ambiguous_contexts.append(contexts[j])
+                    ambiguous_contexts.append(contexts[j].text)
+
+                if (
+                    "pertinent" in scores[j].lower()
+                    and "non pertinent" not in scores[j].lower()
+                ):
+                    useful_contexts.append(contexts[j].text)
+                elif "ambigu" in scores[j].lower():
+                    ambiguous_contexts.append(contexts[j].text)
         else:
             for i, context in enumerate(contexts):
                 prompt = self.prompts["document_relevance2"]["QUERY_TEMPLATE"].format(
-                    context=contexts[i], query=query
+                    context=contexts[i].text, query=query
                 )
                 system_prompt = self.prompts["document_relevance2"]["SYSTEM_PROMPT"]
                 score = agent.predict(prompt=prompt, system_prompt=system_prompt)
@@ -210,10 +225,9 @@ class CragAgent(NaiveRagAgent):
                 energies[1] += score["energy"][1]
                 score = score["text"]
                 if "relevant" in score.lower() and "irrelevant" not in score.lower():
-                    useful_contexts.append(context)
+                    useful_contexts.append(context.text)
                 elif "ambiguous" in score.lower():
-                    ambiguous_contexts.append(context)
-
+                    ambiguous_contexts.append(context.text)
         if len(useful_contexts) > 0:
             context = self.contexts_to_prompts(contexts=useful_contexts)
         elif len(ambiguous_contexts) > 0:
@@ -288,7 +302,8 @@ class CragAgent(NaiveRagAgent):
                 impacts[1] += web_results["impacts"][1]
                 web_results = web_results["texts"]
                 context = self.contexts_to_prompts(contexts=web_results)
-
+            else:
+                context = ""
         prompt = self.prompts["smooth_generation"]["QUERY_TEMPLATE"].format(
             context=context, query=query
         )
@@ -298,6 +313,7 @@ class CragAgent(NaiveRagAgent):
             options_generation = self.config_server["options_generation"]
 
         system_prompt = self.prompts["smooth_generation"]["SYSTEM_PROMPT"]
+        print(prompt, system_prompt)
         answer = agent.predict(prompt=prompt, system_prompt=system_prompt,
                                options_generation=options_generation)
         nb_input_tokens += (
@@ -321,8 +337,7 @@ class CragAgent(NaiveRagAgent):
             "answer": answer["texts"],
             "nb_input_tokens": nb_input_tokens,
             "nb_output_tokens": nb_output_tokens,
-            "context": context,
-            "doc_names": [],
+            "context": contexts,
             "impacts": impacts,
             "energy": energies,
         }
