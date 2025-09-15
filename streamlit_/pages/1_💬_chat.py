@@ -45,15 +45,17 @@ with st.sidebar:
         on_change=reset_success_button,
     )
 
-    if "chat_database_name" not in st.session_state:
+    if "chat_database_name" not in st.session_state or st.session_state["chat_database_name"] is None:
         st.session_state["chat_database_name"] = []
 
-    st.multiselect(
-        label="**Choose Database(s) for retrieval**",
-        options=st.session_state["all_databases"],
-        key="chat_database_name",
-    )
-
+    if len(st.session_state["all_databases"]) == 0 or st.session_state["all_databases"] is None:
+        st.warning("⚠️ No database available, please create one in the databases page")
+    else:
+        st.multiselect(
+            label="**Choose Database(s) for retrieval**",
+            options=st.session_state["all_databases"],
+            key="chat_database_name",
+        )
     if "all_system_prompt" not in st.session_state:
         st.session_state["all_system_prompt"] = st.session_state["config_server"][
             "all_system_prompt"

@@ -5,8 +5,7 @@ import json
 
 def get_possible_embeddings_model(provider):
     if provider=="ollama":
-        return ["mxbai-embed-large:latest", "bge-m3:latest", 
-                "bge-m3-fine-tune:latest", "all-minilm:22m"]
+        return ["mxbai-embed-large:latest", "bge-m3:latest", "all-minilm:22m"]
     elif provider=="openai":
         return ["text-embedding-3-small", "text-embedding-3-large",
                  "text-embedding-ada-002"]
