@@ -14,4 +14,4 @@ textColor="#ffffff"
 disableWidgetStateDuplicationWarning = true
 
 [server]
-port = 8508
+port = 8501
