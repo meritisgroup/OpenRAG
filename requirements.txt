@@ -13,14 +13,9 @@ leidenalg
 pyvis
 langchain_community
 crawl4ai
-transformers
-SentencePiece
-timm
 scikit-learn
 opencv-python
 elasticsearch==8.17.2
-colpali-engine
-SpeechRecognition
 pydub
 numpy 
 elasticsearch==8.17.2
@@ -31,6 +26,5 @@ streamlit==1.44.0
 mistralai
 ecologits
 rapidfuzz
-duckduckgo-search
 docling
 ddgs
