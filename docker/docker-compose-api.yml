@@ -45,6 +45,5 @@ services:
     volumes:
       - ../storage:/app/storage
       - ../data:/app/data
-      - ../streamlit_/utils:/app/streamlit_/utils
 networks:
   app-network:

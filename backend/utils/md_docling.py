@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from pathlib import Path
 from io import BytesIO
 import logging
+import numpy as np
 
 from docling.datamodel.base_models import InputFormat
 from docling.document_converter import DocumentConverter, PdfFormatOption
@@ -172,11 +173,17 @@ class ImageAnalyzer:
             temperature=0
         else:
             temperature=1
-
-        category=self.agent.predict_image(prompt=classification_prompt,data_url=data_url,json_format=ImageClassification,temperature=temperature)
-        print(category.category)
+        print("test")
+        category=self.agent.predict_image(prompt=classification_prompt,
+                                          data_url=data_url,
+                                          json_format=ImageClassification,
+                                          temperature=temperature)
+        print(category)
         description_prompt=get_prompt(category.category, context)
-        response=self.agent.predict_image(prompt=description_prompt,data_url=data_url,json_format=ImageDescription,temperature=temperature)
+        response=self.agent.predict_image(prompt=description_prompt,
+                                          data_url=data_url,
+                                          json_format=ImageDescription,
+                                          temperature=temperature)
 
 
         return response
@@ -197,8 +204,6 @@ def json_to_markdown(data: ImageDescription, index: int) -> list[str]:
 
 class DoclingConverter:
     
-
-
     def __init__(self, config_server):
         self.converter = self._init_converter()
         self.analyzer = ImageAnalyzer(config_server)
@@ -264,9 +269,6 @@ class DoclingConverter:
     for item, stack in result.document._iterate_items_with_stack(traverse_pictures=True)
     if isinstance(item, PictureItem)
 ]
-        
-
-        
 
         img_index = 0
         line_index = 0
@@ -280,7 +282,7 @@ class DoclingConverter:
 
                 
                 image = picture_item.get_image(result)
-                
+                print(np.array(image).shape)
                 try:
                     buffer = BytesIO()
                     image.save(buffer, format="PNG")

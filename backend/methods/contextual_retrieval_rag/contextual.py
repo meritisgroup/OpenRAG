@@ -43,7 +43,6 @@ def run_batch_contextual(agent, doc_chunks, doc_content, language="EN"):
 
     taille_batch = 100
     contexts = None
-    
     range_chunks = range(0, len(user_prompts), taille_batch)
     progress_bar_chunks = ProgressBar(total=len(range_chunks))
     j = 0

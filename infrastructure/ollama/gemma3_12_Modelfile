@@ -1,0 +1,2 @@
+FROM gemma3:12b
+PARAMETER num_ctx 4096

@@ -78,6 +78,11 @@ def loadmodel(model_name: str, gpu_memory_utilization=0.9, nb_try=0):
                 app.state.models[model_name]["model"] = AutoModel.from_pretrained(model_name,
                                                                                   trust_remote_code=True,
                                                                                   attn_implementation="sdpa").eval().cuda()
+            elif model_name=="google/gemma-3-1b-it" or model_name=="google/gemma-3-4b-it" or model_name=="google/gemma-3-12b-it":
+                app.state.models[model_name]["model"] = LLM(model=model_name,
+                                                            gpu_memory_utilization=gpu_memory_utilization,
+                                                            max_model_len=16384)
+                app.state.models[model_name]["tokenizer"] = AutoTokenizer.from_pretrained(model_name)
             else:
                 app.state.models[model_name]["model"] = LLM(model=model_name,
                                                             gpu_memory_utilization=gpu_memory_utilization)

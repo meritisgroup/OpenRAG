@@ -90,7 +90,8 @@ if "new_doc" not in st.session_state:
 
 if database_name is not None:
     database_path = f"./data/databases/{database_name}"
-    file_list = os.listdir(f"./data/databases/{database_name}")
+    file_list = os.listdir(database_path)
+    file_list = [f for f in file_list if os.path.isfile(os.path.join(database_path, f))]
     document_list = [f for f in file_list if f != "metadatas.json"]
     display_db = pd.DataFrame(data={"Doc Name": document_list})
     st.write(display_db)

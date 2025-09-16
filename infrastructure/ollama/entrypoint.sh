@@ -10,6 +10,7 @@ while [ "$(ollama list | grep 'NAME')" == "" ]; do
 done
 
 ollama pull gemma3:1b
+ollama create -f gemma3_12_Modelfile gemma3:12b
 ollama pull all-minilm:22m
 ollama pull mxbai-embed-large:latest
 ollama pull bge-m3:latest

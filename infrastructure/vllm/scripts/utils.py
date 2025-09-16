@@ -42,7 +42,7 @@ def get_sampling_params(model_name, max_tokens=512, temperature=0, tokenizer=Non
                               stop="<end_of_turn>",
                               logprobs=3,
                               guided_decoding=guided_decoding_params_json)
-    elif model_name=="meta-llama/Llama-3.1-8B-Instruct" or model_name=="google/gemma-3-1b-it" or model_name=="google/gemma-3-4b-it":
+    elif model_name=="meta-llama/Llama-3.1-8B-Instruct" or model_name=="google/gemma-3-1b-it" or model_name=="google/gemma-3-4b-it" or model_name=="google/gemma-3-12b-it":
         return SamplingParams(temperature=temperature,
                               max_tokens=max_tokens,
                               min_p=0.15,
@@ -89,7 +89,7 @@ def get_chat_template(model_name, tokenizer,
             prompts_results.append(inputs)
 
 
-        elif model_name=="google/gemma-3-1b-it" or model_name=="google/gemma-3-4b-it":
+        elif model_name=="google/gemma-3-1b-it" or model_name=="google/gemma-3-4b-it" or model_name=="google/gemma-3-12b-it":
             temp = [{"role": "system", "content": [{"type": "text", "text":system}]},
                     {"role": "user", "content": [{"type": "text", "text":prompt}]}]
             temp = tokenizer.apply_chat_template(temp,

@@ -5,11 +5,17 @@ from ...utils.splitter import get_splitter
 from .prompts import prompts
 import numpy as np
 from pathlib import Path
+import json
 
 from tqdm.auto import tqdm
 from ...utils.progress import ProgressBar
 import os
+from pydantic import BaseModel
+from typing import List
 
+
+class Questions_Model(BaseModel):
+    questions: List[str]
 
 class QbRagIndexation:
     def __init__(
@@ -49,7 +55,7 @@ class QbRagIndexation:
         k = 0
         for i in data_range:
             results = self.agent.multiple_predict(prompts=prompts[i:i + taille_batch],
-                                            system_prompts=system_prompts[i:i + taille_batch])
+                                                  system_prompts=system_prompts[i:i + taille_batch])
             k+=1
             progress_bar.update(k-1, text=text_to_show+" {}".format(np.round((k/len(data_range))*100,2)))
             if outputs is None:
@@ -96,7 +102,7 @@ class QbRagIndexation:
             elements_to_retry = []
             for k, questions in enumerate(list_questions["texts"]):
                 try:
-                    questions1 = ast.literal_eval(questions)
+                    questions1 = json.loads(questions)
                     for i in range(len(questions1)):
                         metadatas.append({"chunk_text": elements[k]})
                         final_path_docs.append(path_docs[k])
@@ -106,7 +112,7 @@ class QbRagIndexation:
                         final_chunks.append(new_chunk)
                 except Exception:
                     elements_to_retry.append(elements[k])
-
+            
             if len(elements_to_retry)>0:
                 list_questions = self.generates_questions(chunks=elements_to_retry,
                                                           temperature=1,
@@ -114,61 +120,15 @@ class QbRagIndexation:
                 elements = elements_to_retry
                 input_tokens += np.sum(list_questions["nb_input_tokens"])
                 output_tokens += np.sum(list_questions["nb_output_tokens"])
+            
 
         taille_batch = 500
-        for i in range(0, len(elements), taille_batch):
+        for i in range(0, len(final_chunks), taille_batch):
             embedding_tokens += np.sum(self.data_manager.add_str_batch_elements(display_message=False,
                                                                                 chunks = final_chunks[i:i + taille_batch],
                                                                                 path_docs=final_path_docs[i:i + taille_batch]))
         return embedding_tokens, input_tokens, output_tokens
 
-
-    def __serial_indexation__(self, doc_chunks, path_docs):
-        """
-        Adds a batch of chunks from doc_chunks to the indexation verctorbase
-        Args:
-            doc_chunks (list[str]) : Chunks to be indexed
-            name_docs (list[str]) : Name of docs each chunk is from
-
-        Returns
-            None
-        """
-        embedding_tokens, input_tokens, output_tokens = 0, 0, 0
-        for k, chunk in enumerate(doc_chunks):
-            questions = self.generates_questions(chunks=[chunk.text])
-            input_tokens += np.sum(questions["nb_input_tokens"])
-            output_tokens += np.sum(questions["nb_output_tokens"])
-
-            for question_str in questions["texts"]:
-                success = False
-                nb_try = 1
-                while not success:
-                    try:
-                        questions1 = ast.literal_eval(questions)
-                        success = True
-                    except Exception:
-                        questions = self.generates_questions(
-                            chunks=[chunk.text], temperature=1
-                        )["texts"][0]
-                        input_tokens += np.sum(questions["nb_input_tokens"])
-                        output_tokens += np.sum(questions["nb_output_tokens"])
-                        success = False
-                        nb_try+=1
-                        if nb_try>10:
-                            break;
-                try:
-                    if success:
-                        for question in questions1:
-                            embedding_tokens += self.data_manager.add_str_elements(
-                                elements=[question],
-                                display_message=False,
-                                metadata=[{"chunk_text": chunk.text}],
-                                chunks=[doc_chunks[k]],
-                                path_docs=[path_docs[k]]
-                            )
-                except Exception:
-                    None
-        return embedding_tokens, input_tokens, output_tokens
 
     def run_pipeline(self, 
                      config_server,

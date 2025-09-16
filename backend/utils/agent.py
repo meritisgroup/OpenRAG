@@ -11,6 +11,7 @@ from .agent_functions import (
 )
 from openai import OpenAI
 from mistralai import Mistral
+from jsonschema import validate
 import json
 import requests
 import time
@@ -84,6 +85,7 @@ class Agent_ollama(Agent):
         self.language = language
         self.max_attempts = max_attempts
         self.temperature = 0
+        self.key_or_url = key_or_url
 
     def predict(
         self, prompt: str, system_prompt: str, temperature=0, options_generation=None
@@ -124,7 +126,8 @@ class Agent_ollama(Agent):
         return answer
 
     def predict_image(
-        self, prompt: str, data_url, json_format: BaseModel, temperature=0
+        self, prompt: str, data_url, 
+        json_format: BaseModel, temperature=0
     ) -> BaseModel:
         """
         It formats the queries with good prompts, then gives these prompts to the LLM and return the cleaned outputs following the given BaseModel format
@@ -160,6 +163,7 @@ class Agent_ollama(Agent):
         return answers
 
     def embeddings(self, texts, model):
+
         embeddings = self.client.embeddings.create(input=texts, model=model)
 
         if type(texts) is type([]):
@@ -276,7 +280,6 @@ class Agent_Vllm(Agent):
         elif "False" in answer and json_format.__name__ == "StatementSupported":
             cleaned = '{"supported": false}'
         else:
-            """
             json_format_str = json.dumps(json_format.model_json_schema())
             prompt = "Can you rewrite the answer to make it match the given json format: \n\n Here's the answer:{}\n\n Can you rewrite it to match this JSON format: {}".format(answer, str(json_format_str))
             system_prompt = "You are an AI assistant which has for mission to rewrite the answer to match a given json format"
@@ -285,7 +288,7 @@ class Agent_Vllm(Agent):
                                      json_format=json_format,
                                      temperature=temperature,
                                      images=images)
-            """
+            
         answer = json.loads(cleaned)
         answer = json_format(**answer)
         return answer
@@ -308,6 +311,23 @@ class Agent_Vllm(Agent):
         answer["texts"] = answer["texts"][0]
         return answer
 
+    def predict_image(
+        self, prompt: str, data_url, json_format: BaseModel, temperature=0,
+        options_generation=None
+    ) -> BaseModel:
+        """
+        It formats the queries with good prompts, then gives these prompts to the LLM and return the cleaned outputs following the given BaseModel format
+        """
+        answer = self.multiple_predict(
+            prompts=[prompt],
+            system_prompts=[prompt],
+            temperature=temperature,
+            images=[data_url],
+            options_generation=options_generation,
+        )
+        answer["texts"] = answer["texts"][0]
+        return answer
+    
     def embeddings(self, texts, model):
         if type(texts) is type("str"):
             texts = [texts]

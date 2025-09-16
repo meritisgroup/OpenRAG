@@ -142,8 +142,8 @@ class AdvancedRag(NaiveRagAgent):
             queries, input_t, output_t, impacts, energy = self.reformulater.reformulate(
                 query=query, nb_reformulation=nb_reformulation
             )
-            self.nb_input_tokens += input_t
-            self.nb_output_tokens += output_t
+            self.nb_input_tokens += np.sum(input_t)
+            self.nb_output_tokens += np.sum(output_t)
         else:
             queries = [query]
 

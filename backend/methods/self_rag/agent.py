@@ -1,5 +1,5 @@
 from ..naive_rag.query import NaiveSearch
-from ..advanced_rag.agent import AdvancedRag
+from ..naive_rag.agent import NaiveRagAgent
 from .prompts import prompts
 from ..naive_rag.indexation import contexts_to_prompts
 import numpy as np
@@ -7,7 +7,7 @@ from backend.database.rag_classes import Chunk
 from ...utils.chunk_lists_merger import merge_chunk_lists
 
 
-class SelfRagAgent(AdvancedRag):
+class SelfRagAgent(NaiveRagAgent):
 
     def __init__(
         self, config_server: dict, dbs_name: list[str], data_folders_name: list[str]
@@ -37,7 +37,6 @@ class SelfRagAgent(AdvancedRag):
         """
         ns = NaiveSearch(data_manager=self.data_manager, nb_chunks=nb_chunks)
         chunk_lists = ns.get_context(query=query)
-        # print(chunk_lists)
         return chunk_lists
 
     def __run_batch_answer(self, query, agent, 
@@ -242,7 +241,6 @@ class SelfRagAgent(AdvancedRag):
 
         retrieval_necessary = retrieval_necessary["texts"]
 
-        answer = None
         if "yes" in retrieval_necessary.lower():
             chunk_lists = self.get_rag_context(query=query, nb_chunks=nb_chunks)
 
@@ -279,6 +277,7 @@ class SelfRagAgent(AdvancedRag):
 
         if type(context)!=list and type(context)!=np.ndarray:
             context = [context]
+            
         return {
             "answer": answer["texts"],
             "nb_input_tokens": nb_input_tokens,

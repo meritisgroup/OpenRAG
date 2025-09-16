@@ -451,7 +451,6 @@ class Semantic_TextSplitter(Splitter):
                 sentence_embeddings["embeddings"] = sentence_embeddings["embeddings"] + results["embeddings"]
                 sentence_embeddings["nb_tokens"]+=np.sum(results["nb_tokens"])
 
-        
         sentence_embeddings = sentence_embeddings["embeddings"]
         similarities = [
             float(
