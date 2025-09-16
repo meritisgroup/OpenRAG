@@ -33,3 +33,4 @@ ecologits
 rapidfuzz
 duckduckgo-search
 docling
+ddgs

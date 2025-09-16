@@ -179,5 +179,4 @@ def concat_chunks(chunk_list: list[Chunk]) -> str:
     for chunk in chunk_list:
         if chunk.text not in context:
             context += chunk.text + "\n[...]\n"
-
     return context

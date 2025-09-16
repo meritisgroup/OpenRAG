@@ -29,7 +29,6 @@ class QueryBasedRagAgent(AdvancedRag):
                         data_folders_name = data_folders_name)
         
         self.prompts = prompts[self.language]
-        self.system_prompt = get_system_prompt(config_server, self.prompts)
         self.data_manager = get_management_data(dbs_name=self.dbs_name,
                                                 data_folders_name=self.data_folders_name,
                                                 storage_path=self.storage_path,

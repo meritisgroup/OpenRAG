@@ -116,7 +116,6 @@ class DocumentText:
                     ).open_doc(path_file=path)
                     self.save_md__()
         elif self.data_preprocessing == "md_without_images":
-                print("ok")
                 if self.reset_preprocess or not self.load_md__():
                     self.content = MarkdownOpener(
                         config_server=self.config_server,
@@ -249,9 +248,6 @@ class DocumentText:
 
         # save chunks
         save_chunks_to_jsonl(self.doc_index, results)
-        """
-        save_chunks_to_file(results)
-        """
         return results
 
     def convert_in_base(self) -> Document:

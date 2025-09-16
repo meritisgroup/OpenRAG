@@ -21,20 +21,12 @@ class Processor_chunks:
         for i in range(len(self.type_processor_chunks)):
             if self.type_processor_chunks[i] == "Contextual":
                 data = self.run_contextual(
-                    chunks=chunks, batch=batch, doc_content=doc_content
+                    chunks=chunks, doc_content=doc_content
                 )
         return data
 
-    def run_contextual(self, chunks, doc_content, batch):
-        if batch:
-            data = run_batch_contextual(
-                agent=self.agent,
-                doc_chunks=chunks,
-                doc_content=doc_content,
-                language=self.language,
-            )
-        else:
-            data = run_serial_contextual(
+    def run_contextual(self, chunks, doc_content):
+        data = run_batch_contextual(
                 agent=self.agent,
                 doc_chunks=chunks,
                 doc_content=doc_content,

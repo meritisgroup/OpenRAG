@@ -269,6 +269,7 @@ class Merger_Database_Vectorbase:
         collection_name=None,
         vb_name: str = None,
     ) -> None:
+
         if vb_name is None:
             vb_name = self.find_vb_name(path_docs)
         elif collection_name is not None and vb_name is not None:

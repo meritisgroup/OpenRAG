@@ -140,7 +140,7 @@ class NaiveRagAgent(RagAgent):
         """
         ns = NaiveSearch(data_manager=self.data_manager, nb_chunks=nb_chunks)
         chunk_lists = ns.get_context(query=query)
-        # print(chunk_lists)
+
         return chunk_lists
 
     def build_final_prompt(self, chunk_list: list[Chunk], query: str):

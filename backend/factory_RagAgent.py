@@ -29,11 +29,11 @@ def change_config_server(rag_name, config_server):
         config_server["embedding_model"] = "openbmb/VisRAG-Ret"
         config_server["model"] = "openbmb/MiniCPM-V-2_6"
     elif config_server["params_host_llm"]["type"] == "ollama":
-        config_server["model"] = "gemma2:9b"
+        config_server["model"] = "gemma3:12b"
         config_server["embedding_model"] = "mxbai-embed-large:latest"
         config_server["reranker_model"] = "gemma3:12b"
     elif config_server["params_host_llm"]["type"] == "vllm":
-        config_server["model"] = "google/gemma-2-2b-it"
+        config_server["model"] = "google/gemma-3-12b-it"
         config_server["embedding_model"] = "BAAI/bge-m3"
         config_server["reranker_model"] = "BAAI/bge-reranker-v2-m3"
     elif config_server["params_host_llm"]["type"] == "openai":

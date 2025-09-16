@@ -238,8 +238,8 @@ class CragAgent(NaiveRagAgent):
 
             answer = agent.predict(prompt=prompt, system_prompt=system_prompt)
             query_web = answer["texts"]
-            nb_input_tokens += answer["nb_input_tokens"]
-            nb_output_tokens += answer["nb_output_tokens"]
+            nb_input_tokens += np.sum(answer["nb_input_tokens"])
+            nb_output_tokens += np.sum(answer["nb_output_tokens"])
 
             impacts[0] += answer["impacts"][0]
             impacts[1] += answer["impacts"][1]
@@ -253,7 +253,7 @@ class CragAgent(NaiveRagAgent):
                     web_results=web_results, query=query
                 )
                 nb_input_tokens += web_results["nb_input_tokens"]
-                nb_output_tokens += web_results["nb_output_token"]
+                nb_output_tokens += web_results["nb_output_tokens"]
                 energies[0] += web_results["energy"][0]
                 energies[1] += web_results["energy"][1]
                 impacts[0] += web_results["impacts"][0]
@@ -304,6 +304,7 @@ class CragAgent(NaiveRagAgent):
                 context = self.contexts_to_prompts(contexts=web_results)
             else:
                 context = ""
+        
         prompt = self.prompts["smooth_generation"]["QUERY_TEMPLATE"].format(
             context=context, query=query
         )
@@ -313,8 +314,8 @@ class CragAgent(NaiveRagAgent):
             options_generation = self.config_server["options_generation"]
 
         system_prompt = self.prompts["smooth_generation"]["SYSTEM_PROMPT"]
-        print(prompt, system_prompt)
-        answer = agent.predict(prompt=prompt, system_prompt=system_prompt,
+        answer = agent.predict(prompt=prompt, 
+                               system_prompt=system_prompt,
                                options_generation=options_generation)
         nb_input_tokens += (
             answer["nb_input_tokens"]

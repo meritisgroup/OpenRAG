@@ -60,9 +60,7 @@ class AgenticRagAgent(AdvancedRag):
             bool: True if the answer is judged to be complete and correct, False otherwise.
         """
         system_prompt = self.prompts["evaluate"]["SYSTEM_PROMPT"]
-        user_prompt = self.prompts["evaluate"]["QUERY_TEMPLATE"].format(
-            query=query, answer=answer
-        )
+        user_prompt = self.prompts["evaluate"]["QUERY_TEMPLATE"].replace("{query}", str(query)).replace("{answer}", str(answer))
 
         result = agent.predict_json(
             system_prompt=system_prompt,
@@ -87,9 +85,7 @@ class AgenticRagAgent(AdvancedRag):
         """
 
         system_prompt = self.prompts["reformulate"]["SYSTEM_PROMPT"]
-        user_prompt = self.prompts["reformulate"]["QUERY_TEMPLATE"].format(
-            query=query, answer=answer
-        )
+        user_prompt = self.prompts["reformulate"]["QUERY_TEMPLATE"].replace("{query}", str(query)).replace("{answer}", str(answer))
         new_query = agent.predict(system_prompt=system_prompt, prompt=user_prompt)
 
         return new_query
