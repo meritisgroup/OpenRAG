@@ -1,13 +1,11 @@
 import requests
 import io
 import fitz
-import torch
-import torch.nn.functional as F
 from PIL import Image, ImageDraw, ImageFont
 import base64
 import numpy as np
 import os
-from transformers import AutoModel, AutoTokenizer, AutoProcessor
+import pandas as pd
 from .agent import Agent
 
 
@@ -25,75 +23,6 @@ def make_request_vlm_ollama(url, image, model, prompt):
 
     return response.json()["response"]
 
-
-def run_generation_vlm_hf(queries, images, model):
-    answers = []
-    if model["model_name"] == "openbmb/MiniCPM-V-2_6":
-        for i in range(len(queries)):
-            msgs = [{"role": "user", "content": images[i] + [queries[i]]}]
-            answer = model["model"].chat(
-                image=None,
-                msgs=msgs,
-                tokenizer=model["tokenizer"],
-                processor=model["processor"],
-            )
-            answers.append(answer)
-    elif "llava" in model["model_name"]:
-        for i in range(len(queries)):
-            answer_temp = []
-            answer = ""
-            for j in range(len(images[i])):
-                answer_temp.append(
-                    make_request_vlm_ollama(
-                        url=model["url"],
-                        image=images[i][j],
-                        model=model["model_name"],
-                        prompt=queries[i],
-                    )
-                )
-
-                answer = answer + "\n\n" + answer_temp[-1]
-            answers.append(answer)
-    return answers
-
-
-def load_vlm_model(model_params, device="cpu"):
-
-    if model_params["type"] == "HF":
-        HF_TOKEN = ""
-        model_tokenizer = AutoTokenizer.from_pretrained(
-            model_params["model_name"],
-            attn_implementation="sdpa",
-            trust_remote_code=True,
-            token=HF_TOKEN,
-        )
-        model = AutoModel.from_pretrained(
-            model_params["model_name"],
-            trust_remote_code=True,
-            attn_implementation="sdpa",
-            token=HF_TOKEN,
-        ).eval()
-        processor = AutoProcessor.from_pretrained(
-            model_params["model_name"], trust_remote_code=True, token=HF_TOKEN
-        )
-        model = model.to(device)
-        return {
-            "model": model,
-            "tokenizer": model_tokenizer,
-            "processor": processor,
-            "model_name": model_params["model_name"],
-        }
-    else:
-        data = {
-            "agent": Agent(
-                model=model_params["model_name"],
-                key_or_url=model_params["url"],
-                language=model_params["language"],
-            )
-        }
-        for key in model_params.keys():
-            data[key] = model_params[key]
-        return data
 
 
 def load_xlsx_images(xlsx_file):
@@ -203,29 +132,3 @@ def load_element(path_element):
     return element, is_empty
 
 
-def get_embedding_vlm(datas, model, tokenizer_model):
-    inputs_image = []
-    inputs_text = []
-    for i in range(len(datas)):
-        if type(datas[i]) is str:
-            inputs_text.append(datas[i])
-            inputs_image.append(None)
-        else:
-            inputs_image.append(datas[i])
-            inputs_text.append("Can you describe and extract the information?")
-
-    inputs = {"text": inputs_text, "image": inputs_image, "tokenizer": tokenizer_model}
-    with torch.no_grad():
-        outputs = model(**inputs)
-
-    last_hidden_state = outputs.last_hidden_state
-    attention_mask = outputs.attention_mask
-
-    attention_mask_cumulative = attention_mask * attention_mask.cumsum(dim=1)
-    weighted_sum = torch.sum(
-        last_hidden_state * attention_mask_cumulative.unsqueeze(-1).float(), dim=1
-    )
-    sum_of_weights = attention_mask_cumulative.sum(dim=1, keepdim=True).float()
-    weighted_mean = weighted_sum / sum_of_weights
-    embeddings = F.normalize(weighted_mean, p=2, dim=1).detach().cpu().numpy()
-    return embeddings

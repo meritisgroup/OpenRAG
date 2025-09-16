@@ -1,24 +1,27 @@
-FROM ubuntu:24.04
+FROM python:3.11
 
-RUN apt-get update && apt-get install -y \
-    python3 python3-pip && \
-    rm -rf /var/lib/apt/lists/*
-    RUN apt-get update && \
-    apt-get install -y \
-      curl \
-      bash
+ENV DEBIAN_FRONTEND=noninteractive 
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl bash libgl1 libglib2.0-0 \
+    texlive-latex-base texlive-fonts-recommended texlive-fonts-extra \
+ && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-RUN apt-get update && apt install -y libgl1 libglib2.0-0
-RUN apt-get update && \
-    apt-get install -y texlive-latex-base \
-                       texlive-fonts-recommended \
-                       texlive-fonts-extra
 COPY requirements.txt .
-RUN pip3 install -r requirements.txt --break-system-packages
 
-RUN python3 -c "import nltk; nltk.download('punkt_tab')"
+RUN pip3 install --no-cache-dir -r requirements.txt 
+
+RUN apt-get update && apt-get install -y \
+    texlive-latex-base \
+    texlive-fonts-recommended \
+    texlive-fonts-extra \
+    texlive-latex-extra \
+ && rm -rf /var/lib/apt/lists/*
+
+RUN python3 -m nltk.downloader punkt_tab
+
 COPY ./.streamlit  ./.streamlit 
 COPY ./backend ./backend
 COPY ./data ./data
