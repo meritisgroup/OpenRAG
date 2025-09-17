@@ -15,6 +15,7 @@ It can be used on the user's hardware or with a supported API key. Available LLM
 
 ## Launch commands
 In oder to launch the app, follow these instruction to ensure a smooth running of the services. 
+On Linux, check the write access; use sudo chown -R 1000:1000 OpenRAG if needed.
 - Navigate to the `docker` folder by running `cd docker`
 
 Upon launching, you can decide to launch all services or not. Here are the possible configurations: 

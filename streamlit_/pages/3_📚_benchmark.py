@@ -128,11 +128,17 @@ if st.session_state["benchmark"]["load"]:
 
 
 st.markdown("## Choose database to perfom benchmark on")
-st.multiselect(
-    label="Choose database",
-    options=st.session_state["all_databases"],
-    key="benchmark_database",
-)
+if "benchmark_database" not in st.session_state or st.session_state["benchmark_database"] is None:
+    st.session_state["benchmark_database"] = []
+
+if len(st.session_state["all_databases"]) == 0 or st.session_state["all_databases"] is None:
+    st.warning("⚠️ No database available, please create one in the databases page")
+else:
+    st.multiselect(
+            label="Choose database",
+            options=st.session_state["all_databases"],
+            key="benchmark_database",
+        )
 
 
 if "all_system_prompt" not in st.session_state:
