@@ -50,8 +50,7 @@ type_retrieval = st.selectbox(
 config_new_rag["type_retrieval"] = type_retrieval
 
 data_preparation = { "pdf_text_extraction":"PDF text extraction", 
-                     "md_without_images": "PDF conversion into markdown",
-                     "md_with_images" : "PDF conversion into markdown with image description" }
+                     "md_without_images": "PDF conversion into markdown"}
 selected_data_prep = st.selectbox(
     label="**Choose data preparation method:**",
     options=list(data_preparation.keys()),

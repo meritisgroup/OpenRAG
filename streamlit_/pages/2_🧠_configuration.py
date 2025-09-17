@@ -70,8 +70,7 @@ st.session_state["config_server"]["hf_token"] = st.session_state.hf_token
 
 # setting type of data preparation
 data_preparation = { "pdf_text_extraction":"PDF text extraction", 
-                     "md_without_images": "PDF conversion into markdown",
-                     "md_with_images" : "PDF conversion into markdown with image description" }
+                     "md_without_images": "PDF conversion into markdown" }
 
 
 selected_data_prep = st.selectbox(
