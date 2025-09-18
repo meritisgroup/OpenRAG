@@ -215,7 +215,7 @@ def predict_vllm(
         and options_generation["type_generation"] == "no_generation"
     ):
         return {
-            "texts": "",
+            "texts": [""],
             "nb_input_tokens": 0,
             "nb_output_tokens": 0,
             "impacts": [0, 0, ""],
