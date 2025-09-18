@@ -27,9 +27,7 @@
     "max_attempts": 5,
     "nb_chunks": 10,
     "nb_chunks_reranker": 20,
-    "ProcessorChunks": [
-        "Contextual"
-    ],
+    "ProcessorChunks": [],
     "hf_token": null,
     "params_llm_dockling": {
         "url": "",
