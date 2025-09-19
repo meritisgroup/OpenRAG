@@ -252,6 +252,7 @@ def show_benchmark(results, session_state=None):
     if session_state["config_server"]["params_host_llm"]["type"] in [
         "openai",
         "mistral",
+        "vllm"
     ]:
         impacts_graph = impact_graph(session_state=session_state)
         energies_graph = energy_graph(session_state=session_state)
