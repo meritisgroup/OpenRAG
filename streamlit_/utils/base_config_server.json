@@ -2,8 +2,8 @@
     "storage_path": "./storage",
     "storage_data_path": "./data/databases",
     "params_host_llm": {
-        "url": "http://ollama:11434/v1",
-        "type": "ollama",
+        "url": "http://vllm:8000",
+        "type": "vllm",
         "api_key": null
     },
     "params_vectorbase": {
@@ -16,14 +16,14 @@
         ]
     },
     "device": "cpu",
-    "model": "gemma3:12b",
+    "model": "google/gemma-3-12b-it",
     "model_for_image": "gemma3:12b",
-    "embedding_model": "mxbai-embed-large:latest",
-    "language": "FR",
+    "embedding_model": "BAAI/bge-m3",
+    "language": "EN",
     "type_retrieval": "embeddings",
     "TextSplitter": "Semantic_TextSplitter",
     "reformulate_query": false,
-    "reranker_model": "gemma3:12b",
+    "reranker_model": "BAAI/bge-reranker-v2-m3",
     "max_attempts": 5,
     "nb_chunks": 10,
     "nb_chunks_reranker": 20,

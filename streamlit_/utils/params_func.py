@@ -12,7 +12,7 @@ def get_possible_embeddings_model(provider):
     elif provider=="mistral":
         return ["mistral-embed"]
     elif provider=="vllm":
-        return ["mixedbread-ai/mxbai-embed-large-v1", "BAAI/bge-m3",
+        return ["BAAI/bge-m3", "mixedbread-ai/mxbai-embed-large-v1",
                  "Qwen/Qwen3-Embedding-0.6B", "sentence-transformers/all-MiniLM-L6-v2"]
     
 
