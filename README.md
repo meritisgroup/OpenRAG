@@ -13,7 +13,7 @@ It can be used on the user's hardware or with a supported API key. Available LLM
 - **OpenAI** : requires an API key
 - **Mistral** : requires an API key
 
-### YouTube Tutorial
+## YouTube Tutorial
 
 You can see our tutorial on youtube to how to install and use OpenRAG to start your first benchmark
 
