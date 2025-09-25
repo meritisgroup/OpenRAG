@@ -1,24 +1,33 @@
 # OpenRAG by Meritis
 
-Welcome to **OpenRAG**, an open source, user friendly RAG benchmark tool ! 
+Welcome to **OpenRAG**, an open source, user friendly RAG benchmark tool !
 
 The goal of OpenRAG is to provide an intuitive tool to help users decide which RAG method, amongst the large number of existing techniques, is most appropriated to ist own use case and data.
 
-In OpenRAG, more than a dozen RAG methods are implemented and more will be added with time. Each RAG can be customized to better fit each user's need. 
+In OpenRAG, more than a dozen RAG methods are implemented and more will be added with time. Each RAG can be customized to better fit each user's need.
 
-It can be used on the user's hardware or with a supported API key. Available LLM host are: 
+It can be used on the user's hardware or with a supported API key. Available LLM host are:
 
 - **Ollama** : requires a GPU
 - **VLLM** : requires a GPU that supports cuda>=12.1
 - **OpenAI** : requires an API key
 - **Mistral** : requires an API key
 
+### YouTube Tutorial
+
+You can see our tutorial on youtube to how to install and use OpenRAG to start your first benchmark
+
+link to the [tutorial video](youtube.com/watch?si=nZdkRZCIznZJZITK&v=i9Xyarj-fFQ&feature=youtu.be)
+
 ## Launch commands
-In oder to launch the app, follow these instruction to ensure a smooth running of the services. 
+
+In oder to launch the app, follow these instruction to ensure a smooth running of the services.
 On Linux, check the write access; use sudo chown -R 1000:1000 OpenRAG if needed.
+
 - Navigate to the `docker` folder by running `cd docker`
 
-Upon launching, you can decide to launch all services or not. Here are the possible configurations: 
+Upon launching, you can decide to launch all services or not. Here are the possible configurations:
+
 - `docker-compose-all.yml`: launches all services (Elasticsearch, the frontend, Ollama, and VLLM)
 - `docker-compose-api.yml`: launches Elasticsearch and the frontend only; OpenAI and Mistral will be usable
 - `docker-compose-ollama.yml`: launches only Elasticsearch, the frontend, and Ollama
@@ -28,7 +37,7 @@ Once you have choosen a docker amongst the options above build it by running `su
 
 You can now access the app through the following URL: [http://localhost:8506/](http://localhost:8506/)
 
-## App functionalities:
+## App functionalities
 
 Once the app is up and running, you can now:
 
@@ -40,7 +49,6 @@ Once the app is up and running, you can now:
 - Benchmark selected methods and retrieved a quantitative report on their performances, their answering time, their energy consumption, greenhouse gas emissions and token consumption
 ![](streamlit_/images/screen_report.png)
 
-
 ### Contacts
 
-For any question concerning the application, feel free to contact the developers at https://meritis.fr/expertise/innovation-ia/#block-form
+For any question concerning the application, feel free to contact the developers at <https://meritis.fr/expertise/innovation-ia/#block-form>

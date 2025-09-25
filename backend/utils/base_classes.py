@@ -6,7 +6,6 @@ from pydantic import BaseModel
 
 
 class Splitter(ABC):
-
     @abstractmethod
     def split_text(self, text: str, chunk_size: int, **kwargs) -> list[str]:
         """
@@ -16,23 +15,59 @@ class Splitter(ABC):
 
     def break_chunks(self, chunks, max_size_chunk=512):
         final_chunks = []
-        for i in range(len(chunks)):
-            if len(chunks[i]) < max_size_chunk:
-                final_chunks.append(chunks[i])
+        for chunk in chunks:
+            if len(chunk) < max_size_chunk:
+                final_chunks.append(chunk)
             else:
-                sentences = nltk.sent_tokenize(chunks[i])
-                current_chunk = sentences[0]
-                for j in range(1, len(sentences)):
-                    if len(current_chunk) + len(sentences[j]) < max_size_chunk:
-                        current_chunk += sentences[j]
+                sentences = nltk.sent_tokenize(chunk)
+                current_smaller_chunk = ""
+
+                for sentence in sentences:
+                    test_chunk = (
+                        current_smaller_chunk
+                        + (" " if current_smaller_chunk else "")
+                        + sentence
+                    )
+
+                    if len(test_chunk) <= max_size_chunk:
+                        current_smaller_chunk = test_chunk
                     else:
-                        final_chunks.append(current_chunk)
-                        current_chunk = sentences[j]
+                        if current_smaller_chunk:
+                            if len(current_smaller_chunk) > max_size_chunk:
+                                final_chunks.extend(
+                                    cut_chunk(current_smaller_chunk, max_size_chunk)
+                                )
+                            else:
+                                final_chunks.append(current_smaller_chunk)
+
+                        if len(sentence) > max_size_chunk:
+                            final_chunks.extend(cut_chunk(sentence, max_size_chunk))
+                            current_smaller_chunk = ""
+                        else:
+                            current_smaller_chunk = sentence
+
+                    if current_smaller_chunk:
+                        if len(current_smaller_chunk) > max_size_chunk:
+                            final_chunks.extend(
+                                cut_chunk(current_smaller_chunk, max_size_chunk)
+                            )
+                        else:
+                            final_chunks.append(current_smaller_chunk)
+
         return final_chunks
-    
+
+
+def cut_chunk(chunk, max_size_chunk):
+    final_chunks = []
+    if len(chunk) > max_size_chunk:
+        for k in range(0, len(chunk), max_size_chunk):
+            final_chunks.append(chunk[k : k + max_size_chunk])
+        return final_chunks
+    else:
+        return [chunk]
+
 
 class VectorBase:
-
     @abstractmethod
     def __init__(self, vb_name: str, path: str) -> None:
         self.vb_name = vb_name
@@ -76,7 +111,6 @@ class VectorBase:
 
 
 class Agent:
-
     @abstractmethod
     def __init__(self, model: str, language: str = "EN", max_attempts: int = 5) -> None:
         self.model = model
@@ -108,5 +142,4 @@ class Agent:
         prompt: str,
         json_format: BaseModel,
     ) -> BaseModel:
-
         pass
