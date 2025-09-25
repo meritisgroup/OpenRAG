@@ -17,7 +17,7 @@ It can be used on the user's hardware or with a supported API key. Available LLM
 
 You can see our tutorial on youtube to how to install and use OpenRAG to start your first benchmark
 
-link to the [tutorial video](youtube.com/watch?si=nZdkRZCIznZJZITK&v=i9Xyarj-fFQ&feature=youtu.be)
+[![Watch the video](https://img.youtube.com/vi/i9Xyarj-fFQ/maxresdefault.jpg)](https://youtu.be/i9Xyarj-fFQ)
 
 ## Launch commands
 
