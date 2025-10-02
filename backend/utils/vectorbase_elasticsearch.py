@@ -215,7 +215,6 @@ class VectorBase_embeddings_elasticsearch(VectorBase):
             }
 
             data.append(temp)
-
         res = helpers.bulk(self.client, data)
         if display_message:
             print(
@@ -303,7 +302,6 @@ class VectorBase_embeddings_elasticsearch(VectorBase):
 
             response = self.client.search(index=collection_name, body=body)
             res.append(response)
-
         results = []
         for l in range(len(res)):
             result = []
@@ -575,7 +573,6 @@ class VectorBase_hybrid_elasticsearch(VectorBase_embeddings_elasticsearch):
             print("the collection have been deleted")
         except Exception as e:
             print(f"Error while deleting the collection : {e}")
-
 
 class VectorBaseVlm_elasticsearch:
     def __init__(

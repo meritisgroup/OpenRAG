@@ -35,7 +35,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
-def loadmodel(model_name: str, gpu_memory_utilization=0.9, nb_try=0):
+def loadmodel(model_name: str, gpu_memory_utilization=0.45, nb_try=0):
     try:
         if model_name not in app.state.models.keys() or "model" not in app.state.models[model_name].keys() or "tokenizer" not in app.state.models[model_name].keys():
             app.state.models[model_name] = {}
@@ -94,7 +94,7 @@ def loadmodel(model_name: str, gpu_memory_utilization=0.9, nb_try=0):
             loadmodel(model_name=model_name,
                       nb_try=1)
         
-def loadmodels(models_name: List[str], gpu_memory_utilization=0.9):
+def loadmodels(models_name: List[str], gpu_memory_utilization=0.5):
     gpu_memory_utilization = gpu_memory_utilization/len(models_name)
     for model_name in models_name:
         loadmodel(model_name=model_name, gpu_memory_utilization=gpu_memory_utilization)
@@ -169,7 +169,7 @@ def generate(
 def generate_embeddings(texts: List[str], model_name: str):
     loadmodel(model_name=model_name)
 
-    outputs = app.state.models[model_name]["model"].encode(texts)
+    outputs = app.state.models[model_name]["model"].embed(texts)
     nb_tokens = []
     for i in range(len(outputs)):
         nb_tokens.append(len(outputs[i].prompt_token_ids))

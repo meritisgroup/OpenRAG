@@ -159,8 +159,8 @@ class CragAgent(NaiveRagAgent):
                 query=query, nb_reformulation=1
             )
             query = query[0]
-            nb_input_tokens += input_t
-            nb_output_tokens += output_t
+            nb_input_tokens += np.sum(input_t)
+            nb_output_tokens += np.sum(output_t)
         contexts = self.get_rag_context(query=query, 
                                         nb_chunks=nb_chunks)[0]
         useful_contexts = []
@@ -215,8 +215,8 @@ class CragAgent(NaiveRagAgent):
                 )
                 system_prompt = self.prompts["document_relevance2"]["SYSTEM_PROMPT"]
                 score = agent.predict(prompt=prompt, system_prompt=system_prompt)
-                nb_input_tokens += scores["nb_input_tokens"]
-                nb_output_tokens += scores["nb_output_tokens"]
+                nb_input_tokens += np.sum(scores["nb_input_tokens"])
+                nb_output_tokens += np.sum(scores["nb_output_tokens"])
 
                 impacts[0] += score["impacts"][0]
                 impacts[1] += score["impacts"][1]
@@ -252,8 +252,8 @@ class CragAgent(NaiveRagAgent):
                 web_results = self.web_results_refinement(
                     web_results=web_results, query=query
                 )
-                nb_input_tokens += web_results["nb_input_tokens"]
-                nb_output_tokens += web_results["nb_output_tokens"]
+                nb_input_tokens += np.sum(web_results["nb_input_tokens"])
+                nb_output_tokens += np.sum(web_results["nb_output_tokens"])
                 energies[0] += web_results["energy"][0]
                 energies[1] += web_results["energy"][1]
                 impacts[0] += web_results["impacts"][0]
@@ -293,8 +293,8 @@ class CragAgent(NaiveRagAgent):
                 web_results = self.web_results_refinement(
                     web_results=web_results, query=query
                 )
-                nb_input_tokens += web_results["nb_input_tokens"]
-                nb_output_tokens += web_results["nb_output_tokens"]
+                nb_input_tokens += np.sum(web_results["nb_input_tokens"])
+                nb_output_tokens += np.sum(web_results["nb_output_tokens"])
 
                 energies[0] += web_results["energy"][0]
                 energies[1] += web_results["energy"][1]

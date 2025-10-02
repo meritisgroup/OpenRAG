@@ -20,7 +20,7 @@ class Chunk(Base):
     # metadata= Mapped[list[str]] = mapped_column(JSON())
 
     def __repr__(self) -> str:
-        return f"Chunk(id={self.id!r}, doc={self.document!r}, text={self.text!r}, position_in_doc={self.position_in_doc!r}, metadata={self.metadata!r})"
+        return f"Chunk(id={self.id!r}, document={self.document!r}, text={self.text!r}, position_in_doc={self.position_in_doc!r}, metadata={self.metadata!r})"
 
     def to_dict(self) -> dict:
 
@@ -63,7 +63,9 @@ class Chunk_query(Base):
             text_doc=chunk.text,
             rerank_score=chunk.rerank_score
         )
-
+    def __repr__(self) -> str:
+        return f"Chunk_query(id={self.id!r}, document={self.document!r}, text={self.text!r}, text_doc={self.text_doc!r}, position_in_doc={self.position_in_doc!r}, rerank_score={self.rerank_score!r})"
+    
     def to_dict(self) -> dict:
 
         return {
