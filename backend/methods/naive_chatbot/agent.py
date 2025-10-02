@@ -6,7 +6,7 @@ Created on Thu Feb  6 16:37:47 2025
 """
 from ...utils.agent import get_Agent
 from ...utils.agent_functions import get_system_prompt
-from ...base_classes import RagAgent
+from ..naive_rag.agent import NaiveRagAgent
 from ...database.database_class import get_management_data
 from .prompts import prompts
 import numpy as np
@@ -14,7 +14,7 @@ from ...database.database_class import DataBase
 from backend.database.rag_classes import Chunk
 
 
-class NaiveChatbot(RagAgent):
+class NaiveChatbot(NaiveRagAgent):
 
     def __init__(self, config_server: dict, *args) -> None:
 
@@ -100,13 +100,3 @@ class NaiveChatbot(RagAgent):
             contexts.append("")
         return contexts
 
-    def generate_answers(
-        self, queries: list[str], nb_chunks=0, options_generation=None
-    ):
-        answers = []
-        for query in queries:
-            answer = self.generate_answer(
-                query=query, nb_chunks=nb_chunks, options_generation=options_generation
-            )
-            answers.append(answer)
-        return answers

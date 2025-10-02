@@ -69,6 +69,15 @@ class Merger_Database_Vectorbase:
             except ValueError:
                 None
 
+    def create_engine_connection(self):
+        for db_name in self.databases.keys():
+            self.databases[db_name]["database"].create_engine_connection()
+
+    def remove_engine_connection(self):
+        for db_name in self.databases.keys():
+            self.databases[db_name]["database"].remove_engine_connection()
+
+
     def add_database(self, db_name, data_folder_name) -> None:
         save_path = os.path.join(self.storage_path, db_name)
         data_path = os.path.join(
@@ -351,8 +360,15 @@ class DataBase:
         self.path_data = path_data
 
         self.name = db_name
-        self.engine = create_engine(f"sqlite:///{path + db_name}")
+        self.create_engine_connection()
+
+    def create_engine_connection(self):
+        self.engine = create_engine(f"sqlite:///{self.path + self.name}")
         self.session = Session(bind=self.engine)
+
+    def remove_engine_connection(self):
+        self.engine = None
+        self.session = None
 
     def add_table(self, table_class: Base) -> None:
         """

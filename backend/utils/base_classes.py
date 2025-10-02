@@ -1,8 +1,11 @@
 from abc import ABC, abstractmethod
 from typing import Union
 import nltk
-from .agent_functions import predict, multiple_predict
+from .agent_functions import predict, multiple_predict, predict_json
 from pydantic import BaseModel
+from typing import List
+from .threading_utils import get_executor_threads
+import concurrent.futures
 
 
 class Splitter(ABC):
@@ -93,20 +96,83 @@ class Agent:
 
         return predict(system_prompt, prompt, self.model, with_tokens)
 
-    def multiple_predict(
-        self, prompts: list[str], system_prompts: list[str]
-    ) -> list[str]:
-        """
-        It batches and generates the answer of the model given the prompts and the system_prompts
-        """
 
-        return multiple_predict(system_prompts, prompts, self.model)
+    def multiple_predict_json(self,
+                              prompts: list[str],
+                              system_prompts: list[str],
+                              json_format: BaseModel,
+                              temperature=0,
+                              images: list[list[str]] = None,
+                              options_generation=None,
+                              max_workers: int = 10):
+
+        results = [None] * len(prompts)
+        
+        if images is None:
+            images = [None] * len(prompts)
+
+        if max_workers<=get_executor_threads():
+            max_workers = 1
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_index = {
+                executor.submit(
+                    self.predict_json,
+                    prompt=prompts[i],
+                    system_prompt=system_prompts[i],
+                    json_format=json_format,
+                    temperature=temperature,
+                    options_generation=options_generation
+                ): i
+                for i in range(len(prompts))
+            }
+
+            for future in concurrent.futures.as_completed(future_to_index):
+                index = future_to_index[future]
+                try:
+                    results[index] = future.result()
+                except Exception as exc:
+                    print(f"Prompt #{index} a généré une exception : {exc}")
+        return results
+    
+    
+    def multiple_predict(
+        self,
+        prompts: List[str],
+        system_prompts: List[str],
+        temperature: float = 0,
+        options_generation=None,
+    ) -> str:
+        """
+        It formats the queries with good prompts, then gives these prompts to the LLM and return the cleaned outputs
+        """
+        answers = multiple_predict(system_prompts,
+                                   prompts,
+                                   self.model,
+                                   self.client,
+                                   temperature=temperature,
+                                   options_generation=options_generation,
+                                   max_workers=self.max_workers)
+        return answers
 
     def predict_json(
         self,
-        system_prompt: str,
         prompt: str,
+        system_prompt: str,
         json_format: BaseModel,
+        temperature=0,
+        options_generation=None,
     ) -> BaseModel:
-
-        pass
+        """
+        It formats the queries with good prompts, then gives these prompts to the LLM and return the cleaned outputs following the given BaseModel format
+        """
+        answer = predict_json(
+            system_prompt,
+            prompt,
+            self.model,
+            self.client,
+            json_format,
+            temperature,
+            options_generation=options_generation,
+        )
+        return answer

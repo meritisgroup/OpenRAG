@@ -5,6 +5,9 @@ from streamlit_.utils.chat_funcs import get_chat_agent
 from backend.utils.utils_vlm import set_vllm_HF_key
 from streamlit_.utils.params_func import get_custom_rags_name
 import json
+from urllib.parse import urlparse
+from streamlit_.utils.params_func import modify_env
+
 
 
 st.markdown("# Set Configuration")
@@ -16,11 +19,6 @@ def set_false():
     "When changin LLM host resests rags to perform benchmark on so that no unavailable Rags are called"
     for i in st.session_state["benchmark"]["rags"].keys():
         st.session_state["benchmark"]["rags"][i] = False
-
-host_llm = {"vllm" : "vLLM",
-            "ollama" : "Ollama",
-            "openai" : "OpenAI",
-            "mistral" : "Mistral"}
 
 host_dict = {
     "ollama": {"url": os.getenv("ollama_LOCAL_URL")+":"+os.getenv("ollama_LOCAL_PORT")+"/v1", 
@@ -49,17 +47,21 @@ st.selectbox(
     key="llm_host"
 )
 
+if st.session_state["llm_host"] in ["ollama", "vllm"]:
+    new_url = st.text_input(label=f"**{st.session_state['llm_host']} endpoint:**",
+              placeholder=host_dict[st.session_state["llm_host"]]["url"],
+              disabled=False if st.session_state["llm_host"] in ["ollama", "vllm"] else True,
+              key  = "endpoint")
 
-st.text_input(
-    label="**Mistral / OpenAI API Key:**",
-    value=st.session_state["api_key"],
-    placeholder="Your API Key",
-    disabled=False if st.session_state["llm_host"] in ["openai", "mistral"] else True,
-    key  = "api_key",
-    type="password"
-    )
+if st.session_state["llm_host"] in ["mistral", "openai"]:
+    st.text_input(label="**Mistral / OpenAI API Key:**",
+                  value=st.session_state["api_key"],
+                  placeholder="Your API Key",
+                  disabled=False if st.session_state["llm_host"] in ["openai", "mistral"] else True,
+                  key  = "api_key",
+                  type="password"
+                 )
 
-st.session_state["config_server"]["params_host_llm"] = host_dict[st.session_state["llm_host"]]
 st.text_input(
     label="**HuggingFace Token:**",
     value=st.session_state["hf_token"],
@@ -81,9 +83,6 @@ selected_data_prep = st.selectbox(
     index= 0,
     key="data_prep",
 )
-
-st.session_state["config_server"]["data_preprocessing"] = st.session_state["data_prep"]
-
 
 # Setting params_vectorbase
 def reset_retrieval():
@@ -120,7 +119,7 @@ else:
         index=list(retrieval_methods.keys()).index(st.session_state["ret"]),
         key="ret"
     )
-st.session_state["config_server"]["type_retrieval"] = st.session_state["ret"]
+
 languages = ["FR", "EN"]
 if "lang" not in st.session_state:
     st.session_state["lang"] = st.session_state["config_server"]["language"]
@@ -149,7 +148,6 @@ st.selectbox(
     index=list(splitter_dic.keys()).index(st.session_state["split"]),
     key = "split"
 )
-st.session_state["config_server"]["TextSplitter"] = st.session_state["split"]
 
 if "reformulate" not in st.session_state:
     st.session_state["reformulate"] = st.session_state["config_server"]["reformulate_query"]
@@ -159,8 +157,6 @@ st.toggle(
     value= st.session_state["reformulate"],
     key="reformulate"
 )
-st.session_state["config_server"]["reformulate_query"] = st.session_state["reformulate"]
-
 if "chunk" not in st.session_state:
     st.session_state["chunk"] = st.session_state["config_server"]["nb_chunks"]
 st.slider(
@@ -177,6 +173,7 @@ st.slider(
 st.session_state["config_server"]["nb_chunks"] = st.session_state["chunk"]
 
 if st.button("Save Configuration", type="primary", use_container_width=True):
+    st.session_state["config_server"]["params_host_llm"] = host_dict[st.session_state["llm_host"]]
     st.session_state["custom_rags"] = get_custom_rags_name(provider=st.session_state["config_server"]["params_host_llm"]["type"])
     rag_method = st.session_state["rag_name"]
     rag_agent = get_chat_agent(rag_method=rag_method,
@@ -185,10 +182,38 @@ if st.button("Save Configuration", type="primary", use_container_width=True):
     st.session_state["rag"] = rag_agent
     
     if type(st.session_state["config_server"]["hf_token"]) is str and len(st.session_state["config_server"]["hf_token"])>0:
+        print(st.session_state["config_server"]["params_host_llm"]["type"])
         if st.session_state["config_server"]["params_host_llm"]["type"]=="vllm":
             set_vllm_HF_key(url=st.session_state["config_server"]["params_host_llm"]['url'],
                             key=st.session_state["config_server"]["hf_token"])
 
     st.session_state["rag_name"] = rag_method
+
+    if 'new_url' in globals() and new_url!="":
+        host_dict[st.session_state["llm_host"]]["url"] = new_url
+        st.session_state["config_server"]["params_host_llm"]["url"] = new_url
+        parsed = urlparse(new_url)
+
+        base_url = f"{parsed.scheme}://{parsed.hostname}"
+        port = parsed.port
+        
+        if st.session_state["llm_host"]=="ollama":
+            modify_env(key="ollama_LOCAL_URL",
+                       value=base_url)
+            modify_env(key="ollama_LOCAL_PORT",
+                       value=port)
+            st.session_state["config_server"]["params_host_llm"]["url"] = os.getenv("ollama_LOCAL_URL")+":"+os.getenv("ollama_LOCAL_PORT")+"/v1"
+        elif st.session_state["llm_host"]=="vllm":
+            modify_env(key="vllm_LOCAL_URL",
+                       value=base_url)
+            modify_env(key="vllm_LOCAL_PORT",
+                       value=port)
+            st.session_state["config_server"]["params_host_llm"]["url"] = os.getenv("VLLM_LOCAL_URL")+":"+os.getenv("VLLM_LOCAL_PORT")
+        
+    st.session_state["config_server"]["TextSplitter"] = st.session_state["split"]
+    st.session_state["config_server"]["reformulate_query"] = st.session_state["reformulate"]
+    st.session_state["config_server"]["type_retrieval"] = st.session_state["ret"]
+    st.session_state["config_server"]["data_preprocessing"] = st.session_state["data_prep"]
+    
     with open("streamlit_/utils/base_config_server.json" , "w") as file:
         json.dump(st.session_state["config_server"], file, indent=4)

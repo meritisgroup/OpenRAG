@@ -1,5 +1,5 @@
 from .base_classes import Evaluator, StatementSupported, ChunkRelevanceAnswer
-from .utils import process_prompt, process_prompt_to_json
+from .utils import process_prompts, process_prompts_to_json
 import numpy as np
 import re
 from ..utils.agent import Agent
@@ -62,16 +62,12 @@ class ContextRelevanceEvaluator(Evaluator):
     ) -> list[float | None]:
         prompts, system_prompt = self._get_prompts(queries, model_contexts)
 
-        cleaned_outputs = [
-            process_prompt(
-                prompt,
-                system_prompt,
-                self.max_attempts,
-                self.agent,
-                self._clean_output,
-            )
-            for prompt in prompts
-        ]
+        cleaned_outputs = process_prompts(prompts,
+                                          [system_prompt],
+                                          self.max_attempts,
+                                          self.agent,
+                                          self._clean_output)
+            
         context_relevance_evaluations = []
         for clean_output, model_context in zip(cleaned_outputs, model_contexts):
             if len(clean_output) > 0:
@@ -157,16 +153,12 @@ class ContextFaithfulnessEvaluator(Evaluator):
 
     def _get_statements(self, queries: list[str], answers: list[str]):
         prompts, system_prompt = self._get_prompts_statements(queries, answers)
-        statements: list[str] = [
-            process_prompt(
-                prompt,
-                system_prompt,
-                self.max_attempts,
-                self.agent,
-                self._clean_output_statements,
-            )
-            for prompt in prompts
-        ]
+        statements: list[str] = process_prompts(prompts,
+                                                [system_prompt],
+                                                self.max_attempts,
+                                                self.agent,
+                                                self._clean_output_statements)
+            
 
         return statements
 
@@ -199,12 +191,11 @@ class ContextFaithfulnessEvaluator(Evaluator):
         prompts, system_prompt = self._get_prompts_faithfulness(
             statements, model_context
         )
-        cleaned_outputs: list[bool] = [
-            process_prompt_to_json(
-                prompt, system_prompt, self.max_attempts, self.agent, StatementSupported
-            )
-            for prompt in prompts
-        ]
+        cleaned_outputs = process_prompts_to_json(prompts,
+                                                  [system_prompt],
+                                                  self.max_attempts,
+                                                  self.agent,
+                                                  StatementSupported)
 
         return cleaned_outputs
 
@@ -287,26 +278,34 @@ class nDCGEvaluator(Evaluator):
             
 
         return all_prompts
-
-
-    def rate_context(self, queries: list[str], answers: list[str], contexts: list[list[Chunk]]) -> list[list[int | None]]:
-
-       
-        
-        scores=[]
-        all_prompts=self._get_prompts(queries, answers, contexts)
-        for per_query in all_prompts:
-            per_query_score=[]
-            for (prompt, system_prompt) in per_query:
-                score_chunk=process_prompt_to_json(
-                prompt, system_prompt, self.max_attempts, self.agent, ChunkRelevanceAnswer).score
-                per_query_score.append(score_chunk)
-            scores.append(per_query_score)
-
-
-        return scores
     
+    def rate_context(self,
+                     queries: list[str],
+                     answers: list[str],
+                     contexts: list[list[Chunk]]) -> list[list[int | None]]:
+        all_prompts = self._get_prompts(queries, answers, contexts)
 
+        prompts = []
+        system_prompts = []
+        index_map = []  
+
+        for query_idx, per_query in enumerate(all_prompts):
+            for prompt_idx, (prompt, system_prompt) in enumerate(per_query):
+                prompts.append(prompt)
+                system_prompts.append(system_prompt)
+                index_map.append(query_idx)
+
+        scores_chunk = process_prompts_to_json(prompts,
+                                               system_prompts,
+                                               self.max_attempts,
+                                               self.agent,
+                                               ChunkRelevanceAnswer)
+
+        scores_finale = [[] for _ in all_prompts]
+        for query_idx, eval_result in zip(index_map, scores_chunk):
+            score_value = eval_result.score if eval_result is not None else None
+            scores_finale[query_idx].append(score_value)
+        return scores_finale
 
     
     def _dcg(self,vals: list[int]) -> float:

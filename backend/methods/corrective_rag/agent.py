@@ -341,6 +341,7 @@ class CragAgent(NaiveRagAgent):
             "context": contexts,
             "impacts": impacts,
             "energy": energies,
+            "original_query": query
         }
 
     def release_gpu_memory(self):

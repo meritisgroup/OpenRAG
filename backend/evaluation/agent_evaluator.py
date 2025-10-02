@@ -257,10 +257,11 @@ class DataFramePreparator:
         ground_truths = [
             ans if pd.notna(ans) and ans != "" else None for ans in df["answer"]
         ]
-
         return queries, ground_truths
 
-    def run_all_queries(self, options_generation=None, log_file: str = "") -> None:
+    def run_all_queries(self,
+                        options_generation=None,
+                        log_file: str = "") -> None:
 
         with open(log_file, "r") as f:
             data_logs = json.load(f)
@@ -280,9 +281,9 @@ class DataFramePreparator:
 
             indexation_tokens[rag_available] = rag_agent.get_infos_embeddings()
             start_time = time.time()
-            rag_results = rag_agent.generate_answers(
-                self.queries, rag_agent.nb_chunks, options_generation=options_generation
-            )
+            rag_results = rag_agent.generate_answers(self.queries,
+                                                     rag_agent.nb_chunks, 
+                                                     options_generation=options_generation)
             end_time = time.time()
             answer_time = end_time - start_time
             answers = [rag_result["answer"] for rag_result in rag_results]

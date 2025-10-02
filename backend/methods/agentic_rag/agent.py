@@ -189,4 +189,5 @@ class AgenticRagAgent(AdvancedRag):
             "context": context_tot,
             "impacts": impacts,
             "energy": energies,
+            "original_query": query
         }

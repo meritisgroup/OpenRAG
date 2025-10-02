@@ -99,7 +99,6 @@ def loadmodels(models_name: List[str], gpu_memory_utilization=0.9):
     for model_name in models_name:
         loadmodel(model_name=model_name, gpu_memory_utilization=gpu_memory_utilization)
 
-
 def releasememorymodel(model_name: str):
     keys = list(app.state.models[model_name].keys())
     for key in keys:
@@ -110,14 +109,12 @@ def releasememorymodel(model_name: str):
     torch.cuda.reset_peak_memory_stats()
     torch.cuda.synchronize()
 
-
 def releasememorymodels():
     keys = list(app.state.models.keys())
     for model_name in keys:
         releasememorymodel(model_name=model_name)
     time.sleep(1)
     print("release models")
-
 
 def generate(
     prompts: List[str],
@@ -169,7 +166,6 @@ def generate(
 
         return texts, logprobs, nb_input_tokens, nb_output_tokens
         
-
 def generate_embeddings(texts: List[str], model_name: str):
     loadmodel(model_name=model_name)
 
@@ -180,7 +176,6 @@ def generate_embeddings(texts: List[str], model_name: str):
         outputs[i] = outputs[i].outputs.embedding
     return outputs, nb_tokens
     
-
 def get_embedding_vlm(model_name, images=[], queries=[]):
     loadmodel(model_name=model_name)
 
@@ -209,7 +204,6 @@ def get_embedding_vlm(model_name, images=[], queries=[]):
     weighted_mean = weighted_sum / sum_of_weights
     embeddings = F.normalize(weighted_mean, p=2, dim=1).detach().cpu().numpy().tolist()
     return embeddings, 0
-
 
 def generate_embeddings_processor(model_name, images=[], queries=[]):
     loadmodel(model_name=model_name)
