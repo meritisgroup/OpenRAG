@@ -84,8 +84,8 @@ class RerankerRag(AdvancedRag):
             queries, input_t, output_t, impacts, energy = self.reformulater.reformulate(
                 query=query, nb_reformulation=nb_reformulation
             )
-            self.nb_input_tokens += input_t
-            self.nb_output_tokens += output_t
+            self.nb_input_tokens += np.sum(input_t)
+            self.nb_output_tokens += np.sum(output_t)
         else:
             queries = [query]
 
@@ -102,7 +102,7 @@ class RerankerRag(AdvancedRag):
                 max_contexts=len(chunk_list),
                 additional_data={"docs_name": docs_name},
             )
-            self.nb_input_tokens += nb_input_tokens
+            self.nb_input_tokens += np.sum(nb_input_tokens)
         else:
             rerank_chunk_list = chunk_list
 

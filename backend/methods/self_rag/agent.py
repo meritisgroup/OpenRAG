@@ -218,8 +218,8 @@ class SelfRagAgent(NaiveRagAgent):
                 query=query, nb_reformulation=1
             )
             query = query[0]
-            nb_input_tokens += input_t
-            nb_output_tokens += ouput_t
+            nb_input_tokens += np.sum(input_t)
+            nb_output_tokens += np.sum(ouput_t)
         agent = self.agent
 
         contexts = ""
@@ -251,8 +251,8 @@ class SelfRagAgent(NaiveRagAgent):
                                     chunk_lists=chunk_lists,
                                     options_generation = options_generation
                                 )
-            nb_input_tokens += answer["nb_input_tokens"]
-            nb_output_tokens += answer["nb_output_tokens"]
+            nb_input_tokens += np.sum(answer["nb_input_tokens"])
+            nb_output_tokens += np.sum(answer["nb_output_tokens"])
             context = answer["context"]
 
         else:

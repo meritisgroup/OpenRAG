@@ -158,7 +158,7 @@ class AdvancedRag(NaiveRagAgent):
                 chunk_list=chunk_list,
                 max_contexts=len(chunk_list),
             )
-            nb_input_tokens += nb_input_tokens
+            self.nb_input_tokens += np.sum(nb_input_tokens)
         else:
             rerank_chunk_list = chunk_list
 

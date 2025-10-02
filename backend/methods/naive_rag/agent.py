@@ -180,8 +180,8 @@ class NaiveRagAgent(RagAgent):
                 query=query, nb_reformulation=1
             )
             query = query[0]
-            nb_input_tokens += input_t
-            nb_output_tokens = output_t
+            nb_input_tokens += np.sum(input_t)
+            nb_output_tokens = np.sum(output_t)
 
         # Building the prompt in 3 steps
         chunk_lists = self.get_rag_context(query=query, nb_chunks=nb_chunks)
