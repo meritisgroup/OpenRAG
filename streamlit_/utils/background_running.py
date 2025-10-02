@@ -40,10 +40,14 @@ def task(
     ):
         if len(rag_agents) > 1:
             if type_bench == "answers":
-                generate_only_answers(rag_names, rag_agents, report_dir=report_dir)
+                generate_only_answers(rag_names, 
+                                      rag_agents, 
+                                      report_dir=report_dir)
             elif type_bench == "contexts":
                 generate_only_contexts(
-                    rag_names=rag_names, rag_agents=rag_agents, report_dir=report_dir
+                    rag_names=rag_names,
+                    rag_agents=rag_agents,
+                    report_dir=report_dir
                 )
             elif type_bench == "full_bench":
                 generate_benchmark(

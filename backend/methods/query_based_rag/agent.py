@@ -115,11 +115,3 @@ class QueryBasedRagAgent(AdvancedRag):
             names_docs.append(name_docs)
         return contexts, names_docs
 
-    def generate_answers(self, queries: list[str], nb_chunks: int = 2, options_generation = None):
-        answers = []
-        for query in queries:
-            answer = self.generate_answer(query=query,
-                                          nb_chunks=nb_chunks,
-                                          options_generation=options_generation)
-            answers.append(answer)
-        return answers

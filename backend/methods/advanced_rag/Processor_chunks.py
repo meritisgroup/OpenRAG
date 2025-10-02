@@ -1,8 +1,8 @@
 from ..contextual_retrieval_rag.contextual import (
-    run_batch_contextual,
-    run_serial_contextual,
+    run_contextual
 )
 from ...database.rag_classes import Chunk
+
 
 
 class Processor_chunks:
@@ -15,7 +15,7 @@ class Processor_chunks:
             self.type_processor_chunks = [self.type_processor_chunks]
         self.language = language
 
-    def process_chunk(self, chunks, doc_content, batch=True):
+    def process_chunk(self, chunks, doc_content):
         if len(self.type_processor_chunks) == 0:
             return {"chunks": chunks, "nb_output_tokens": 0, "nb_input_tokens": 0}
         for i in range(len(self.type_processor_chunks)):
@@ -26,12 +26,10 @@ class Processor_chunks:
         return data
 
     def run_contextual(self, chunks, doc_content):
-        data = run_batch_contextual(
-                agent=self.agent,
-                doc_chunks=chunks,
-                doc_content=doc_content,
-                language=self.language,
-            )
+        data = run_contextual(agent=self.agent,
+                              doc_chunks=chunks,
+                              doc_content=doc_content,
+                              language=self.language)
         results = {
             "chunks": [],
             "nb_output_tokens": data["nb_output_tokens"],

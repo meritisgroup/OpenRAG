@@ -4,14 +4,14 @@ Created on Thu Feb  6 16:37:47 2025
 
 @author: chardy
 """
-from ...base_classes import RagAgent
+from ..naive_rag.agent import NaiveRagAgent
 from ...utils.agent import get_Agent
 from .prompts import prompts
 import numpy as np
 from .get_rags_to_merge import get_rag_to_merge
 
 
-class MergerRagAgent(RagAgent):
+class MergerRagAgent(NaiveRagAgent):
     "Original RAG with no modification"
 
     def __init__(
@@ -166,15 +166,5 @@ class MergerRagAgent(RagAgent):
                 "context": full_response["context"],
                 "impacts": full_response["impacts"],
                 "energy": full_response["energy"],
+                "original_query": query
             }
-    
-    def generate_answers(
-        self, queries: list[str], nb_chunks: int = 2, options_generation=None
-    ):
-        answers = []
-        for query in queries:
-            answer = self.generate_answer(
-                query=query, nb_chunks=nb_chunks, options_generation=options_generation
-            )
-            answers.append(answer)
-        return answers

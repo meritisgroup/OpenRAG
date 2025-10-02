@@ -88,7 +88,7 @@ with st.sidebar:
 
     reset_index = st.checkbox(label="Reset indexing", value=False)
     reset_preprocess = st.checkbox(label="Reset preprocessing", value=False)
-
+    
     if st.button(
         "Initialize RAG Agent",
         use_container_width=True,

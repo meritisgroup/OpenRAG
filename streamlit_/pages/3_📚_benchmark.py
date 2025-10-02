@@ -16,11 +16,11 @@ from streamlit_.utils.benchmark_funcs import (
     run_indexation_benchmark,
     get_folder_saved_benchmark,
     show_already_done_benchmark,
-    get_report_path,
-)
-from streamlit_.utils.chat_funcs import get_chat_agent, change_default_prompt
+    get_report_path)
 
+from streamlit_.utils.chat_funcs import get_chat_agent, change_default_prompt
 from backend.utils.progress import ProgressBar
+
 
 st.markdown("# Benchmark Generation")
 st.markdown("## Choose RAG techniques to benchmark:")

@@ -9,7 +9,9 @@ import json
 from backend.database.rag_classes import Document, Tokens, Chunk
 
 
-def get_chat_agent(rag_method, databases_name, session_state=None):
+def get_chat_agent(rag_method,
+                   databases_name,
+                   session_state=None):
     if session_state is None:
         session_state = st.session_state
 

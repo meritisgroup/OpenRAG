@@ -153,9 +153,8 @@ def generate_only_answers(rag_names, rag_agents, report_dir):
                 },
                 f,
             )
-    dataframe_preparator.run_all_queries(
-        options_generation={"type_generation": "simple_generation"}, log_file=log_file
-    )
+    dataframe_preparator.run_all_queries(options_generation={"type_generation": "simple_generation"},
+                                         log_file=log_file)
     df = dataframe_preparator.get_dataframe()
     df.to_csv(os.path.join(get_report_path(), "bench_df.csv"), index=False)
 
@@ -199,9 +198,8 @@ def generate_only_contexts(rag_names, rag_agents, report_dir):
                 },
                 f,
             )
-    dataframe_preparator.run_all_queries(
-        options_generation={"type_generation": "no_generation"}, log_file=log_file
-    )
+    dataframe_preparator.run_all_queries(options_generation={"type_generation": "no_generation"},
+                                         log_file=log_file)
     df = dataframe_preparator.get_dataframe()
     df.to_csv(os.path.join(get_report_path(), "contexts_df.csv"), index=False)
 
@@ -303,14 +301,11 @@ def generate_benchmark(
                 f,
             )
 
-    dataframe_preparator = DataFramePreparator(
-        rag_agents=rag_agents,
-        rags_available=rag_names,
-        input_path=os.path.join("data", "queries", queries_doc_mane),
-    )
-    dataframe_preparator.run_all_queries(
-        options_generation={"type_generation": "simple_generation"}, log_file=log_file
-    )
+    dataframe_preparator = DataFramePreparator(rag_agents=rag_agents,
+                                               rags_available=rag_names,
+                                               input_path=os.path.join("data", "queries", queries_doc_mane))
+    dataframe_preparator.run_all_queries(options_generation={"type_generation": "simple_generation"},
+                                         log_file=log_file)
 
     df = dataframe_preparator.get_dataframe()
     evaluation_agent = AgentEvaluator(

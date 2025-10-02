@@ -2,34 +2,33 @@
     "storage_path": "./storage",
     "storage_data_path": "./data/databases",
     "params_host_llm": {
-        "url": "http://ollama:11434/v1",
+        "url": null,
         "type": "ollama",
         "api_key": null
     },
     "params_vectorbase": {
         "backend": "elasticsearch",
         "batch": true,
-        "url": "http://elasticsearch:9200",
+        "url": "http://localhost:9200",
         "auth": [
             "elastic",
             "UDY9ydMS"
         ]
     },
+    "max_workers": 10,
     "device": "cpu",
-    "model": "gemma3:12b",
+    "model": "gpt-4o-mini",
     "model_for_image": "gemma3:12b",
-    "embedding_model": "mxbai-embed-large:latest",
+    "embedding_model": "text-embedding-3-small",
     "language": "FR",
-    "type_retrieval": "embeddings",
-    "TextSplitter": "Semantic_TextSplitter",
+    "type_retrieval": "hybrid",
+    "TextSplitter": "TextSplitter",
     "reformulate_query": false,
-    "reranker_model": "gemma3:12b",
+    "reranker_model": "gpt-4.1-nano-2025-04-14",
     "max_attempts": 5,
     "nb_chunks": 10,
     "nb_chunks_reranker": 20,
-    "ProcessorChunks": [
-        "Contextual"
-    ],
+    "ProcessorChunks": [],
     "hf_token": null,
     "params_llm_dockling": {
         "url": "",

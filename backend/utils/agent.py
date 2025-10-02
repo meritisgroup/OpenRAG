@@ -38,6 +38,7 @@ def get_Agent(config_server: dict, image_description=False):
             key_or_url=params_host_llm["url"],
             language=config_server["language"],
             max_attempts=config_server["max_attempts"],
+            max_workers=config_server["max_workers"]
         )
     if params_host_llm["type"] == "vllm":
         agent = Agent_Vllm(
@@ -45,6 +46,7 @@ def get_Agent(config_server: dict, image_description=False):
             key_or_url=params_host_llm["url"],
             language=config_server["language"],
             max_attempts=config_server["max_attempts"],
+            max_workers=config_server["max_workers"]
         )
     elif params_host_llm["type"] == "openai":
         agent = Agent_openai(
@@ -52,6 +54,7 @@ def get_Agent(config_server: dict, image_description=False):
             key_or_url=params_host_llm["api_key"],
             language=config_server["language"],
             max_attempts=config_server["max_attempts"],
+            max_workers=config_server["max_workers"]
         )
     elif params_host_llm["type"] == "mistral":
         agent = Agent_mistral(
@@ -59,6 +62,7 @@ def get_Agent(config_server: dict, image_description=False):
             key_or_url=params_host_llm["api_key"],
             language=config_server["language"],
             max_attempts=config_server["max_attempts"],
+            max_workers=config_server["max_workers"]
         )
     return agent
 
@@ -71,6 +75,7 @@ class Agent_ollama(Agent):
         key_or_url="http://localhost:11434/v1",
         language="EN",
         max_attempts=5,
+        max_workers = 10,
     ):
         """
         Args :
@@ -86,6 +91,7 @@ class Agent_ollama(Agent):
         self.max_attempts = max_attempts
         self.temperature = 0
         self.key_or_url = key_or_url
+        self.max_workers = max_workers
 
     def predict(
         self, prompt: str, system_prompt: str, temperature=0, options_generation=None
@@ -98,28 +104,6 @@ class Agent_ollama(Agent):
             prompt,
             self.model,
             self.client,
-            temperature,
-            options_generation=options_generation,
-        )
-        return answer
-
-    def predict_json(
-        self,
-        prompt: str,
-        system_prompt: str,
-        json_format: BaseModel,
-        temperature=0,
-        options_generation=None,
-    ) -> BaseModel:
-        """
-        It formats the queries with good prompts, then gives these prompts to the LLM and return the cleaned outputs following the given BaseModel format
-        """
-        answer = predict_json(
-            system_prompt,
-            prompt,
-            self.model,
-            self.client,
-            json_format,
             temperature,
             options_generation=options_generation,
         )
@@ -141,26 +125,7 @@ class Agent_ollama(Agent):
             temperature,
         )
         return answer
-
-    def multiple_predict(
-        self,
-        prompts: List[str],
-        system_prompts: List[str],
-        temperature=0,
-        options_generation=None,
-    ) -> str:
-        """
-        It formats the queries with good prompts, then gives these prompts to the LLM and return the cleaned outputs
-        """
-        answers = multiple_predict(
-            system_prompts,
-            prompts,
-            self.model,
-            self.client,
-            temperature,
-            options_generation=options_generation,
-        )
-        return answers
+    
 
     def embeddings(self, texts, model):
 
@@ -213,18 +178,21 @@ class Agent_Vllm(Agent):
         key_or_url="http://0.0.0.0:8000",
         language="EN",
         max_attempts=5,
+        max_workers = 10,
     ):
         self.model = model
         self.language = language
         self.max_attempts = max_attempts
         self.url = key_or_url
         self.temperature = 0
+        self.max_workers = max_workers
+
 
     def multiple_predict(
         self,
         prompts: List[str],
         system_prompts: List[str],
-        images: list[list[str]] = None,
+        images = None,
         json_format=None,
         temperature=0,
         options_generation=None,
@@ -247,52 +215,6 @@ class Agent_Vllm(Agent):
 
         return answers
 
-    def predict_json(
-        self,
-        prompt: str,
-        system_prompt: str,
-        json_format: BaseModel,
-        temperature=0,
-        images: list[str] = None,
-        options_generation=None,
-    ) -> BaseModel:
-        """
-        It formats the queries with good prompts, then gives these prompts to the LLM and return the cleaned outputs following the given BaseModel format
-        """
-        answer = self.multiple_predict(
-            prompts=[prompt],
-            system_prompts=[system_prompt],
-            temperature=temperature,
-            json_format=json_format,
-            images=[images],
-            options_generation=options_generation,
-        )
-        answer = answer["texts"][0]
-
-        if "json" in answer:
-            cleaned = answer.split("json\n")[1].split("\n```")[0]
-        elif "{" in answer:
-            cleaned = answer.split("{")[1].split("}")[0]
-            cleaned = "{" + cleaned + "}"
-        elif "True" in answer and json_format.__name__ == "StatementSupported":
-            cleaned = '{"supported": true}'
-
-        elif "False" in answer and json_format.__name__ == "StatementSupported":
-            cleaned = '{"supported": false}'
-        else:
-            json_format_str = json.dumps(json_format.model_json_schema())
-            prompt = "Can you rewrite the answer to make it match the given json format: \n\n Here's the answer:{}\n\n Can you rewrite it to match this JSON format: {}".format(answer, str(json_format_str))
-            system_prompt = "You are an AI assistant which has for mission to rewrite the answer to match a given json format"
-            return self.predict_json(prompt=prompt,
-                                     system_prompt=system_prompt,
-                                     json_format=json_format,
-                                     temperature=temperature,
-                                     images=images)
-            
-        answer = json.loads(cleaned)
-        answer = json_format(**answer)
-        return answer
-
     def predict(
         self,
         prompt: str,
@@ -310,6 +232,78 @@ class Agent_Vllm(Agent):
         )
         answer["texts"] = answer["texts"][0]
         return answer
+
+
+
+    def multiple_predict_json(self, 
+                              prompts: list[str],
+                              system_prompts: list[str],
+                              json_format: BaseModel,
+                              temperature=0, 
+                              images: list[list[str]] = None,
+                              options_generation = None):
+        answers = self.multiple_predict(
+            prompts=prompts,
+            system_prompts=system_prompts,
+            temperature=temperature,
+            json_format=json_format,
+            images=images,
+            options_generation=options_generation,
+        )
+        results = []
+        for i in range(len(answers["texts"])):
+            answer_temp = answers["texts"][i]
+            if "json" in answer_temp:
+                cleaned = answer_temp.split("json\n")[1].split("\n```")[0]
+            elif "{" in answer_temp:
+                cleaned = answer_temp.split("{")[1].split("}")[0]
+                cleaned = "{" + cleaned + "}"
+            elif "True" in answer_temp and json_format.__name__ == "StatementSupported":
+                cleaned = '{"supported": true}'
+
+            elif "False" in answer_temp and json_format.__name__ == "StatementSupported":
+                cleaned = '{"supported": false}'
+            else:
+                if images is not None and 0 <= i < len(images) and images[i] is not None: 
+                    cleaned = self.multiple_predict_json(prompts = [prompts[i]],
+                                                        system_prompts = [system_prompts[i]],
+                                                        json_format = json_format,
+                                                        temperature = temperature+0.5 if temperature<1 else temperature, 
+                                                        images = [images[i]],
+                                                        options_generation = options_generation)
+                else:
+                    cleaned = self.multiple_predict_json(prompts = [prompts[i]],
+                                                        system_prompts = [system_prompts[i]],
+                                                        json_format = json_format,
+                                                        temperature = temperature+0.5 if temperature<1 else temperature, 
+                                                        images = None,
+                                                        options_generation = options_generation)
+            if type(cleaned)==str:
+                answer = json.loads(cleaned)
+                answer = json_format(**answer)
+            else:
+                answer = cleaned
+            results.append(answer)
+        return results
+
+    def predict_json(
+        self,
+        prompt: str,
+        system_prompt: str,
+        json_format: BaseModel,
+        temperature=0,
+        images: list[str] = None,
+        options_generation=None,
+    ) -> BaseModel:
+        """
+        It formats the queries with good prompts, then gives these prompts to the LLM and return the cleaned outputs following the given BaseModel format
+        """
+        return self.multiple_predict_json(prompts=[prompt],
+                                          system_prompts=[system_prompt],
+                                          json_format=json_format,
+                                          temperature=temperature,
+                                          images=[images],
+                                          options_generation=options_generation)[0]
 
     def predict_image(
         self, prompt: str, data_url, json_format: BaseModel, temperature=0,
@@ -387,6 +381,7 @@ class Agent_openai(Agent):
         key_or_url: str = None,
         language="EN",
         max_attempts=5,
+        max_workers = 10
     ):
         """
         Args :
@@ -401,29 +396,7 @@ class Agent_openai(Agent):
         self.language = language
         self.max_attempts = max_attempts
         self.temperature = 0
-
-    def predict_json(
-        self,
-        prompt: str,
-        system_prompt: str,
-        json_format: BaseModel,
-        temperature=0,
-        options_generation=None,
-    ) -> BaseModel:
-        """
-        It formats the queries with good prompts, then gives these prompts to the LLM and return the cleaned outputs following the given BaseModel format
-        """
-        temperature = self.temperature
-        answer = predict_json(
-            system_prompt,
-            prompt,
-            self.model,
-            self.client,
-            json_format,
-            temperature,
-            options_generation=options_generation,
-        )
-        return answer
+        self.max_workers = max_workers
 
     def predict_image(
         self, prompt: str, data_url, json_format: BaseModel, temperature=0
@@ -461,30 +434,11 @@ class Agent_openai(Agent):
             options_generation=options_generation,
         )
         return answer
-
-    def multiple_predict(
-        self,
-        prompts: List[str],
-        system_prompts: List[str],
-        temperature: float = 0,
-        options_generation=None,
-    ) -> str:
-        """
-        It formats the queries with good prompts, then gives these prompts to the LLM and return the cleaned outputs
-        """
-        temperature = self.temperature
-        answers = multiple_predict(
-            system_prompts,
-            prompts,
-            self.model,
-            self.client,
-            temperature=temperature,
-            options_generation=options_generation,
-        )
-        return answers
+    
 
     def embeddings(self, texts, model):
-        embeddings = self.client.embeddings.create(input=texts, model=model)
+        embeddings = self.client.embeddings.create(input=texts,
+                                                   model=model)
 
         if type(texts) is type([]):
             vector_embeddings = [
@@ -535,6 +489,7 @@ class Agent_mistral(Agent_openai):
         key_or_url: str = None,
         language="EN",
         max_attempts=5,
+        max_workers = 10
     ):
         """
         Args :
@@ -548,7 +503,7 @@ class Agent_mistral(Agent_openai):
             key_or_url=key_or_url,
             language=language,
             max_attempts=max_attempts,
-        )
+            max_workers=max_workers)
 
         self.client = Mistral(api_key=key_or_url)
 
@@ -571,29 +526,6 @@ class Agent_mistral(Agent_openai):
             "embeddings": vector_embeddings,
             "nb_tokens": embeddings.usage.total_tokens,
         }
-
-    def predict_json(
-        self,
-        prompt: str,
-        system_prompt: str,
-        json_format: BaseModel,
-        temperature=0,
-        options_generation=None,
-    ) -> BaseModel:
-        """
-        It formats the queries with good prompts, then gives these prompts to the LLM and return the cleaned outputs following the given BaseModel format
-        """
-        temperature = self.temperature
-        answer = predict_json(
-            system_prompt,
-            prompt,
-            self.model,
-            self.client,
-            json_format,
-            temperature,
-            options_generation=options_generation,
-        )
-        return answer
 
     def predict(
         self,

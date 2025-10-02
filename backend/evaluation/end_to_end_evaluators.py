@@ -1,5 +1,5 @@
 from .base_classes import Evaluator, MetricAnswer, GroundTruthAnswer
-from .utils import process_prompt_to_json
+from .utils import process_prompts_to_json
 import numpy as np
 import re
 from ..utils.agent import Agent
@@ -61,12 +61,11 @@ class GroundTruthComparison(Evaluator):
             metric, queries, real_answers, proposed_answers
         )
 
-        cleaned_outputs = [
-            process_prompt_to_json(
-                prompt, system_prompt, self.max_attempts, self.agent, GroundTruthAnswer
-            )
-            for prompt in prompts
-        ]
+        cleaned_outputs = process_prompts_to_json(prompts,
+                                                  [system_prompt],
+                                                  self.max_attempts,
+                                                  self.agent,
+                                                  GroundTruthAnswer)
         return cleaned_outputs
 
     def _clean_output(self, output: str) -> str | None:
@@ -175,12 +174,11 @@ class MetricComparaison(Evaluator):
             metric, queries, ground_truths, first_answers, second_answers
         )
 
-        cleaned_outputs = [
-            process_prompt_to_json(
-                prompt, system_prompt, self.max_attempts, self.agent, MetricAnswer
-            )
-            for prompt in prompts
-        ]
+        cleaned_outputs =  process_prompts_to_json(prompts, 
+                                                   [system_prompt],
+                                                   self.max_attempts,
+                                                   self.agent,
+                                                   MetricAnswer)
         return cleaned_outputs
 
     def run_evaluation_pipeline(

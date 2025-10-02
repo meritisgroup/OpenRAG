@@ -92,9 +92,9 @@ class AdvancedRag(NaiveRagAgent):
         index.run_pipeline(
             chunk_size=self.chunk_size,
             chunk_overlap=overlap,
-            batch=self.params_vectorbase["batch"],
             config_server=self.config_server,
-            reset_preprocess=reset_preprocess
+            reset_preprocess=reset_preprocess,
+            max_workers=self.config_server["max_workers"]
         )
 
         return None
@@ -138,16 +138,17 @@ class AdvancedRag(NaiveRagAgent):
         agent = self.agent
         impacts = [0, 0, ""]
         energy = [0, 0, ""]
+        nb_input_tokens = 0
+        nb_output_tokens = 0
         if self.reformulate_query:
             queries, input_t, output_t, impacts, energy = self.reformulater.reformulate(
                 query=query, nb_reformulation=nb_reformulation
             )
-            self.nb_input_tokens += np.sum(input_t)
-            self.nb_output_tokens += np.sum(output_t)
+            nb_input_tokens += np.sum(input_t)
+            nb_output_tokens += np.sum(output_t)
         else:
             queries = [query]
 
-        # Building the prompt in several steps
         chunk_lists = self.get_rag_context(query=queries[0], nb_chunks=nb_chunks)
         chunk_list = [chunk for chunk_list in chunk_lists for chunk in chunk_list]
 
@@ -157,7 +158,7 @@ class AdvancedRag(NaiveRagAgent):
                 chunk_list=chunk_list,
                 max_contexts=len(chunk_list),
             )
-            self.nb_input_tokens += nb_input_tokens
+            nb_input_tokens += nb_input_tokens
         else:
             rerank_chunk_list = chunk_list
 
@@ -171,8 +172,8 @@ class AdvancedRag(NaiveRagAgent):
             system_prompt=self.system_prompt,
             options_generation=options_generation,
         )
-        self.nb_input_tokens += np.sum(answer["nb_input_tokens"])
-        self.nb_output_tokens += np.sum(answer["nb_output_tokens"])
+        nb_input_tokens += np.sum(answer["nb_input_tokens"])
+        nb_output_tokens += np.sum(answer["nb_output_tokens"])
 
         impact = answer["impacts"]
         impact[0] += impacts[0]
@@ -184,20 +185,11 @@ class AdvancedRag(NaiveRagAgent):
 
         return {
             "answer": answer["texts"],
-            "nb_input_tokens": self.nb_input_tokens,
-            "nb_output_tokens": self.nb_output_tokens,
+            "nb_input_tokens": nb_input_tokens,
+            "nb_output_tokens": nb_output_tokens,
             "context": rerank_chunk_list,
             "impacts": impact,
             "energy": energies,
+            "original_query": query
         }
 
-    def generate_answers(
-        self, queries: list[str], nb_chunks: int = 2, options_generation=None
-    ):
-        answers = []
-        for query in queries:
-            answer = self.generate_answer(
-                query=query, nb_chunks=nb_chunks, options_generation=options_generation
-            )
-            answers.append(answer)
-        return answers
