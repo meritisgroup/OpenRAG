@@ -2,8 +2,8 @@
     "storage_path": "./storage",
     "storage_data_path": "./data/databases",
     "params_host_llm": {
-        "url": null,
-        "type": "ollama",
+        "url": "http://localhost:8000",
+        "type": "vllm",
         "api_key": null
     },
     "params_vectorbase": {
