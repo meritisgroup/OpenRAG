@@ -84,8 +84,8 @@ class RerankerRag(AdvancedRag):
             queries, input_t, output_t, impacts, energy = self.reformulater.reformulate(
                 query=query, nb_reformulation=nb_reformulation
             )
-            self.nb_input_tokens += input_t
-            self.nb_output_tokens += output_t
+            self.nb_input_tokens += np.sum(input_t)
+            self.nb_output_tokens += np.sum(output_t)
         else:
             queries = [query]
 
@@ -102,7 +102,7 @@ class RerankerRag(AdvancedRag):
                 max_contexts=len(chunk_list),
                 additional_data={"docs_name": docs_name},
             )
-            self.nb_input_tokens += nb_input_tokens
+            self.nb_input_tokens += np.sum(nb_input_tokens)
         else:
             rerank_chunk_list = chunk_list
 
@@ -134,24 +134,5 @@ class RerankerRag(AdvancedRag):
             "context": rerank_chunk_list,
             "impacts": impact,
             "energy": energies,
+            "original_query": query
         }
-
-    # def get_rag_contexts(self, queries: list[str], nb_chunks: int = 5):
-    #     contexts = []
-    #     names_docs = []
-    #     for query in queries:
-    #         context, name_docs = self.get_rag_context(query=query, nb_chunks=nb_chunks)
-    #         contexts.append(context)
-    #         names_docs.append(name_docs)
-    #     return contexts, names_docs
-
-    def generate_answers(
-        self, queries: list[str], nb_chunks: int = 2, options_generation=None
-    ):
-        answers = []
-        for query in queries:
-            answer = self.generate_answer(
-                query=query, nb_chunks=nb_chunks, options_generation=options_generation
-            )
-            answers.append(answer)
-        return answers

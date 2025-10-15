@@ -16,11 +16,11 @@ from streamlit_.utils.benchmark_funcs import (
     run_indexation_benchmark,
     get_folder_saved_benchmark,
     show_already_done_benchmark,
-    get_report_path,
+    get_report_path, generate_questions
 )
 from streamlit_.utils.chat_funcs import get_chat_agent, change_default_prompt
-
 from backend.utils.progress import ProgressBar
+
 
 st.markdown("# Benchmark Generation")
 st.markdown("## Choose RAG techniques to benchmark:")
@@ -139,6 +139,51 @@ else:
             options=st.session_state["all_databases"],
             key="benchmark_database",
         )
+    
+
+
+
+
+    
+st.markdown("## Generate queries")
+left, right = st.columns([0.5, 0.15], vertical_alignment="bottom")
+st.session_state["benchmark"]["number_of_questions"] = left.number_input(
+    label="Number of queries",
+    min_value=1,
+    step=1,
+    value=5)
+
+if right.button(label="Generate queries", type="primary", use_container_width=True):
+    file_path = "./data/queries/generated_queries.xlsx"
+    config_server=st.session_state["config_server"]
+
+
+    number = st.session_state["benchmark"]["number_of_questions"]
+    list_queries, list_answers = generate_questions(
+        n_questions=number,
+        databases=st.session_state["benchmark_database"],
+        config_server=config_server
+    )
+
+    df = pd.DataFrame({
+        "query": list_queries,
+        "answer": list_answers
+    })
+
+
+    if not os.path.exists(file_path):
+        df.to_excel(file_path, index=False)
+        st.success(f"File created and {number} queries saved to: {file_path}")
+    else:
+        existing_df = pd.read_excel(file_path)
+        updated_df = pd.concat([existing_df, df], ignore_index=True)
+        updated_df.to_excel(file_path, index=False)
+        st.success(f"Added {number} new queries ")
+
+    st.write(f"Generating {number} queries...")
+
+
+
 
 
 if "all_system_prompt" not in st.session_state:

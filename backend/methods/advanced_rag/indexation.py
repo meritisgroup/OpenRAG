@@ -5,10 +5,55 @@ from ...database.data_extraction import DocumentText
 from ...database.rag_classes import Document
 from .Processor_chunks import Processor_chunks
 from ...utils.progress import ProgressBar
+from ..naive_rag.indexation import indexation
+from ...utils.threading_utils import get_executor_threads
 from tqdm.auto import tqdm
 import numpy as np
 import os
 from pathlib import Path
+import concurrent.futures
+
+
+
+def process_single_doc(
+    data_manager,
+    processor_chunks,
+    path_doc: str,
+    doc_index: int,
+    config_server: dict,
+    splitter, 
+    chunk_size: int,
+    chunk_overlap: bool,
+    reset_preprocess: bool,
+    use_batch: bool,
+) -> dict:
+    
+    doc_indexation_tokens = 0
+    doc = DocumentText(path=path_doc,
+                       doc_index=doc_index,
+                       config_server=config_server,
+                       splitter=splitter,
+                       reset_preprocess=reset_preprocess)
+
+    doc_chunks = doc.chunks(chunk_size=chunk_size,
+                            chunk_overlap=chunk_overlap)
+    name_docs = [str(Path(path_doc).name) for i in range(len(doc_chunks))]
+    path_docs = [str(Path(path_doc).parent) for i in range(len(doc_chunks))]
+    data = processor_chunks.process_chunk(chunks=doc_chunks,
+                                          doc_content=doc.content)
+    doc_chunks = data["chunks"]
+
+    doc_indexation_tokens += np.sum(data["nb_output_tokens"])
+    doc_indexation_tokens += np.sum(indexation(data_manager=data_manager,
+                                               doc_chunks=doc_chunks,
+                                               path_docs=path_docs))
+
+    return {
+        "name": str(Path(path_doc).name),
+        "path": str(path_doc),
+        "embedding_tokens": int(doc_indexation_tokens),
+        "parent_path": str(Path(path_doc).parent),
+    }
 
 
 class AdvancedIndexation:
@@ -44,55 +89,10 @@ class AdvancedIndexation:
             agent=self.agent,
             embedding_model=self.embedding_model,
         )
-        self.processor_chunks = Processor_chunks(
-            agent=self.agent,
-            type_processor_chunks=type_processor_chunks,
-            language=self.language,
-        )
+        self.processor_chunks = Processor_chunks(agent=self.agent,
+                                                 type_processor_chunks=type_processor_chunks,
+                                                 language=self.language)
 
-    def __batch_indexation__(self, doc_chunks, path_docs):
-        """
-        Adds a batch of chunks from doc_chunks to the indexation verctorbase
-        Args:
-            doc_chunks (list[str]) : Chunks to be indexed
-            name_docs (list[str]) : Name of docs each chunk is from
-
-        Returns
-            None
-        """
-        tokens = 0
-
-        taille_batch = 500
-        range_chunks = range(0, len(doc_chunks), taille_batch)
-        progress_bar_chunks = ProgressBar(total=len(range_chunks))
-        j = 0
-        for i in range_chunks:
-            tokens += np.sum(
-                self.data_manager.add_str_batch_elements(
-                    chunks=doc_chunks[i : i + taille_batch],
-                    path_docs=path_docs[i : i + taille_batch],
-                    display_message=False,
-                )
-            )
-            progress_bar_chunks.update(j)
-            j += 1
-        progress_bar_chunks.clear()
-        return tokens
-
-    def __serial_indexation__(self, doc_chunks, path_docs) -> int:
-        """
-        Adds a batch of chunks from doc_chunks to the indexation verctorbase
-        Args:
-            doc_chunks (list[str]) : Chunks to be indexed
-            name_docs (list[str]) : Name of docs each chunk is from
-
-        Returns
-            indexation_tokens :
-        """
-        tokens = self.data_manager.add_str_elements(
-            doc_chunks, path_docs, display_message=False
-        )
-        return tokens
 
     def run_pipeline(
         self,
@@ -100,7 +100,8 @@ class AdvancedIndexation:
         chunk_size: int = 500,
         chunk_overlap: bool = True,
         batch: bool = True,
-        reset_preprocess = False
+        reset_preprocess = False,
+        max_workers: int = 10
     ) -> None:
         """
         Split texts from self.data_path, embed them and save them in a vector base.
@@ -127,46 +128,39 @@ class AdvancedIndexation:
             doc for doc in to_process_norm if doc not in docs_already_norm
         ]
 
+        if max_workers<=get_executor_threads():
+            max_workers = 1
+
         self.data_manager.create_collection()
         progress_bar = ProgressBar(total=len(docs_to_process))
-        for i, path_doc in enumerate(docs_to_process):
-            doc_tokens = 0
-            progress_bar.set_description(f"Embbeding chunks - {path_doc}")
-            doc = DocumentText(path=path_doc,
-                               doc_index=i,
-                               config_server=config_server,
-                               splitter=self.splitter,
-                               reset_preprocess=reset_preprocess)
-            
-            doc_chunks = doc.chunks(chunk_size=chunk_size,
-                                    chunk_overlap=chunk_overlap)
-            name_docs = [str(Path(path_doc).name) for i in range(len(doc_chunks))]
-            path_docs = [str(Path(path_doc).parent) for i in range(len(doc_chunks))]
-            # try:
-            data = self.processor_chunks.process_chunk(
-                chunks=doc_chunks, doc_content=doc.content, batch=batch
-            )
-            doc_chunks = data["chunks"]
-            doc_tokens += np.sum(data["nb_output_tokens"])
-            if batch:
-                doc_tokens += self.__batch_indexation__(
-                    doc_chunks=doc_chunks, path_docs=path_docs
-                )
+        index = 0
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {
+                executor.submit(process_single_doc,
+                                self.data_manager,
+                                self.processor_chunks,
+                                path_doc,
+                                i,
+                                config_server,
+                                self.splitter,
+                                chunk_size,
+                                chunk_overlap,
+                                reset_preprocess,
+                                batch,
+                            ): path_doc for i, path_doc in enumerate(docs_to_process)
+                        }
+            for future in concurrent.futures.as_completed(futures):
+                path_doc = futures[future]
+                result = future.result()
 
-            else:
-                doc_tokens += self.__serial_indexation__(
-                    doc_chunks=doc_chunks, path_docs=path_docs
-                )
-            # except Exception:
-            #     print("Failed indexing: {}".format(path_doc))
+                new_doc = Document(name=result["name"],
+                                    path=result["path"],
+                                    embedding_tokens=result["embedding_tokens"],
+                                    input_tokens=0,
+                                    output_tokens=0)
 
-            new_doc = Document(
-                name=str(Path(path_doc).name),
-                path=str(Path(path_doc)),
-                embedding_tokens=doc_tokens,
-                input_tokens=0,
-                output_tokens=0,
-            )
-            self.data_manager.add_instance(new_doc, path=str(Path(path_doc).parent))
-            progress_bar.update(i)
+                progress_bar.update(index)
+                index+=1
+                self.data_manager.add_instance(instance=new_doc,
+                                                path=result["parent_path"])
         progress_bar.clear()

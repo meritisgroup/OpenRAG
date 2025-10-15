@@ -218,8 +218,8 @@ class SelfRagAgent(NaiveRagAgent):
                 query=query, nb_reformulation=1
             )
             query = query[0]
-            nb_input_tokens += input_t
-            nb_output_tokens += ouput_t
+            nb_input_tokens += np.sum(input_t)
+            nb_output_tokens += np.sum(ouput_t)
         agent = self.agent
 
         contexts = ""
@@ -251,8 +251,8 @@ class SelfRagAgent(NaiveRagAgent):
                                     chunk_lists=chunk_lists,
                                     options_generation = options_generation
                                 )
-            nb_input_tokens += answer["nb_input_tokens"]
-            nb_output_tokens += answer["nb_output_tokens"]
+            nb_input_tokens += np.sum(answer["nb_input_tokens"])
+            nb_output_tokens += np.sum(answer["nb_output_tokens"])
             context = answer["context"]
 
         else:
@@ -285,30 +285,8 @@ class SelfRagAgent(NaiveRagAgent):
             "context": context,
             "impacts": impacts,
             "energy": energies,
+            "original_query": query
         }
 
     def release_gpu_memory(self):
         self.agent.release_memory()
-
-    # def get_rag_contexts(self, queries: list[str], nb_chunks: int = 5):
-    #     contexts = []
-    #     names_docs = []
-    #     for query in queries:
-    #         context, name_docs = self.get_rag_context(query=query, nb_chunks=nb_chunks)
-    #         contexts.append(context)
-    #         names_docs.append(name_docs)
-    #     return contexts, names_docs
-
-    def generate_answers(
-        self, queries: list[str], nb_chunks: int = 2, options_generation=None
-    ):
-        answers = []
-        impact = 0
-        for query in queries:
-            answer = self.generate_answer(
-                query=query, nb_chunks=nb_chunks, options_generation=options_generation
-            )
-            answers.append(answer)
-            impact += answer["impacts"][0]
-
-        return answers

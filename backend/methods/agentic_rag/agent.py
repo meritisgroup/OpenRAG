@@ -162,8 +162,8 @@ class AgenticRagAgent(AdvancedRag):
             )
             answer_additional = info["answer"]
 
-            nb_input_tokens += info["nb_input_tokens"]
-            nb_output_tokens += info["nb_output_tokens"]
+            nb_input_tokens += np.sum(info["nb_input_tokens"])
+            nb_output_tokens += np.sum(info["nb_output_tokens"])
             context_tot += info["context"]
 
             impacts[0] += info["impacts"][0]
@@ -189,4 +189,5 @@ class AgenticRagAgent(AdvancedRag):
             "context": context_tot,
             "impacts": impacts,
             "energy": energies,
+            "original_query": query
         }

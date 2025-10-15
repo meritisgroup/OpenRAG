@@ -40,6 +40,7 @@ def change_config_server(rag_name, config_server):
         config_server["model"] = "gpt-4o-mini"
         config_server["embedding_model"] = "text-embedding-3-small"
         config_server["reranker_model"] = "gpt-4.1-nano-2025-04-14"
+        config_server["model_for_image"] = "gpt-4o-mini"
     elif config_server["params_host_llm"]["type"] == "mistral":
         config_server["model"] = "mistral-small-latest"
         config_server["embedding_model"] = "mistral-embed"

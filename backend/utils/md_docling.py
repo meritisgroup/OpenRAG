@@ -218,7 +218,7 @@ class DoclingConverter:
             images_scale=5,
             accelerator_options=AcceleratorOptions(
                                 num_threads=4, 
-                                device=AcceleratorDevice.AUTO
+                                device="cpu"
                             )
         )
         return DocumentConverter(
@@ -282,7 +282,6 @@ class DoclingConverter:
 
                 
                 image = picture_item.get_image(result)
-                print(np.array(image).shape)
                 try:
                     buffer = BytesIO()
                     image.save(buffer, format="PNG")

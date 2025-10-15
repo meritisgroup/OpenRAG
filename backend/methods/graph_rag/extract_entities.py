@@ -57,7 +57,7 @@ def extract_entities_relations(
     )
 
     tokens = 0
-    taille_batch = 50
+    taille_batch = 500
     outputs = None
     data_range = range(0, len(prompts), taille_batch)
     progress_bar = ProgressBar(total=len(data_range))

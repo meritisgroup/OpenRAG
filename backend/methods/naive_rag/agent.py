@@ -15,9 +15,14 @@ from ...utils.chunk_lists_merger import merge_chunk_lists
 from .prompts import prompts
 import numpy as np
 from sqlalchemy import func
+import concurrent.futures
 from backend.database.rag_classes import Document, Tokens, Chunk
 from ..query_reformulation.query_reformulation import query_reformulation
 from .indexation import concat_chunks
+from ...utils.threading_utils import get_executor_threads
+
+
+import time
 
 
 class NaiveRagAgent(RagAgent):
@@ -53,18 +58,18 @@ class NaiveRagAgent(RagAgent):
         self.params_vectorbase = config_server["params_vectorbase"]
 
         self.agent = get_Agent(config_server)
-        self.data_manager = get_management_data(
-            dbs_name=self.dbs_name,
-            data_folders_name=self.data_folders_name,
-            storage_path=self.storage_path,
-            config_server=config_server,
-            agent=self.agent,
-        )
 
+        self.data_manager = get_management_data(dbs_name=self.dbs_name,
+                                                data_folders_name=self.data_folders_name,
+                                                storage_path=self.storage_path,
+                                                config_server=config_server,
+                                                agent=self.agent)
+        
         self.config_server = config_server
 
         self.prompts = prompts[self.language]
-        self.system_prompt = get_system_prompt(self.config_server, self.prompts)
+        self.system_prompt = get_system_prompt(self.config_server,
+                                               self.prompts)
         self.chunk_size = config_server["chunk_length"]
         self.reformulate_query = config_server["reformulate_query"]
 
@@ -74,6 +79,7 @@ class NaiveRagAgent(RagAgent):
             )
 
         self.chunk_lists_merger = merge_chunk_lists
+
 
     def get_nb_token_embeddings(self):
         return self.data_manager.get_nb_token_embeddings()
@@ -121,9 +127,9 @@ class NaiveRagAgent(RagAgent):
         index.run_pipeline(
             chunk_size=self.chunk_size,
             chunk_overlap=overlap,
-            batch=self.params_vectorbase["batch"],
             config_server=self.config_server,
-            reset_preprocess=reset_preprocess
+            reset_preprocess=reset_preprocess,
+            max_workers=self.config_server["max_workers"]
         )
 
         return None
@@ -174,8 +180,8 @@ class NaiveRagAgent(RagAgent):
                 query=query, nb_reformulation=1
             )
             query = query[0]
-            nb_input_tokens += input_t
-            nb_output_tokens = output_t
+            nb_input_tokens += np.sum(input_t)
+            nb_output_tokens = np.sum(output_t)
 
         # Building the prompt in 3 steps
         chunk_lists = self.get_rag_context(query=query, nb_chunks=nb_chunks)
@@ -209,27 +215,45 @@ class NaiveRagAgent(RagAgent):
             "context": chunks,
             "impacts": impacts,
             "energy": energies,
+            "original_query": query
         }
 
     def release_gpu_memory(self):
         self.agent.release_memory()
 
-    # def get_rag_contexts(self, queries: list[str], nb_chunks: int = 5):
-    #     contexts = []
-    #     names_docs = []
-    #     for query in queries:
-    #         context, name_docs = self.get_rag_context(query=query, nb_chunks=nb_chunks)
-    #         contexts.append(context)
-    #         names_docs.append(name_docs)
-    #     return contexts, names_docs
+    def generate_answers(self,
+                         queries: list[str], 
+                         nb_chunks: int = 2, 
+                         options_generation=None,
+                         max_workers = None):
+        
+        if max_workers is None:
+            max_workers = self.config_server["max_workers"]
+        
+        if max_workers<=get_executor_threads():
+            max_workers = 1
 
-    def generate_answers(
-        self, queries: list[str], nb_chunks: int = 2, options_generation=None
-    ):
         answers = []
-        for query in queries:
-            answer = self.generate_answer(
-                query=query, nb_chunks=nb_chunks, options_generation=options_generation
-            )
-            answers.append(answer)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_query = {
+                executor.submit(
+                    self.generate_answer, 
+                    query=query, 
+                    nb_chunks=nb_chunks, 
+                    options_generation=options_generation
+                ): query for query in queries
+            }
+            for future in concurrent.futures.as_completed(future_to_query):
+                try:
+                    result = future.result()
+                    answers.append(result)
+                    
+                    self.nb_input_tokens += result["nb_input_tokens"]
+                    self.nb_output_tokens += result["nb_output_tokens"]
+
+                except Exception as exc:
+                    query_that_failed = future_to_query[future]
+                   
+        query_map = {query: i for i, query in enumerate(queries)}
+        answers.sort(key=lambda x: query_map[x['original_query']])
         return answers

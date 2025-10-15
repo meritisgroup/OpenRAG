@@ -16,6 +16,14 @@ from streamlit_.utils.chat_funcs import get_chat_agent
 from backend.utils.progress import ProgressBar
 
 
+import base64
+import random
+from pydantic import BaseModel
+from io import BytesIO
+from backend.utils.agent import get_Agent
+import fitz
+
+
 color_discrete_sequence = [
     "#636EFA",
     "#EF553B",
@@ -28,6 +36,93 @@ color_discrete_sequence = [
     "#FF97FF",
     "#FECB52",
 ]
+
+
+question_generation_prompt = """
+You are an assistant specialized in generating questions from documents.  
+You are given an image of a single page from a PDF.  
+
+Your task:  
+1. Carefully read ONLY the content visible on this page.  
+2. Generate ONE clear and direct question based strictly on the content of this page.  
+   - The question must stand on its own: do NOT reference the page, the document, or the source (never use phrases like "according to this document" or "on this page").  
+   - The question should be specific and test understanding of the page’s content.  
+   - Do NOT invent information not present on this page.  
+3. Provide the correct answer to the question, also written directly, without mentioning the document.  
+
+Format your output as follows (and nothing else):  
+
+query: <your question here>  
+answer: <your answer here>
+"""
+
+class QuestionOnPage(BaseModel):
+    query: str
+    answer : str
+
+class QuestionGenerator:
+    """Image analysis via Ollama with minimal JSON output."""
+
+
+    def __init__(self, config_server):
+        self.agent = get_Agent(config_server, image_description=True)
+        self.config_server=config_server 
+
+    def generate_question(self, image_bytes: bytes) -> QuestionOnPage:
+        image_b64 = base64.b64encode(image_bytes).decode("utf-8")
+        data_url = f"data:image/png;base64,{image_b64}"
+
+        if self.config_server["params_host_llm"]["type"]=="ollama":
+            temperature=0
+        else:
+            temperature=1
+
+        print("test")
+    
+        response=self.agent.predict_image(prompt=question_generation_prompt,
+                                          data_url=data_url,
+                                          json_format=QuestionOnPage,
+                                          temperature=temperature)
+        return response
+
+
+
+
+def generate_questions(n_questions, databases, config_server):
+
+    databases_paths = [os.path.join("data/databases", db) for db in databases]
+    print(databases_paths)
+    question_generator=QuestionGenerator(config_server=config_server)
+    list_queries, list_answers=[],[]
+
+    for _ in range(n_questions):
+        #choose a random db
+        db_path = random.choice(databases_paths)
+
+        #choose a random pdf
+        pdf_files = [f for f in os.listdir(db_path) if f.lower().endswith(".pdf")]
+        if not pdf_files:
+            continue 
+        pdf_path = os.path.join(db_path, random.choice(pdf_files))
+
+        #choose a random page
+        doc = fitz.open(pdf_path)
+        page_number = random.randint(0, len(doc) - 1)
+        page = doc.load_page(page_number)
+        
+        #convert this page into bytes
+        pix = page.get_pixmap()
+        image_bytes = pix.tobytes("png")
+
+        generation = question_generator.generate_question(image_bytes=image_bytes)
+        list_queries.append(generation.query)
+        list_answers.append(generation.answer)
+
+        doc.close()
+
+    return list_queries, list_answers
+    
+    
 
 
 def get_folder_saved_benchmark():
@@ -153,9 +248,8 @@ def generate_only_answers(rag_names, rag_agents, report_dir):
                 },
                 f,
             )
-    dataframe_preparator.run_all_queries(
-        options_generation={"type_generation": "simple_generation"}, log_file=log_file
-    )
+    dataframe_preparator.run_all_queries(options_generation={"type_generation": "simple_generation"},
+                                         log_file=log_file)
     df = dataframe_preparator.get_dataframe()
     df.to_csv(os.path.join(get_report_path(), "bench_df.csv"), index=False)
 
@@ -199,9 +293,8 @@ def generate_only_contexts(rag_names, rag_agents, report_dir):
                 },
                 f,
             )
-    dataframe_preparator.run_all_queries(
-        options_generation={"type_generation": "no_generation"}, log_file=log_file
-    )
+    dataframe_preparator.run_all_queries(options_generation={"type_generation": "no_generation"},
+                                         log_file=log_file)
     df = dataframe_preparator.get_dataframe()
     df.to_csv(os.path.join(get_report_path(), "contexts_df.csv"), index=False)
 
@@ -252,6 +345,7 @@ def show_benchmark(results, session_state=None):
     if session_state["config_server"]["params_host_llm"]["type"] in [
         "openai",
         "mistral",
+        "vllm"
     ]:
         impacts_graph = impact_graph(session_state=session_state)
         energies_graph = energy_graph(session_state=session_state)
@@ -303,14 +397,11 @@ def generate_benchmark(
                 f,
             )
 
-    dataframe_preparator = DataFramePreparator(
-        rag_agents=rag_agents,
-        rags_available=rag_names,
-        input_path=os.path.join("data", "queries", queries_doc_mane),
-    )
-    dataframe_preparator.run_all_queries(
-        options_generation={"type_generation": "simple_generation"}, log_file=log_file
-    )
+    dataframe_preparator = DataFramePreparator(rag_agents=rag_agents,
+                                               rags_available=rag_names,
+                                               input_path=os.path.join("data", "queries", queries_doc_mane))
+    dataframe_preparator.run_all_queries(options_generation={"type_generation": "simple_generation"},
+                                         log_file=log_file)
 
     df = dataframe_preparator.get_dataframe()
     evaluation_agent = AgentEvaluator(

@@ -108,23 +108,6 @@ class DocumentText:
         self.path = path
         self.reset_preprocess = reset_preprocess
 
-        if self.data_preprocessing == "md_with_images":
-                if self.reset_preprocess or not self.load_md__():
-                    self.content = MarkdownOpener(
-                        config_server=self.config_server,
-                        image_description=True
-                    ).open_doc(path_file=path)
-                    self.save_md__()
-        elif self.data_preprocessing == "md_without_images":
-                if self.reset_preprocess or not self.load_md__():
-                    self.content = MarkdownOpener(
-                        config_server=self.config_server,
-                        image_description=False
-                    ).open_doc(path_file=path)
-                    self.save_md__()
-        else:
-                self.content = Opener(save=False).open_doc(path)
-
         try:
             if self.data_preprocessing == "md_with_images":
                 if self.reset_preprocess or not self.load_md__():

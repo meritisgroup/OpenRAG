@@ -1,7 +1,6 @@
 fastapi==0.115.11
 numpy==1.26.4
-vllm
-transformers==4.51.0
+vllm==0.10.1.1
 qwen-vl-utils==0.0.10
 timm
 codecarbon

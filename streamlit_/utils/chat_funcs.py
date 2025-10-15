@@ -9,7 +9,9 @@ import json
 from backend.database.rag_classes import Document, Tokens, Chunk
 
 
-def get_chat_agent(rag_method, databases_name, session_state=None):
+def get_chat_agent(rag_method,
+                   databases_name,
+                   session_state=None):
     if session_state is None:
         session_state = st.session_state
 
@@ -90,10 +92,10 @@ def prepare_show_context(chunks: list[Chunk]):
         block = ""
         if chunk.document != None:
             block += f"source : {chunk.document}\n\n"
-        block = f"{cleaned_context}"
+        block += f"{cleaned_context}"
         if chunk.rerank_score != None:
             block += f"\n\n Rerank score : {chunk.rerank_score}"
         blocks.append(block)
-
-    output = "\n\n" + ("-" * 10) + "\n\n".join(blocks)
+    separator = "\n" + ("-" * 200) + "\n"
+    output = separator.join(blocks)
     return output

@@ -48,7 +48,7 @@ class QbRagIndexation:
             system_prompts.append(system_prompt)
         
         tokens = 0
-        taille_batch = 100
+        taille_batch = 1000
         outputs = None
         data_range = range(0, len(prompts), taille_batch)
         progress_bar = ProgressBar(total=len(data_range))
@@ -72,7 +72,7 @@ class QbRagIndexation:
         return outputs
 
 
-    def __batch_indexation__(self, doc_chunks, path_docs):
+    def __indexation__(self, doc_chunks, path_docs):
         """
         Adds a batch of chunks from doc_chunks to the indexation verctorbase
         Args:
@@ -122,7 +122,7 @@ class QbRagIndexation:
                 output_tokens += np.sum(list_questions["nb_output_tokens"])
             
 
-        taille_batch = 500
+        taille_batch = 1000
         for i in range(0, len(final_chunks), taille_batch):
             embedding_tokens += np.sum(self.data_manager.add_str_batch_elements(display_message=False,
                                                                                 chunks = final_chunks[i:i + taille_batch],
@@ -134,7 +134,6 @@ class QbRagIndexation:
                      config_server,
                      chunk_size, 
                      chunk_overlap: bool = True,
-                     batch: bool = True,
                      reset_preprocess: bool = False):
         add_fields = [
             {
@@ -173,19 +172,14 @@ class QbRagIndexation:
                                     chunk_overlap=chunk_overlap)
             name_docs = [str(Path(path_doc).name) for i in range(len(doc_chunks))]
             path_docs = [str(Path(path_doc).parent) for i in range(len(doc_chunks))]
-            if batch:
-                embedding_t, input_t, output_t = self.__batch_indexation__(doc_chunks=doc_chunks,
-                                                                           path_docs=path_docs)
+
+            embedding_t, input_t, output_t = self.__indexation__(doc_chunks=doc_chunks,
+                                                                 path_docs=path_docs)
                 
-                embedding_tokens += embedding_t
-                input_tokens += input_t
-                output_tokens += output_t
-            else:
-                embedding_t, input_t, output_t = self.__serial_indexation__(doc_chunks=doc_chunks,
-                                                                            path_docs=path_docs)
-                embedding_tokens += embedding_t
-                input_tokens += input_t
-                output_tokens += output_t 
+            embedding_tokens += embedding_t
+            input_tokens += input_t
+            output_tokens += output_t
+
             new_doc = Document(name=str(Path(path_doc).name),
                                path=str(Path(path_doc)),
                                embedding_tokens=int(embedding_tokens),
