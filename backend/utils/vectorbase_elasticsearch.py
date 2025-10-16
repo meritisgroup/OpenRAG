@@ -516,7 +516,8 @@ class VectorBase_hybrid_elasticsearch(VectorBase_embeddings_elasticsearch):
         if collection_name is None:
             collection_name = self.vb_name
 
-        data = self.agent.embeddings(texts=queries, model=self.embedding_model)
+        data = self.agent.embeddings(texts=queries,
+                                     model=self.embedding_model)
         res = []
         num_candidates = max(500, k*5)
         for i in range(len(queries)):

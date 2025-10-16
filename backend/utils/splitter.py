@@ -440,7 +440,7 @@ class Semantic_TextSplitter(Splitter):
         sentences = self.break_chunks(chunks=sentences,
                                       max_size_chunk=chunk_size)
 
-        taille_batch = 1000
+        taille_batch = 100
         sentence_embeddings = None
         for i in range(0, len(sentences), taille_batch):
             results = self.agent.embeddings(texts=sentences[i:i + taille_batch],

@@ -21,6 +21,7 @@ def task(
     report_dir,
     type_bench,
     config_server,
+    models_infos,
     queries_doc_name,
     databases,
     session_state=None,
@@ -55,6 +56,7 @@ def task(
                     rag_agents,
                     databases=databases,
                     config_server=config_server,
+                    models_infos=models_infos,
                     report_dir=report_dir,
                     queries_doc_mane=queries_doc_name,
                     session_state=session_state,
@@ -84,6 +86,7 @@ def run_benchmark(
         databases = st.session_state["benchmark_database"]
         report_dir = get_report_path()
         config_server = st.session_state["config_server"]
+        models_infos = st.session_state["models_infos"]
         queries_doc_name = st.session_state["benchmark"]["queries_doc_name"]
 
         if background:
@@ -92,6 +95,8 @@ def run_benchmark(
             system = platform.system()
 
             config_server_str = json.dumps(config_server)
+            models_infos_str = json.dumps(models_infos)
+
             databases_str = json.dumps(databases)
             session_state = dict(st.session_state)
 
@@ -124,6 +129,8 @@ def run_benchmark(
                 type_bench,
                 "--config_server",
                 config_server_str,
+                 "--models_infos",
+                models_infos_str,
                 "--queries_doc_name",
                 queries_doc_name,
                 "--databases",
@@ -160,6 +167,7 @@ def run_benchmark(
                 report_dir=report_dir,
                 type_bench=type_bench,
                 config_server=config_server,
+                models_infos=models_infos,
                 queries_doc_name=queries_doc_name,
                 databases=databases,
             )
@@ -180,6 +188,7 @@ if __name__ == "__main__":
     parser.add_argument("--report_dir", type=str, required=True)
     parser.add_argument("--type_bench", type=str, required=True)
     parser.add_argument("--config_server", type=str, required=True)
+    parser.add_argument("--models_infos", type=str, required=True)
     parser.add_argument("--session_state_file", type=str, required=True)
     parser.add_argument("--queries_doc_name", type=str, required=True)
     parser.add_argument(
@@ -189,6 +198,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     config_server = json.loads(args.config_server)
+    models_infos = json.loads(args.models_infos)
     databases = json.loads(args.databases)
     reset_index = args.reset_index
     reset_preprocess = args.reset_preprocess
@@ -204,6 +214,7 @@ if __name__ == "__main__":
         reset_preprocess=reset_preprocess,
         type_bench=args.type_bench,
         config_server=config_server,
+        models_infos=models_infos,
         queries_doc_name=args.queries_doc_name,
         databases=databases,
         session_state=session_state,

@@ -81,25 +81,24 @@ class VectorBase:
 class Agent:
 
     @abstractmethod
-    def __init__(self, model: str, language: str = "EN", max_attempts: int = 5) -> None:
-        self.model = model
+    def __init__(self, language: str = "EN", max_attempts: int = 5) -> None:
         self.language = language
         self.max_attempts = max_attempts
         self.temperature = None
 
     def predict(
-        self, prompt: str, system_prompt: str, with_tokens: bool = False
+        self, prompt: str, model: str, system_prompt: str, with_tokens: bool = False
     ) -> str:
         """
         It generates the answer of the model given the prompt and the system_prompt
         """
-
-        return predict(system_prompt, prompt, self.model, with_tokens)
+        return predict(system_prompt, prompt, model, with_tokens)
 
 
     def multiple_predict_json(self,
                               prompts: list[str],
                               system_prompts: list[str],
+                              model: str,
                               json_format: BaseModel,
                               temperature=0,
                               images: list[list[str]] = None,
@@ -120,6 +119,7 @@ class Agent:
                     self.predict_json,
                     prompt=prompts[i],
                     system_prompt=system_prompts[i],
+                    model=model,
                     json_format=json_format,
                     temperature=temperature,
                     options_generation=options_generation
@@ -138,6 +138,7 @@ class Agent:
     
     def multiple_predict(
         self,
+        model: str,
         prompts: List[str],
         system_prompts: List[str],
         temperature: float = 0,
@@ -148,8 +149,8 @@ class Agent:
         """
         answers = multiple_predict(system_prompts,
                                    prompts,
-                                   self.model,
-                                   self.client,
+                                   model,
+                                   self.clients[model],
                                    temperature=temperature,
                                    options_generation=options_generation,
                                    max_workers=self.max_workers)
@@ -158,6 +159,7 @@ class Agent:
     def predict_json(
         self,
         prompt: str,
+        model: str,
         system_prompt: str,
         json_format: BaseModel,
         temperature=0,
@@ -166,13 +168,11 @@ class Agent:
         """
         It formats the queries with good prompts, then gives these prompts to the LLM and return the cleaned outputs following the given BaseModel format
         """
-        answer = predict_json(
-            system_prompt,
-            prompt,
-            self.model,
-            self.client,
-            json_format,
-            temperature,
-            options_generation=options_generation,
-        )
+        answer = predict_json(system_prompt,
+                              prompt,
+                              model,
+                              self.clients[model],
+                              json_format,
+                              temperature,
+                              options_generation=options_generation)
         return answer

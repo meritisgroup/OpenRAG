@@ -18,6 +18,7 @@ import concurrent.futures
 def process_single_doc(
     data_manager,
     processor_chunks,
+    model: str,
     path_doc: str,
     doc_index: int,
     config_server: dict,
@@ -40,7 +41,8 @@ def process_single_doc(
     name_docs = [str(Path(path_doc).name) for i in range(len(doc_chunks))]
     path_docs = [str(Path(path_doc).parent) for i in range(len(doc_chunks))]
     data = processor_chunks.process_chunk(chunks=doc_chunks,
-                                          doc_content=doc.content)
+                                          doc_content=doc.content,
+                                          model=model)
     doc_chunks = data["chunks"]
 
     doc_indexation_tokens += np.sum(data["nb_output_tokens"])
@@ -61,7 +63,8 @@ class AdvancedIndexation:
         self,
         data_manager,
         agent: Agent,
-        embedding_model,
+        embedding_model: str,
+        llm_model: str,
         language: str = "EN",
         type_text_splitter: str = "TextSplitter",
         type_processor_chunks: list[str] = [],
@@ -82,6 +85,7 @@ class AdvancedIndexation:
         self.data_manager = data_manager
         self.agent = agent
         self.embedding_model = embedding_model
+        self.llm_model = llm_model
         self.language = language
 
         self.splitter = get_splitter(
@@ -139,6 +143,7 @@ class AdvancedIndexation:
                 executor.submit(process_single_doc,
                                 self.data_manager,
                                 self.processor_chunks,
+                                self.llm_model,
                                 path_doc,
                                 i,
                                 config_server,

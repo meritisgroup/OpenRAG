@@ -17,6 +17,7 @@ class MergerRagAgent(NaiveRagAgent):
     def __init__(
         self,
         config_server: dict,
+        models_infos: dict,
         dbs_name: list[str],
         data_folders_name: list[str]
     ) -> None:
@@ -27,7 +28,8 @@ class MergerRagAgent(NaiveRagAgent):
         """
         self.config_server=config_server
         self.rag_list=config_server["rag_list"]
-        self.agent = get_Agent(config_server)
+        self.agent = get_Agent(config_server,
+                               models_infos=models_infos)
         self.nb_chunks = config_server["nb_chunks"]
         self.dbs_name = dbs_name
         self.data_folders_name = data_folders_name
@@ -36,6 +38,7 @@ class MergerRagAgent(NaiveRagAgent):
         for i in range(len(self.rag_list)):
             rag_agent = get_rag_to_merge(rag_name=self.rag_list[i], 
                                          config_server=self.config_server["rag_config_list"][i],
+                                         models_infos=models_infos,
                                          databases_name=data_folders_name)
             self.rag_agents[self.rag_list[i]] = rag_agent
 
@@ -105,7 +108,8 @@ class MergerRagAgent(NaiveRagAgent):
 
         return agent.predict(prompt=user_prompt,
                              system_prompt=system_prompt,
-                             options_generation=options_generation)
+                             options_generation=options_generation,
+                             model=self.llm_model)
 
     def generate_answer(
         self,

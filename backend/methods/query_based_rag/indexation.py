@@ -23,6 +23,7 @@ class QbRagIndexation:
         data_manager,
         agent,
         embedding_model,
+        llm_model,
         language: str = "EN",
         type_text_splitter="TextSplitter",
     ):
@@ -30,6 +31,7 @@ class QbRagIndexation:
         self.data_manager = data_manager
         self.agent = agent
         self.embedding_model = embedding_model
+        self.llm_model = llm_model
         self.language = language
         self.prompts = prompts[language]
         self.splitter = get_splitter(
@@ -38,7 +40,11 @@ class QbRagIndexation:
             embedding_model=self.embedding_model,
         )
 
-    def generates_questions(self, chunks: list[str], temperature=1, text_to_show="Generate questions"):
+    def generates_questions(self,
+                            chunks: list[str],
+                            model: str,
+                            temperature=1,
+                            text_to_show="Generate questions"):
         prompts = []
         system_prompts = []
         for chunk in chunks:
@@ -48,13 +54,14 @@ class QbRagIndexation:
             system_prompts.append(system_prompt)
         
         tokens = 0
-        taille_batch = 1000
+        taille_batch = 100
         outputs = None
         data_range = range(0, len(prompts), taille_batch)
         progress_bar = ProgressBar(total=len(data_range))
         k = 0
         for i in data_range:
             results = self.agent.multiple_predict(prompts=prompts[i:i + taille_batch],
+                                                  model=model,
                                                   system_prompts=system_prompts[i:i + taille_batch])
             k+=1
             progress_bar.update(k-1, text=text_to_show+" {}".format(np.round((k/len(data_range))*100,2)))
@@ -87,6 +94,7 @@ class QbRagIndexation:
         for k, chunk in enumerate(doc_chunks):
             elements.append(chunk.text.replace("\n", "").replace("'", ""))
         list_questions = self.generates_questions(chunks=elements,
+                                                  model=self.llm_model,
                                                   text_to_show="Generate questions")
 
         input_tokens += np.sum(list_questions["nb_input_tokens"])
@@ -116,13 +124,14 @@ class QbRagIndexation:
             if len(elements_to_retry)>0:
                 list_questions = self.generates_questions(chunks=elements_to_retry,
                                                           temperature=1,
+                                                          model=self.llm_model,
                                                           text_to_show="Regenerate fail questions")
                 elements = elements_to_retry
                 input_tokens += np.sum(list_questions["nb_input_tokens"])
                 output_tokens += np.sum(list_questions["nb_output_tokens"])
             
 
-        taille_batch = 1000
+        taille_batch = 100
         for i in range(0, len(final_chunks), taille_batch):
             embedding_tokens += np.sum(self.data_manager.add_str_batch_elements(display_message=False,
                                                                                 chunks = final_chunks[i:i + taille_batch],

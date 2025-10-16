@@ -22,6 +22,7 @@ class GraphRagAgent(RagAgent):
     def __init__(
         self,
         config_server: dict,
+        models_infos: dict,
         dbs_name: list[str],
         data_folders_name: list[str]
     ) -> None:
@@ -37,10 +38,12 @@ class GraphRagAgent(RagAgent):
         self.nb_chunks = config_server["nb_chunks"]
         self.storage_path = config_server["storage_path"]
         self.embedding_model = config_server["embedding_model"]
+        self.llm_model = config_server["model"]
         self.type_text_splitter = config_server["TextSplitter"]
         self.config_server = config_server
 
-        self.agent = get_Agent(config_server)
+        self.agent = get_Agent(config_server,
+                               models_infos=models_infos)
         self.data_manager = get_management_data(dbs_name=self.dbs_name,
                                                 data_folders_name=self.data_folders_name,
                                                 storage_path=self.storage_path,
@@ -53,7 +56,8 @@ class GraphRagAgent(RagAgent):
         self.reformulate_query = config_server["reformulate_query"]
         if self.reformulate_query:
             self.reformulater = query_reformulation(
-                agent=self.agent, language=self.language
+                agent=self.agent, language=self.language,
+                model=self.llm_model
             )
 
         self.prompts = PROMPTS[self.language]
@@ -82,7 +86,8 @@ class GraphRagAgent(RagAgent):
             language=self.language,
             agent=self.agent,
             type_text_splitter=self.type_text_splitter,
-            embedding_model=self.embedding_model
+            embedding_model=self.embedding_model,
+            llm_model = self.llm_model
         )
 
         index.run_pipeline(chunk_size=self.chunk_size, 
@@ -108,6 +113,7 @@ class GraphRagAgent(RagAgent):
         if method == "global":
             search = GlobalSearch(
                 agent=self.agent,
+                model=self.llm_model,
                 data_manager = self.data_manager,
                 pre_filter_size=nb_chunks,
                 language=self.language,
@@ -116,6 +122,7 @@ class GraphRagAgent(RagAgent):
         else:
             search = LocalSearch(
                 agent=self.agent,
+                model=self.llm_model,
                 data_manager = self.data_manager,
                 start_node=nb_chunks,
                 language=self.language,
@@ -153,7 +160,8 @@ class GraphRagAgent(RagAgent):
 
         answer = self.agent.predict(prompt=prompt,
                                     system_prompt=self.system_prompt,
-                                    options_generation=options_generation)
+                                    options_generation=options_generation,
+                                    model=self.llm_model)
         impacts[2] = answer["impacts"][2]
         impacts[0] += answer["impacts"][0]
         impacts[1] += answer["impacts"][1]

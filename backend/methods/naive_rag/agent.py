@@ -29,7 +29,8 @@ class NaiveRagAgent(RagAgent):
     "Original RAG with no modification"
 
     def __init__(
-        self, config_server: dict, dbs_name: list[str], data_folders_name: list[str]
+        self, config_server: dict, models_infos: dict,
+          dbs_name: list[str], data_folders_name: list[str]
     ) -> None:
         """
         Args:
@@ -45,19 +46,25 @@ class NaiveRagAgent(RagAgent):
             type_retrieval (str) : How documents will be retrieved (embeddings, BM25, vlm_embeddings are available plus hybrid if using elasticsearch)
         """
 
+        self.llm_model = config_server["model"]
+        self.embedding_model = config_server["embedding_model"]
+
         self.storage_path = config_server["storage_path"]
         self.nb_chunks = config_server["nb_chunks"]
         self.embedding_model = config_server["embedding_model"]
         self.language = config_server["language"]
         self.type_text_splitter = config_server["TextSplitter"]
         self.type_retrieval = config_server["type_retrieval"]
-
+        self.nb_input_tokens = 0
+        self.nb_output_tokens = 0
+        
         self.dbs_name = dbs_name
         self.data_folders_name = data_folders_name
 
         self.params_vectorbase = config_server["params_vectorbase"]
 
-        self.agent = get_Agent(config_server)
+        self.agent = get_Agent(config_server,
+                               models_infos=models_infos)
 
         self.data_manager = get_management_data(dbs_name=self.dbs_name,
                                                 data_folders_name=self.data_folders_name,
@@ -75,7 +82,8 @@ class NaiveRagAgent(RagAgent):
 
         if self.reformulate_query:
             self.reformulater = query_reformulation(
-                agent=self.agent, language=self.language
+                agent=self.agent, language=self.language,
+                model=self.llm_model
             )
 
         self.chunk_lists_merger = merge_chunk_lists
@@ -117,20 +125,16 @@ class NaiveRagAgent(RagAgent):
             self.data_manager.delete_collection()
             self.data_manager.clean_database()
 
-        index = NaiveRagIndexation(
-            data_manager=self.data_manager,
-            type_text_splitter=self.type_text_splitter,
-            agent=self.agent,
-            embedding_model=self.embedding_model,
-        )
+        index = NaiveRagIndexation(data_manager=self.data_manager,
+                                  type_text_splitter=self.type_text_splitter,
+                                  agent=self.agent,
+                                  embedding_model=self.embedding_model)
 
-        index.run_pipeline(
-            chunk_size=self.chunk_size,
-            chunk_overlap=overlap,
-            config_server=self.config_server,
-            reset_preprocess=reset_preprocess,
-            max_workers=self.config_server["max_workers"]
-        )
+        index.run_pipeline(chunk_size=self.chunk_size,
+                           chunk_overlap=overlap,
+                           config_server=self.config_server,
+                           reset_preprocess=reset_preprocess,
+                           max_workers=self.config_server["max_workers"])
 
         return None
 
@@ -144,7 +148,8 @@ class NaiveRagAgent(RagAgent):
         Output:
             context (list[str]) : All retrieved chunks
         """
-        ns = NaiveSearch(data_manager=self.data_manager, nb_chunks=nb_chunks)
+        ns = NaiveSearch(data_manager=self.data_manager,
+                         nb_chunks=nb_chunks)
         chunk_lists = ns.get_context(query=query)
 
         return chunk_lists
@@ -197,6 +202,7 @@ class NaiveRagAgent(RagAgent):
             prompt=prompt,
             system_prompt=self.system_prompt,
             options_generation=options_generation,
+            model=self.llm_model
         )
 
         nb_input_tokens += np.sum(answer["nb_input_tokens"])
@@ -221,39 +227,3 @@ class NaiveRagAgent(RagAgent):
     def release_gpu_memory(self):
         self.agent.release_memory()
 
-    def generate_answers(self,
-                         queries: list[str], 
-                         nb_chunks: int = 2, 
-                         options_generation=None,
-                         max_workers = None):
-        
-        if max_workers is None:
-            max_workers = self.config_server["max_workers"]
-        
-        if max_workers<=get_executor_threads():
-            max_workers = 1
-
-        answers = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_to_query = {
-                executor.submit(
-                    self.generate_answer, 
-                    query=query, 
-                    nb_chunks=nb_chunks, 
-                    options_generation=options_generation
-                ): query for query in queries
-            }
-            for future in concurrent.futures.as_completed(future_to_query):
-                try:
-                    result = future.result()
-                    answers.append(result)
-                    
-                    self.nb_input_tokens += result["nb_input_tokens"]
-                    self.nb_output_tokens += result["nb_output_tokens"]
-
-                except Exception as exc:
-                    query_that_failed = future_to_query[future]
-                   
-        query_map = {query: i for i, query in enumerate(queries)}
-        answers.sort(key=lambda x: query_map[x['original_query']])
-        return answers

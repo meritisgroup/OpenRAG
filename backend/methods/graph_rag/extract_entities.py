@@ -34,6 +34,7 @@ def make_chunk_id() -> str:
 
 def extract_entities_relations(
     agent: Agent,
+    model: str,
     chunks: list[Chunk],
     doc_name: str,
     language: str = "EN",
@@ -57,7 +58,7 @@ def extract_entities_relations(
     )
 
     tokens = 0
-    taille_batch = 500
+    taille_batch = 100
     outputs = None
     data_range = range(0, len(prompts), taille_batch)
     progress_bar = ProgressBar(total=len(data_range))
@@ -66,6 +67,7 @@ def extract_entities_relations(
         results = agent.multiple_predict(
             prompts=prompts[i : i + taille_batch],
             system_prompts=system_prompts[i : i + taille_batch],
+            model=model
         )
         k += 1
         progress_bar.update(

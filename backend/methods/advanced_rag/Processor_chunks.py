@@ -15,19 +15,20 @@ class Processor_chunks:
             self.type_processor_chunks = [self.type_processor_chunks]
         self.language = language
 
-    def process_chunk(self, chunks, doc_content):
+    def process_chunk(self, chunks, doc_content, model):
         if len(self.type_processor_chunks) == 0:
             return {"chunks": chunks, "nb_output_tokens": 0, "nb_input_tokens": 0}
         for i in range(len(self.type_processor_chunks)):
             if self.type_processor_chunks[i] == "Contextual":
-                data = self.run_contextual(
-                    chunks=chunks, doc_content=doc_content
-                )
+                data = self.run_contextual(chunks=chunks,
+                                           doc_content=doc_content,
+                                           model=model)
         return data
 
-    def run_contextual(self, chunks, doc_content):
+    def run_contextual(self, chunks, doc_content, model):
         data = run_contextual(agent=self.agent,
                               doc_chunks=chunks,
+                              model=model,
                               doc_content=doc_content,
                               language=self.language)
         results = {

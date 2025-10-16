@@ -11,6 +11,7 @@ class QueryReformulationRag(AdvancedRag):
     def __init__(
         self,
         config_server: dict,
+        models_infos: dict,
         dbs_name: list[str],
         data_folders_name: list[str]
     ) -> None:
@@ -21,8 +22,8 @@ class QueryReformulationRag(AdvancedRag):
 
         super().__init__(
             config_server=config_server,
+            models_infos=models_infos,
             dbs_name=dbs_name,
             data_folders_name=data_folders_name
         )
-        self.nb_chunks = config_server["nb_chunks"]
         self.prompts = prompts[self.language]

@@ -24,7 +24,7 @@ def get_neighbors_chunks(doc_chunks, index, max_context_len=8192):
     return local_context
 
 
-def run_contextual(agent, doc_chunks, doc_content, language="EN"):
+def run_contextual(agent, model, doc_chunks, doc_content, language="EN"):
     chunk_with_context = []
     user_prompts = []
     system_prompts = []
@@ -41,14 +41,15 @@ def run_contextual(agent, doc_chunks, doc_content, language="EN"):
         user_prompts.append(prompt)
         system_prompts.append(system_prompt)
 
-    taille_batch = 500
+    taille_batch = 100
     contexts = None
     range_chunks = range(0, len(user_prompts), taille_batch)
     progress_bar_chunks = ProgressBar(total=len(range_chunks))
     j = 0
     for i in range_chunks:
         results = agent.multiple_predict(prompts=user_prompts[i:i + taille_batch],
-                                         system_prompts=system_prompts[i:i + taille_batch])
+                                         system_prompts=system_prompts[i:i + taille_batch],
+                                         model=model)
         if contexts is None:
            contexts = results
         else:

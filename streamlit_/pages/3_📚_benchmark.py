@@ -28,9 +28,7 @@ col1, col2, col3 = st.columns(3)
 
 
 all_rags = list(
-    st.session_state["all_rags"][
-        st.session_state["config_server"]["params_host_llm"]["type"]
-    ].keys()
+    st.session_state["all_rags"].keys()
 )
 nb_rags = len(all_rags)
 rags_per_column = nb_rags // 3 if nb_rags % 3 == 0 else nb_rags // 3 + 1
@@ -42,9 +40,7 @@ with col1:
         else:
             disable = False
         st.session_state["benchmark"]["rags"][all_rags[i]] = st.checkbox(
-            label=st.session_state["all_rags"][
-                st.session_state["config_server"]["params_host_llm"]["type"]
-            ][all_rags[i]],
+            label=st.session_state["all_rags"][all_rags[i]],
             value=st.session_state["benchmark"]["rags"][all_rags[i]],
             disabled=disable,
         )
@@ -56,9 +52,7 @@ with col2:
         else:
             disable = False
         st.session_state["benchmark"]["rags"][all_rags[i]] = st.checkbox(
-            label=st.session_state["all_rags"][
-                st.session_state["config_server"]["params_host_llm"]["type"]
-            ][all_rags[i]],
+            label=st.session_state["all_rags"][all_rags[i]],
             value=st.session_state["benchmark"]["rags"][all_rags[i]],
             disabled=disable,
         )
@@ -70,9 +64,7 @@ with col3:
         else:
             disable = False
         st.session_state["benchmark"]["rags"][all_rags[i]] = st.checkbox(
-            label=st.session_state["all_rags"][
-                st.session_state["config_server"]["params_host_llm"]["type"]
-            ][all_rags[i]],
+            label=st.session_state["all_rags"][all_rags[i]],
             value=st.session_state["benchmark"]["rags"][all_rags[i]],
             disabled=disable,
         )

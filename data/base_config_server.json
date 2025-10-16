@@ -1,11 +1,8 @@
 {
     "storage_path": "./storage",
     "storage_data_path": "./data/databases",
-    "params_host_llm": {
-        "url": "http://localhost:8000",
-        "type": "vllm",
-        "api_key": null
-    },
+    "default_mode_provider": "openai",
+    "mode": "default",
     "params_vectorbase": {
         "backend": "elasticsearch",
         "batch": true,
@@ -17,11 +14,11 @@
     },
     "max_workers": 10,
     "device": "cpu",
-    "model": "google/gemma-3-12b-it",
-    "model_for_image": "gemma3:12b",
-    "embedding_model": "BAAI/bge-m3",
+    "model": "gemma3:4b",
+    "model_for_image": "gpt-4o-mini",
+    "embedding_model": "text-embedding-3-small",
     "language": "EN",
-    "type_retrieval": "embeddings",
+    "type_retrieval": "hybrid",
     "TextSplitter": "Semantic_TextSplitter",
     "reformulate_query": false,
     "reranker_model": "BAAI/bge-reranker-v2-m3",
@@ -46,5 +43,10 @@
     },
     "options_generation": {
         "type_generation": "simple_generation"
+    },
+    "params_host_llm": {
+        "url": "http://localhost:11436/v1",
+        "type": "ollama",
+        "api_key": null
     }
 }

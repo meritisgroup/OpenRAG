@@ -16,6 +16,7 @@ class RerankerRag(AdvancedRag):
     def __init__(
         self,
         config_server: dict,
+        models_infos: dict,
         dbs_name: list[str],
         data_folders_name: list[str],
         type_processor_chunks: list[str] = [],
@@ -39,10 +40,11 @@ class RerankerRag(AdvancedRag):
         
         super().__init__(
             config_server=config_server,
+            models_infos=models_infos,
             dbs_name=dbs_name,
             data_folders_name=data_folders_name,
         )
-        self.nb_chunks = config_server["nb_chunks"]
+
 
     def get_rag_context(self, query: str, nb_chunks: int = 5) -> list[list[Chunk]]:
         """
@@ -54,7 +56,8 @@ class RerankerRag(AdvancedRag):
         Output:
             context (list[str]) : All retrieved chunks
         """
-        ns = NaiveSearch(data_manager=self.data_manager, nb_chunks=nb_chunks)
+        ns = NaiveSearch(data_manager=self.data_manager,
+                         nb_chunks=nb_chunks)
         chunk_lists = ns.get_context(query=query)
         return chunk_lists
 
@@ -114,6 +117,7 @@ class RerankerRag(AdvancedRag):
         answer = agent.predict(
             prompt=prompt,
             system_prompt=self.system_prompt,
+            model=self.llm_model,
             options_generation=options_generation,
         )
         self.nb_input_tokens += np.sum(answer["nb_input_tokens"])

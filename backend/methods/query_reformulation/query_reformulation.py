@@ -7,8 +7,9 @@ def remove_duplicates(lst):
 
 class query_reformulation:
 
-    def __init__(self, agent, language):
+    def __init__(self, agent, model, language):
         self.agent = agent
+        self.model = model
         self.language = language
         self.prompts = prompts[language]
 
@@ -25,9 +26,9 @@ class query_reformulation:
             system_prompts.append(system_prompt)
             prompts.append(prompt)
 
-        queries = self.agent.multiple_predict(
-            prompts=prompts, system_prompts=system_prompts
-        )
+        queries = self.agent.multiple_predict(prompts=prompts,
+                                              system_prompts=system_prompts,
+                                              model=self.model)
         nb_input_tokens = queries["nb_input_tokens"]
         nb_output_tokens = queries["nb_output_tokens"]
         impacts = [0, 0, queries["impacts"][2]]

@@ -13,177 +13,50 @@ from openai import OpenAI
 from mistralai import Mistral
 from jsonschema import validate
 import json
+import concurrent.futures
 import requests
 import time
 import numpy as np
 from typing import List
 from .base_classes import Agent
 from .agent_functions import np_array_to_file
+from .threading_utils import get_executor_threads
 from pydantic import BaseModel
 from backend.database.rag_classes import Chunk
 
 
-def get_Agent(config_server: dict, image_description=False):
-    params_host_llm = config_server["params_host_llm"]
-
-    if image_description == False:
-        choix_model = "model"
-    elif image_description == True:
-        choix_model = "model_for_image"
-
-    if params_host_llm["type"] == "ollama":
-
-        agent = Agent_ollama(
-            model=config_server[choix_model],
-            key_or_url=params_host_llm["url"],
-            language=config_server["language"],
-            max_attempts=config_server["max_attempts"],
-            max_workers=config_server["max_workers"]
-        )
-    if params_host_llm["type"] == "vllm":
-        agent = Agent_Vllm(
-            model=config_server[choix_model],
-            key_or_url=params_host_llm["url"],
-            language=config_server["language"],
-            max_attempts=config_server["max_attempts"],
-            max_workers=config_server["max_workers"]
-        )
-    elif params_host_llm["type"] == "openai":
-        agent = Agent_openai(
-            model=config_server[choix_model],
-            key_or_url=params_host_llm["api_key"],
-            language=config_server["language"],
-            max_attempts=config_server["max_attempts"],
-            max_workers=config_server["max_workers"]
-        )
-    elif params_host_llm["type"] == "mistral":
-        agent = Agent_mistral(
-            model=config_server[choix_model],
-            key_or_url=params_host_llm["api_key"],
-            language=config_server["language"],
-            max_attempts=config_server["max_attempts"],
-            max_workers=config_server["max_workers"]
-        )
+def get_Agent(config_server: dict, models_infos: dict):
+    agent = Agent_openai(models_infos = models_infos,
+                         language=config_server["language"],
+                         max_attempts=config_server["max_attempts"],
+                         max_workers=config_server["max_workers"])
     return agent
 
 
-class Agent_ollama(Agent):
+def cosine_similarity(a, b):
+    a = np.array(a)
+    b = np.array(b)
+    return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
 
-    def __init__(
-        self,
-        model: str,
-        key_or_url="http://localhost:11434/v1",
-        language="EN",
-        max_attempts=5,
-        max_workers = 10,
-    ):
-        """
-        Args :
-            model : Name of the LLM used to realize the task (available LLMs are the keys of the dictionary from resources/prompts.json)
-            key_or_url : Docker's port if ollama, api_key else if open ai
-            language : Language of prompts
-            max_attempts : Maximal number of attempts the LLM will try to give you a correct format for the answer
-        """
-        self.client = OpenAI(base_url=key_or_url, api_key="ollama")
-
-        self.model = model
-        self.language = language
-        self.max_attempts = max_attempts
-        self.temperature = 0
-        self.key_or_url = key_or_url
-        self.max_workers = max_workers
-
-    def predict(
-        self, prompt: str, system_prompt: str, temperature=0, options_generation=None
-    ) -> str:
-        """
-        It formats the query with the good prompt, then gives this prompt to the LLM and return the cleaned output
-        """
-        answer = predict(
-            system_prompt,
-            prompt,
-            self.model,
-            self.client,
-            temperature,
-            options_generation=options_generation,
-        )
-        return answer
-
-    def predict_image(
-        self, prompt: str, data_url, 
-        json_format: BaseModel, temperature=0
-    ) -> BaseModel:
-        """
-        It formats the queries with good prompts, then gives these prompts to the LLM and return the cleaned outputs following the given BaseModel format
-        """
-        answer = predict_image(
-            prompt,
-            self.model,
-            data_url,
-            self.client,
-            json_format,
-            temperature,
-        )
-        return answer
-    
-
-    def embeddings(self, texts, model):
-
-        embeddings = self.client.embeddings.create(input=texts, model=model)
-
-        if type(texts) is type([]):
-            vector_embeddings = [
-                embeddings.data[k].embedding for k in range(len(texts))
-            ]
-
-        else:
-            vector_embeddings = [embeddings.data[0].embedding]
-
-        return {
-            "embeddings": vector_embeddings,
-            "nb_tokens": embeddings.usage.total_tokens,
-        }
-
-    def reranking(self, query: str, chunk_list: list[Chunk], model: str = "gemma3:1b"):
-        scores = []
-        input_tokens = []
-        system_prompt = """You are a highly accurate reranking model. Given a user query and a retrieved document chunk, your job is to assign a numerical relevance score from 0 to 1, where:
-
-                            1.0 means "perfectly relevant",
-                            0.0 means "completely irrelevant".
-
-                            Evaluate the document chunk solely based on its relevance to answering or supporting the query. Do not hallucinate or infer information not present in the chunk."""
-        for chunk in chunk_list:
-            prompt = f" Context : {chunk.text}\n Query : {query}"
-            json_response, nb_input_tokens = rerank(
-                system_prompt, prompt, model, self.client, temperature=None
-            )
-
-            scores.append(json_response.score)
-            input_tokens.append(nb_input_tokens)
-
-        return {
-            "scores": scores,
-            "nb_input_tokens": input_tokens,
-        }
-
-    def release_memory(self):
-        None
 
 
 class Agent_Vllm(Agent):
     def __init__(
         self,
-        model: str,
-        key_or_url="http://0.0.0.0:8000",
+        models_infos,
         language="EN",
         max_attempts=5,
         max_workers = 10,
-    ):
-        self.model = model
+    ):  
+        self.clients = {}
+        for key in self.models_infos.keys():
+            if "api_key" in self.models_infos[key].keys() and "url" in self.models_infos[key].keys():
+                self.clients[key] = OpenAI(api_key=self.models_infos[key]["api_key"],
+                                           base_url=self.models_infos[key]["url"])
+                
+        self.models_infos = models_infos
         self.language = language
         self.max_attempts = max_attempts
-        self.url = key_or_url
         self.temperature = 0
         self.max_workers = max_workers
 
@@ -192,6 +65,7 @@ class Agent_Vllm(Agent):
         self,
         prompts: List[str],
         system_prompts: List[str],
+        model: str,
         images = None,
         json_format=None,
         temperature=0,
@@ -205,7 +79,7 @@ class Agent_Vllm(Agent):
         answers = predict_vllm(
             system_prompts=system_prompts,
             prompts=prompts,
-            model=self.model,
+            model=model,
             url=url,
             temperature=self.temperature,
             images=images,
@@ -219,6 +93,7 @@ class Agent_Vllm(Agent):
         self,
         prompt: str,
         system_prompt: str,
+        model: str,
         images: list[str] = None,
         temperature=0,
         options_generation=None,
@@ -226,6 +101,7 @@ class Agent_Vllm(Agent):
         answer = self.multiple_predict(
             prompts=[prompt],
             system_prompts=[system_prompt],
+            model = model,
             temperature=temperature,
             images=[images],
             options_generation=options_generation,
@@ -238,6 +114,7 @@ class Agent_Vllm(Agent):
     def multiple_predict_json(self, 
                               prompts: list[str],
                               system_prompts: list[str],
+                              model : str,
                               json_format: BaseModel,
                               temperature=0, 
                               images: list[list[str]] = None,
@@ -245,6 +122,7 @@ class Agent_Vllm(Agent):
         answers = self.multiple_predict(
             prompts=prompts,
             system_prompts=system_prompts,
+            model = model,
             temperature=temperature,
             json_format=json_format,
             images=images,
@@ -268,6 +146,7 @@ class Agent_Vllm(Agent):
                     cleaned = self.multiple_predict_json(prompts = [prompts[i]],
                                                         system_prompts = [system_prompts[i]],
                                                         json_format = json_format,
+                                                        model=model,
                                                         temperature = temperature+0.5 if temperature<1 else temperature, 
                                                         images = [images[i]],
                                                         options_generation = options_generation)
@@ -277,6 +156,7 @@ class Agent_Vllm(Agent):
                                                         json_format = json_format,
                                                         temperature = temperature+0.5 if temperature<1 else temperature, 
                                                         images = None,
+                                                        model=model,
                                                         options_generation = options_generation)
             if type(cleaned)==str:
                 answer = json.loads(cleaned)
@@ -290,6 +170,7 @@ class Agent_Vllm(Agent):
         self,
         prompt: str,
         system_prompt: str,
+        model: str,
         json_format: BaseModel,
         temperature=0,
         images: list[str] = None,
@@ -300,14 +181,16 @@ class Agent_Vllm(Agent):
         """
         return self.multiple_predict_json(prompts=[prompt],
                                           system_prompts=[system_prompt],
+                                          model = model,
                                           json_format=json_format,
                                           temperature=temperature,
                                           images=[images],
                                           options_generation=options_generation)[0]
 
     def predict_image(
-        self, prompt: str, data_url, json_format: BaseModel, temperature=0,
-        options_generation=None
+        self, prompt: str, model: str, 
+        data_url, json_format: BaseModel, 
+        temperature=0, options_generation=None
     ) -> BaseModel:
         """
         It formats the queries with good prompts, then gives these prompts to the LLM and return the cleaned outputs following the given BaseModel format
@@ -315,6 +198,7 @@ class Agent_Vllm(Agent):
         answer = self.multiple_predict(
             prompts=[prompt],
             system_prompts=[prompt],
+            model = model,
             temperature=temperature,
             images=[data_url],
             options_generation=options_generation,
@@ -373,16 +257,15 @@ class Agent_Vllm(Agent):
         scores = requests.post(url, json=data).json()
 
 
+
 class Agent_openai(Agent):
 
-    def __init__(
-        self,
-        model: str,
-        key_or_url: str = None,
-        language="EN",
-        max_attempts=5,
-        max_workers = 10
-    ):
+    def __init__(self,
+                 models_infos,
+                 url: str = None,
+                 language="EN",
+                 max_attempts=5,
+                 max_workers = 10):
         """
         Args :
             model : Name of the LLM used to realize the task (available LLMs are the keys of the dictionary from resources/prompts.json)
@@ -390,25 +273,36 @@ class Agent_openai(Agent):
             language : Language of prompts
             max_attempts : Maximal number of attempts the LLM will try to give you a correct format for the answer
         """
-        self.client = OpenAI(api_key=key_or_url)
+        self.models_infos = models_infos
+        self.clients = {}
+        for key in self.models_infos.keys():
+            if "api_key" in self.models_infos[key].keys() and "url" in self.models_infos[key].keys():
+                print("url", self.models_infos[key]["url"])
+                if self.models_infos[key]["url"] is not None:
+                    url = self.models_infos[key]["url"] + "/v1"
+                self.clients[key] = OpenAI(api_key=self.models_infos[key]["api_key"],
+                                           base_url=url)
 
-        self.model = model
+        
         self.language = language
         self.max_attempts = max_attempts
         self.temperature = 0
         self.max_workers = max_workers
 
-    def predict_image(
-        self, prompt: str, data_url, json_format: BaseModel, temperature=0
-    ) -> BaseModel:
+    def predict_image(self, 
+                      prompt: str, 
+                      model: str,
+                      data_url,
+                      json_format: BaseModel,
+                      temperature=0) -> BaseModel:
         """
         It formats the queries with good prompts, then gives these prompts to the LLM and return the cleaned outputs following the given BaseModel format
         """
         answer = predict_image(
             prompt,
-            self.model,
+            model,
             data_url,
-            self.client,
+            self.clients[model],
             json_format,
             temperature,
         )
@@ -418,6 +312,7 @@ class Agent_openai(Agent):
         self,
         prompt: str,
         system_prompt: str,
+        model: str,
         temperature: float = 0,
         options_generation=None,
     ) -> str:
@@ -428,8 +323,8 @@ class Agent_openai(Agent):
         answer = predict(
             system_prompt,
             prompt,
-            self.model,
-            self.client,
+            model,
+            self.clients[model],
             temperature=temperature,
             options_generation=options_generation,
         )
@@ -437,8 +332,8 @@ class Agent_openai(Agent):
     
 
     def embeddings(self, texts, model):
-        embeddings = self.client.embeddings.create(input=texts,
-                                                   model=model)
+        embeddings = self.clients[model].embeddings.create(input=texts,
+                                                           model=model)
 
         if type(texts) is type([]):
             vector_embeddings = [
@@ -453,140 +348,76 @@ class Agent_openai(Agent):
             "nb_tokens": embeddings.usage.total_tokens,
         }
 
-    def reranking(self, query: str, chunk_list: list[Chunk], model: str = "gemma3:1b"):
-        scores = []
-        input_tokens = []
-        system_prompt = """You are a highly accurate reranking model. Given a user query and a retrieved document chunk, your job is to assign a numerical relevance score from 0 to 1, where:
+    def reranking(self, query: str, chunk_list: list[Chunk],
+                  model, max_workers: int = 10):
+        if self.models_infos[model]["type"]=="reranker":
+            documents = [chunk.text for chunk in chunk_list]
+            url = self.models_infos[model]['url'] + "/v1/rerank"
+            payload = {
+                "model": model,
+                "query": query,
+                "documents": documents
+            }
 
-                            1.0 means "perfectly relevant",
-                            0.0 means "completely irrelevant".
+            headers = {
+                "accept": "application/json",
+                "Content-Type": "application/json"
+            }
+            response = requests.post(url,
+                                     json=payload,
+                                     headers=headers).json()
+            input_tokens = [response["usage"]["total_tokens"]]
+            ordered_by_index = sorted(response["results"], key=lambda x: x["index"])
 
-                            Evaluate the document chunk solely based on its relevance to answering or supporting the query. Do not hallucinate or infer information not present in the chunk."""
+            scores = [item["relevance_score"] for item in ordered_by_index]
+        elif self.models_infos[model]["type"]=="embedding":
+            documents = [chunk.text for chunk in chunk_list]
+            emb_chunks = self.clients[model].embeddings.create(input=documents,
+                                                              model=model)
+            chunks_tokens = emb_chunks.usage.total_tokens
 
-        for chunk in chunk_list:
-            prompt = f" Context : {chunk.text}\n Query : {query}"
-            json_response, nb_input_tokens = rerank(
-                system_prompt, prompt, model, self.client, temperature=None
-            )
+            emb_chunk = [emb_chunks.data[k].embedding for k in range(len(emb_chunks.data))]
+            emb_query = self.clients[model].embeddings.create(input=query, 
+                                                              model=model)
+            query_tokens = emb_query.usage.total_tokens
+            emb_query = emb_query.data[0].embedding
+            scores = [cosine_similarity(doc, emb_query) for doc in emb_chunk]
+            input_tokens = [chunks_tokens+query_tokens]
+        elif self.models_infos[model]["type"]=="llm":
+            system_prompt = """You are a highly accurate reranking model. Given a user query and a retrieved document chunk, your job is to assign a numerical relevance score from 0 to 1, where:
 
-            scores.append(json_response.score)
-            input_tokens.append(nb_input_tokens)
+                                1.0 means "perfectly relevant",
+                                0.0 means "completely irrelevant".
+
+                                Evaluate the document chunk solely based on its relevance to answering or supporting the query. Do not hallucinate or infer information not present in the chunk."""
+            scores = []
+            input_tokens = []
+
+            if max_workers <= get_executor_threads():
+                max_workers = 1
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = []
+                for chunk in chunk_list:
+                    prompt = f" Context : {chunk.text}\n Query : {query}"
+                    future = executor.submit(rerank,
+                                            system_prompt,
+                                            prompt,
+                                            model,
+                                            self.clients[model],
+                                            temperature=None)
+                    futures.append(future)
+
+                for future in concurrent.futures.as_completed(futures):
+                    json_response, nb_input_tokens = future.result()
+                    scores.append(json_response.score)
+                    input_tokens.append(nb_input_tokens)
+
 
         return {
             "scores": scores,
             "nb_input_tokens": input_tokens,
-        }
+            }
 
     def release_memory(self):
         None
-
-
-class Agent_mistral(Agent_openai):
-
-    def __init__(
-        self,
-        model: str,
-        key_or_url: str = None,
-        language="EN",
-        max_attempts=5,
-        max_workers = 10
-    ):
-        """
-        Args :
-            model : Name of the LLM used to realize the task (available LLMs are the keys of the dictionary from resources/prompts.json)
-            key_or_url : Docker's port if ollama, api_key else if open ai
-            language : Language of prompts
-            max_attempts : Maximal number of attempts the LLM will try to give you a correct format for the answer
-        """
-        super().__init__(
-            model=model,
-            key_or_url=key_or_url,
-            language=language,
-            max_attempts=max_attempts,
-            max_workers=max_workers)
-
-        self.client = Mistral(api_key=key_or_url)
-
-        self.model = model
-        self.language = language
-        self.max_attempts = max_attempts
-
-    def embeddings(self, texts, model):
-        embeddings = self.client.embeddings.create(inputs=texts, model=model)
-
-        if type(texts) is type([]):
-            vector_embeddings = [
-                embeddings.data[k].embedding for k in range(len(texts))
-            ]
-
-        else:
-            vector_embeddings = [embeddings.data[0].embedding]
-
-        return {
-            "embeddings": vector_embeddings,
-            "nb_tokens": embeddings.usage.total_tokens,
-        }
-
-    def predict(
-        self,
-        prompt: str,
-        system_prompt: str,
-        temperature: float = 0,
-        options_generation=None,
-    ) -> str:
-        """
-        It formats the query with the good prompt, then gives this prompt to the LLM and return the cleaned output
-        """
-        answer = predict_mistral(
-            system_prompt,
-            prompt,
-            self.model,
-            self.client,
-            temperature=temperature,
-            options_generation=options_generation,
-        )
-
-        return answer
-
-    def multiple_predict(
-        self,
-        prompts: List[str],
-        system_prompts: List[str],
-        temperature: float = 0,
-        options_generation=None,
-    ) -> str:
-        """
-        It formats the queries with good prompts, then gives these prompts to the LLM and return the cleaned outputs
-        """
-        answers = multiple_predict_mistral(
-            system_prompts,
-            prompts,
-            self.model,
-            self.client,
-            temperature=temperature,
-            options_generation=options_generation,
-        )
-        return answers
-
-    def reranking(self, query: str, contexts: list[str], model: str = "gemma3:1b"):
-        scores = []
-        input_tokens = []
-        system_prompt = """You are a highly accurate reranking model. Given a user query and a retrieved document chunk, your job is to assign a numerical relevance score from 0 to 1, where:
-
-                            1.0 means "perfectly relevant",
-                            0.0 means "completely irrelevant".
-
-                            Evaluate the document chunk solely based on its relevance to answering or supporting the query. Do not hallucinate or infer information not present in the chunk."""
-        for context in contexts:
-            prompt = f" Context : {context}\n Query : {query}"
-            json_response, nb_input_tokens = rerank(
-                system_prompt, prompt, model, self.client, temperature=None
-            )
-
-            scores.append(json_response.score)
-            input_tokens.append(nb_input_tokens)
-
-        return {
-            "scores": scores,
-            "nb_input_tokens": input_tokens,
-        }

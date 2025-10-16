@@ -1,0 +1,14 @@
+{
+    "vllm": {
+        "url": "http://localhost:8000",
+        "api_key": "vllm"
+    },
+    "openai": {
+        "url": null,
+        "api_key": ""
+    },
+    "ollama": {
+        "url": "http://localhost:451/v1",
+        "api_key": "ollama"
+    }
+}

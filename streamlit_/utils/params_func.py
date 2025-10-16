@@ -17,8 +17,6 @@ def get_possible_embeddings_model(provider):
     elif provider=="openai":
         return ["text-embedding-3-small", "text-embedding-3-large",
                  "text-embedding-ada-002"]
-    elif provider=="mistral":
-        return ["mistral-embed"]
     elif provider=="vllm":
         return ["BAAI/bge-m3", "mixedbread-ai/mxbai-embed-large-v1",
                  "Qwen/Qwen3-Embedding-0.6B", "sentence-transformers/all-MiniLM-L6-v2"]
@@ -28,34 +26,29 @@ def get_default_embeddings_model(provider):
     return get_possible_embeddings_model(provider=provider)[0]
 
 
-def get_config_rag(rag_name, provider):
-    custom_rags_name = get_custom_rags_name(provider=provider)
-    merge_rags_name = get_merge_rags_name(provider=provider)
+def get_config_rag(rag_name):
+    custom_rags_name = get_custom_rags_name()
+    merge_rags_name = get_merge_rags_name()
     if rag_name in custom_rags_name:
-        with open(f"data/custom_rags/{provider}/{rag_name}.json", "r") as file:
+        with open(f"data/custom_rags/{rag_name}.json", "r") as file:
             config = json.load(file)
         return config
     elif rag_name in merge_rags_name:
-        with open(f"data/merge/{provider}/{rag_name}.json", "r") as file:
+        with open(f"data/merge/{rag_name}.json", "r") as file:
             config = json.load(file)
         return config
     else:
-        with open(f"streamlit_/utils/base_config_server.json", "r") as file:
+        with open(f"data/base_config_server.json", "r") as file:
             config = json.load(file)
         return config
 
 
-def get_custom_rags_name(provider=None):
+def get_custom_rags_name():
     custom_rags = []
-    if provider is None:
-        folders = ["vllm", "ollama", "openai", "mistral"]
-    else:
-        folders = [provider]
-    for f in folders:
-        if not os.path.exists(f"data/custom_rags/'{f}'"):
-            os.makedirs(f"data/custom_rags/{f}", exist_ok=True)
+    if not os.path.exists(f"data/custom_rags"):
+        os.makedirs(f"data/custom_rags", exist_ok=True)
 
-        custom_rags += os.listdir(f"data/custom_rags/{f}")
+    custom_rags += os.listdir(f"data/custom_rags")
 
     custom_rags = [
         custom_rag[:-5] for custom_rag in custom_rags if custom_rag != ".gitkeep"
@@ -72,17 +65,12 @@ def get_custom_rags_name(provider=None):
     return unique_rags
 
 
-def get_merge_rags_name(provider=None):
+def get_merge_rags_name():
     custom_rags = []
-    if provider is None:
-        folders = ["vllm", "ollama", "openai", "mistral"]
-    else:
-        folders = [provider]
-    for f in folders:
-        if not os.path.exists(f"data/merge/'{f}'"):
-            os.makedirs(f"data/merge/{f}", exist_ok=True)
+    if not os.path.exists(f"data/merge'"):
+        os.makedirs(f"data/merge", exist_ok=True)
 
-        custom_rags += os.listdir(f"data/merge/{f}")
+    custom_rags += os.listdir(f"data/merge")
 
     custom_rags = [
         custom_rag[:-5] for custom_rag in custom_rags if custom_rag != ".gitkeep"

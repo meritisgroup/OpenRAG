@@ -6,7 +6,7 @@ import os
 
 list_doc = os.listdir("data/databases/scaling")
 
-with open("streamlit_/utils/base_config_server.json", 'r') as f:
+with open("data/base_config_server.json", 'r') as f:
     config_server = json.load(f)
 
 config_server["data_preprocessing"] = "md_without_images"

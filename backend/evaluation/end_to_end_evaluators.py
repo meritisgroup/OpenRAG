@@ -11,6 +11,7 @@ class GroundTruthComparison(Evaluator):
     def __init__(
         self,
         agent: Agent,
+        model: str,
         max_attemps: int = 5,
         batch_size: int = 10,
     ) -> None:
@@ -21,6 +22,7 @@ class GroundTruthComparison(Evaluator):
         """
         super().__init__(agent, max_attemps, batch_size)
         self.agent = agent
+        self.model = model
 
         self.system_prompt = PROMPTS[self.language]["rate_from_ground_truth"][
             "SYSTEM_PROMPT"
@@ -61,11 +63,12 @@ class GroundTruthComparison(Evaluator):
             metric, queries, real_answers, proposed_answers
         )
 
-        cleaned_outputs = process_prompts_to_json(prompts,
-                                                  [system_prompt],
-                                                  self.max_attempts,
-                                                  self.agent,
-                                                  GroundTruthAnswer)
+        cleaned_outputs = process_prompts_to_json(prompts=prompts,
+                                                  system_prompts=[system_prompt],
+                                                  max_retry=self.max_attempts,
+                                                  agent=self.agent,
+                                                  model=self.model,
+                                                  json_format=GroundTruthAnswer)
         return cleaned_outputs
 
     def _clean_output(self, output: str) -> str | None:
@@ -121,13 +124,14 @@ class MetricComparaison(Evaluator):
     def __init__(
         self,
         agent: Agent,
+        model: str,
         max_attemps=5,
         batch_size=10,
     ):
         super().__init__(agent, max_attemps, batch_size)
 
         self.agent = agent
-
+        self.model = model
         self.system_prompt = PROMPTS[self.language]["rate_metric"]["SYSTEM_PROMPT"]
         self.prompt_template = PROMPTS[self.language]["rate_metric"]["QUERY_TEMPLATE"]
         self.metrics = PROMPTS[self.language]["metrics"]
@@ -174,11 +178,12 @@ class MetricComparaison(Evaluator):
             metric, queries, ground_truths, first_answers, second_answers
         )
 
-        cleaned_outputs =  process_prompts_to_json(prompts, 
-                                                   [system_prompt],
-                                                   self.max_attempts,
-                                                   self.agent,
-                                                   MetricAnswer)
+        cleaned_outputs =  process_prompts_to_json(prompts=prompts, 
+                                                   system_prompts=[system_prompt],
+                                                   max_retry=self.max_attempts,
+                                                   agent=self.agent,
+                                                   model=self.model,
+                                                   json_format=MetricAnswer)
         return cleaned_outputs
 
     def run_evaluation_pipeline(

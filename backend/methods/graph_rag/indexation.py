@@ -30,8 +30,12 @@ class GraphRagIndexation:
         agent: Agent,
         type_text_splitter: str,
         embedding_model: str,
+        llm_model: str,
         language: str = "EN",
     ):  
+        
+        self.llm_model = llm_model
+        self.embedding_model = embedding_model
         self.data_manager = data_manager
         self.agent = agent
         self.language = language
@@ -95,6 +99,7 @@ class GraphRagIndexation:
 
             entities, relations, input_tokens, output_tokens = (
                     extract_entities_relations(agent=self.agent,
+                                               model = self.llm_model,
                                                chunks=chunks,
                                                doc_name=name_docs[0],
                                                language=self.language)
@@ -158,6 +163,7 @@ class GraphRagIndexation:
                                     db_name=db_name)
         db = self.data_manager.get_database(db_name=db_name)
         cd = CommunityDescription(agent=self.agent,
+                                  model=self.llm_model,
                                   graph=graph,
                                   db=db)
 
@@ -186,7 +192,7 @@ class GraphRagIndexation:
 
                 if truncated_entities != []:
                     nb_tokens = 0
-                    taille_batch = 500
+                    taille_batch = 100
                     for i in range(len(truncated_entities)):
                         truncated_entities[i] = Chunk(text=truncated_entities[i], 
                                                       document="",
@@ -231,7 +237,7 @@ class GraphRagIndexation:
 
                 if truncated_communities != []:
                     nb_tokens = 0
-                    taille_batch = 500
+                    taille_batch = 100
                     for i in range(len(truncated_communities)):
                         truncated_communities[i] = Chunk(text=truncated_communities[i], 
                                                              document="",

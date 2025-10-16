@@ -20,13 +20,15 @@ class QueryBasedRagAgent(AdvancedRag):
     def __init__(
         self,
         config_server: dict,
+        models_infos: dict,
         dbs_name: list[str],
         data_folders_name: list[str]
     ) -> None:
         """ """
         super().__init__(config_server=config_server,
-                        dbs_name = dbs_name,
-                        data_folders_name = data_folders_name)
+                         models_infos=models_infos,
+                         dbs_name = dbs_name,
+                         data_folders_name = data_folders_name)
         
         self.prompts = prompts[self.language]
         self.data_manager = get_management_data(dbs_name=self.dbs_name,
@@ -57,11 +59,12 @@ class QueryBasedRagAgent(AdvancedRag):
             data_manager=self.data_manager,
             type_text_splitter=self.type_text_splitter,
             embedding_model=self.embedding_model,
+            llm_model=self.llm_model
         )
 
         qb_index.run_pipeline(chunk_size=self.chunk_size,
                               config_server=self.config_server,
-                              chunk_overlap=overlap,
+                              chunk_overlap=overlap,                              
                               reset_preprocess=reset_preprocess)
         
     def remove_duplicate_chunks(self, chunks):

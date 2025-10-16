@@ -23,7 +23,7 @@ def indexation(data_manager, doc_chunks, path_docs):
         """
 
         tokens = 0
-        taille_batch = 1000
+        taille_batch = 100
         range_chunks = range(0, len(doc_chunks), taille_batch)
         for i in range_chunks:
             tokens += np.sum(
@@ -139,7 +139,6 @@ class NaiveRagIndexation:
         self.data_manager.create_collection()
         progress_bar = ProgressBar(total=len(docs_to_process))
         index = 0
-        print("max", max_workers)
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {
                 executor.submit(process_single_doc,
@@ -167,7 +166,6 @@ class NaiveRagIndexation:
 
                     progress_bar.update(index)
                     index+=1
-                    print(index)
                     self.data_manager.add_instance(instance=new_doc,
                                            path=result["parent_path"]
                     )

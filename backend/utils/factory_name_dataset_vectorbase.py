@@ -1,7 +1,7 @@
 
 
 def get_name(rag_name, config_server, additionnal_name=""):
-    name = ""
+    name = "{}_".format(config_server["embedding_model"])
     if (
         rag_name == "naive"
         or rag_name == "crag"
@@ -10,60 +10,41 @@ def get_name(rag_name, config_server, additionnal_name=""):
         or rag_name == "self"
         or rag_name == "main"
     ):
-        name = "naive_rag_{}_{}_{}".format(
+        name = name + "{}_{}".format(
             config_server["type_retrieval"],
-            config_server["params_vectorbase"]["backend"],
             config_server["TextSplitter"],
         )
     elif rag_name == "graph":
-        name = "graph_rag_{}_{}_{}".format(
-            config_server["type_retrieval"],
-            config_server["params_vectorbase"]["backend"],
-            config_server["TextSplitter"],
-        )
+        name = "graph_rag_{}{}_{}".format(name,
+                                          config_server["type_retrieval"],
+                                          config_server["TextSplitter"])
+    elif rag_name == "query_based":
+        name = "query_rag_{}{}_{}".format(name,
+                                          config_server["type_retrieval"],
+                                          config_server["TextSplitter"],
+                                        )
     elif rag_name == "advanced_rag":
-        name = "advanced_rag_{}_{}_{}".format(
+        name = "{}{}_{}".format(name,
             config_server["type_retrieval"],
-            config_server["params_vectorbase"]["backend"],
             config_server["TextSplitter"],
         )
         if len(config_server["ProcessorChunks"]) > 0:
             for i in range(len(config_server["ProcessorChunks"])):
                 name += "_{}".format(config_server["ProcessorChunks"][i])
-    elif rag_name == "query_based":
-        name = "query_rag_{}_{}_{}".format(
-            config_server["type_retrieval"],
-            config_server["params_vectorbase"]["backend"],
-            config_server["TextSplitter"],
-        )
+
     elif rag_name == "semantic_chunking":
-        name = "semantic_rag_{}_{}_{}".format(
+        name = "{}{}_{}".format(name,
             config_server["type_retrieval"],
-            config_server["params_vectorbase"]["backend"],
-            config_server["TextSplitter"],
+            "Semantic_TextSplitter",
         )
     elif rag_name == "contextual_retrieval":
-        name = "contextual_rag_{}_{}_{}".format(
+        name = "{}{}_{}".format(name,
             config_server["type_retrieval"],
-            config_server["params_vectorbase"]["backend"],
             config_server["TextSplitter"],
-        )
-    elif rag_name == "agentic":
-        name = "agentic_rag_{}_{}_{}".format(
-            config_server["type_retrieval"],
-            config_server["params_vectorbase"]["backend"],
-            config_server["TextSplitter"],
-        )
-    elif rag_name == "merger":
-        name = "merger_rag_{}_{}_{}".format(
-            config_server["type_retrieval"],
-            config_server["params_vectorbase"]["backend"],
-            config_server["TextSplitter"],
+            "Contextual"
         )
 
     name += "_{}".format(config_server["data_preprocessing"])
-    name += "_{}".format(config_server["params_host_llm"]["type"])
-    
     if additionnal_name != "":
         name += "_" + additionnal_name
     name = name.lower()

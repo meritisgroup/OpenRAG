@@ -7,6 +7,7 @@ def process_prompts(
     prompts: List[str],
     system_prompts: List[str],
     max_retry: int,
+    model: str,
     agent,
     clean_output,
 ):
@@ -21,7 +22,9 @@ def process_prompts(
     if len(system_prompts) == 1 and len(prompts) > 1:
         system_prompts = [system_prompts[0] for _ in range(len(prompts))]
 
-    evaluations = agent.multiple_predict(system_prompts, prompts)["texts"]
+    evaluations = agent.multiple_predict(system_prompts=system_prompts,
+                                         model=model,
+                                         prompts=prompts)["texts"]
     if evaluations is None:
         return None
 
@@ -36,11 +39,12 @@ def process_prompts(
     failed_prompts = [prompts[i] for i in failed_indices]
     failed_system_prompts = [system_prompts[i] for i in failed_indices]
 
-    retry_eval = process_prompts(failed_prompts,
-                                 failed_system_prompts,
-                                 max_retry - 1,
-                                 agent,
-                                 clean_output)
+    retry_eval = process_prompts(prompts=failed_prompts,
+                                 system_prompts=failed_system_prompts,
+                                 model=model,
+                                 max_retry=max_retry - 1,
+                                 agent=agent,
+                                 clean_output=clean_output)
 
     if retry_eval is not None:
         merged = []
@@ -56,21 +60,24 @@ def process_prompts(
     return cleaned_outputs
 
 
-def process_prompts_to_json(
-    prompts: List[str],
-    system_prompts: List[str],
-    max_retry: int,
-    agent,
-    json_format: BaseModel,
-) -> BaseModel | None:
+def process_prompts_to_json(prompts: List[str],
+                            system_prompts: List[str],
+                            model: str,
+                            max_retry: int,
+                            agent,
+                            json_format: BaseModel,
+                        ) -> BaseModel | None:
+    
     if max_retry <= 0 or not prompts:
         return None
+    
     if len(system_prompts)==1 and len(prompts)>1:
         system_prompts = [system_prompts[0] for i in range(len(prompts))]
         
-    evaluation = agent.multiple_predict_json(system_prompts,
-                                             prompts,
-                                             json_format)
+    evaluation = agent.multiple_predict_json(system_prompts=system_prompts,
+                                             prompts=prompts,
+                                             model=model,
+                                             json_format=json_format)
 
     if evaluation is None:
         return None
@@ -83,13 +90,12 @@ def process_prompts_to_json(
     if not failed_prompts:
         return evaluation
 
-    retry_eval = process_prompts_to_json(
-        failed_prompts,
-        system_prompts,
-        max_retry - 1,
-        agent,
-        json_format,
-    )
+    retry_eval = process_prompts_to_json(prompts=failed_prompts,
+                                         system_prompts=system_prompts,
+                                         model=model,
+                                         max_retry=max_retry - 1,
+                                         agent=agent,
+                                         json_format=json_format)
 
     if retry_eval is not None:
         merged = []

@@ -17,6 +17,7 @@ class SemanticChunkingRagAgent(AdvancedRag):
     def __init__(
         self,
         config_server: dict,
+        models_infos: dict,
         dbs_name: list[str],
         data_folders_name: list[str]
     ) -> None:
@@ -43,6 +44,7 @@ class SemanticChunkingRagAgent(AdvancedRag):
         
         super().__init__(
             config_server=config_server,
+            models_infos=models_infos,
             dbs_name=dbs_name,
             data_folders_name=data_folders_name,
         )

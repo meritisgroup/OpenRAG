@@ -5,9 +5,15 @@ import json
 import pandas as pd
 import os
 import glob
+from ecologits import EcoLogits
 from dotenv import load_dotenv
 
 load_dotenv()
+
+if not getattr(EcoLogits, "_initialized", False):
+    EcoLogits.init()
+    EcoLogits._initialized = True
+
 
 chat = st.Page("streamlit_/pages/1_💬_chat.py", title="Chat")
 config = st.Page("streamlit_/pages/2_🧠_configuration.py", title="Configuration")
@@ -19,6 +25,8 @@ advanced_configuration = st.Page(
     "streamlit_/pages/7_🛠️_advanced_configuration.py", title="Advanced Configuration"
 )
 metadatas = st.Page("streamlit_/pages/8_⚡_metadatas.py", title="Metadatas")
+
+
 pg = st.navigation(
     (
         [
@@ -48,8 +56,19 @@ st.logo(
     icon_image="streamlit_/images/logomeritis_horizontal_rvb.png",
 )
 
+if 'mode_interface' not in st.session_state:
+    st.session_state.mode_interface = 'Simple' 
+
+st.session_state.mode_interface = st.sidebar.radio(
+    "Choisissez votre mode d'utilisation :",
+    ['Simple', 'Avancé'],
+    key='mode_inteface',
+    horizontal=True,
+)
+st.sidebar.divider()
+
 if "config_server" not in st.session_state:
-    with open("streamlit_/utils/base_config_server.json", "r") as file:
+    with open("data/base_config_server.json", "r") as file:
         base_config_server = json.load(file)
         if base_config_server["params_vectorbase"]["backend"] == "elasticsearch":
             base_config_server["params_vectorbase"]["url"] = (
@@ -60,42 +79,48 @@ if "config_server" not in st.session_state:
                 os.getenv("ES_LOCAL_PASSWORD"),
             ]
         st.session_state["config_server"] = base_config_server
-        st.session_state["hf_token"] = st.session_state["config_server"]["hf_token"]
 
-    for folder in ["vllm", "ollama", "openai", "mistral"]:
-        for file in glob.glob(f"data/custom_rags/folder/*.json"):
-            with open(file, "r") as f:
-                config = json.load(f)
-            if config["params_vectorbase"]["backend"] == "elasticsearch":
-                config["params_vectorbase"]["url"] = (
-                    os.getenv("ES_LOCAL_URL") + ":" + os.getenv("ES_LOCAL_PORT")
-                )
-                config["params_vectorbase"]["auth"] = [
-                    "elastic",
-                    os.getenv("ES_LOCAL_PASSWORD"),
-                ]
-            with open(file, "w") as f:
-                json.dump(config, f, indent=4)
+    for file in glob.glob(f"data/custom_rags/*.json"):
+        with open(file, "r") as f:
+            config = json.load(f)
+        if config["params_vectorbase"]["backend"] == "elasticsearch":
+            config["params_vectorbase"]["url"] = (
+                os.getenv("ES_LOCAL_URL") + ":" + os.getenv("ES_LOCAL_PORT")
+            )
+            config["params_vectorbase"]["auth"] = [
+                "elastic",
+                os.getenv("ES_LOCAL_PASSWORD"),
+            ]
+        with open(file, "w") as f:
+            json.dump(config, f, indent=4)
 
 if "rag" not in st.session_state:
     st.session_state["rag_name"] = "naive"
 
+if "providers_infos" not in st.session_state:
+    with open("data/providers_infos.json", "r") as file:
+        providers_infos = json.load(file)
+    st.session_state["providers_infos"] = providers_infos
+    
 if "api_key" not in st.session_state:
-    st.session_state["api_key"] = st.session_state["config_server"]["params_host_llm"][
-        "api_key"
-    ]
+    provider_default_mode = st.session_state["config_server"]["default_mode_provider"]
+    st.session_state["api_key"] = st.session_state["providers_infos"][provider_default_mode]["api_key"]
+
+
+if "models_infos" not in st.session_state:
+    with open("data/models_infos.json", "r") as file:
+        models_infos = json.load(file)
+    st.session_state["models_infos"] = models_infos
 
 if "all_rags" not in st.session_state:
-    with open("streamlit_/utils/all_rags.json", "r") as file:
-        all_rags = json.load(file)
-    st.session_state["all_rags"] = all_rags
+    with open("data/all_rags.json", "r") as file:
+        models_infos = json.load(file)
+    st.session_state["all_rags"] = models_infos
+
 
 if "benchmark" not in st.session_state:
     st.session_state["benchmark"] = {}
-    list_rags = list(st.session_state["all_rags"]["vllm"].keys())
-    list_rags += list(st.session_state["all_rags"]["ollama"].keys())
-    list_rags += list(st.session_state["all_rags"]["openai"].keys())
-    list_rags += list(st.session_state["all_rags"]["mistral"].keys())
+    list_rags = list(st.session_state["all_rags"].keys())
     list_rags = set(list_rags)
     st.session_state["benchmark"]["rags"] = dict(
         zip(
@@ -109,9 +134,7 @@ if "benchmark" not in st.session_state:
     st.session_state["benchmark"]["load"] = False
 
 
-st.session_state["custom_rags"] = get_custom_rags_name(
-    provider=st.session_state["config_server"]["params_host_llm"]["type"]
-)
+st.session_state["custom_rags"] = get_custom_rags_name()
 if ".gitkeep" in st.session_state["custom_rags"]:
     st.session_state["custom_rags"].remove(".gitkeep")
 
@@ -119,21 +142,15 @@ if "databases" not in st.session_state:
     st.session_state["databases"] = {}
 
 if "merge_rags" not in st.session_state:
-    for folder in ["vllm", "ollama", "openai", "mistral"]:
-        if not os.path.exists(f"data/merge/{folder}"):
-            os.makedirs(f"data/merge/{folder}")
+    if not os.path.exists(f"data/merge"):
+        os.makedirs(f"data/merge")
 
-    st.session_state["merge_rags"] = get_merge_rags_name(
-        provider=st.session_state["config_server"]["params_host_llm"]["type"]
-    )
+    st.session_state["merge_rags"] = get_merge_rags_name()
 
 
 if "rags_to_merge" not in st.session_state:
     st.session_state["rags_to_merge"] = {}
-    list_rags = list(st.session_state["all_rags"]["vllm"].keys())
-    list_rags += list(st.session_state["all_rags"]["ollama"].keys())
-    list_rags += list(st.session_state["all_rags"]["openai"].keys())
-    list_rags += list(st.session_state["all_rags"]["mistral"].keys())
+    list_rags = list(st.session_state["all_rags"].keys())
     list_rags = set(list_rags)
     st.session_state["rags_to_merge"]["rags"] = dict(
         zip(
@@ -162,8 +179,5 @@ if "all_databases" not in st.session_state:
         st.session_state["chat_database_name"] = all_db[0] if len(all_db) > 0 else None
     if "benchmark_database" not in st.session_state:
         st.session_state["benchmark_database"] = all_db[0] if len(all_db) > 0 else None
-
-for k, v in st.session_state.items():
-    st.session_state[k] = v
 
 pg.run()

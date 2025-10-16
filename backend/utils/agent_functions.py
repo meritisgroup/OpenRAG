@@ -7,8 +7,8 @@ import cv2
 import io
 from pydantic import BaseModel
 from typing import Union
-import concurrent.futures
 from ecologits import EcoLogits
+import concurrent.futures
 from .progress import ProgressBar
 from .threading_utils import get_executor_threads
 
@@ -44,6 +44,12 @@ def predict_json(
     temperature: float = None,
     options_generation=None,
 ) -> str:
+    
+    if not getattr(EcoLogits, "_initialized", False):
+        EcoLogits.init()
+        EcoLogits._initialized = True
+
+
     if (
         options_generation is not None
         and options_generation["type_generation"] == "no_generation"
@@ -86,6 +92,9 @@ def predict_image(
     json_format: BaseModel,
     temperature: float = None,
 ) -> str:
+    if not getattr(EcoLogits, "_initialized", False):
+        EcoLogits.init()
+        EcoLogits._initialized = True
 
     try:
         params = {
@@ -132,6 +141,10 @@ def predict(
     """
     Gives the prompt to the LLM and returns the output
     """
+    if not getattr(EcoLogits, "_initialized", False):
+        EcoLogits.init()
+        EcoLogits._initialized = True
+        
     if (
         options_generation is not None
         and options_generation["type_generation"] == "no_generation"
@@ -144,7 +157,6 @@ def predict(
             "energy": [0, 0, ""],
         }
 
-    EcoLogits.init()
     response = client.chat.completions.create(
         model=model,
         messages=[
@@ -357,7 +369,11 @@ def predict_mistral(
             "energy": [0, 0, ""],
         }
 
-    EcoLogits.init()
+    if not getattr(EcoLogits, "_initialized", False):
+        EcoLogits.init()
+        EcoLogits._initialized = True
+
+
     response = client.chat.complete(
         model=model,
         messages=[
@@ -506,10 +522,8 @@ def rerank(
         if temperature is not None:
             params["temperature"] = temperature
         if type(client) is OpenAI:
+            params.pop("impacts", None)
             scores = client.beta.chat.completions.parse(**params)
-
-        if type(client) is Mistral:
-            scores = client.chat.parse(**params)
 
         json_response = scores.choices[0].message
         nb_input_tokens = scores.usage.prompt_tokens

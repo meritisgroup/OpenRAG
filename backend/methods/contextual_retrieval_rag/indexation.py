@@ -16,6 +16,7 @@ import concurrent.futures
 def process_single_doc(
     data_manager,
     agent,
+    model: str,
     path_doc: str,
     doc_index: int,
     config_server: dict,
@@ -59,6 +60,7 @@ def process_single_doc(
 
         chunk_with_context = run_contextual(agent=agent,
                                             doc_chunks=doc_chunks,
+                                            model=model,
                                             doc_content=little_doc,
                                             language=language)
         chunk_with_context = chunk_with_context
@@ -125,7 +127,7 @@ class ContextualRetrievalIndexation:
         for k, chunk in enumerate(doc_chunks):
             elements.append(chunk.text.replace("\n", "").replace("'", ""))
 
-        taille_batch = 1000
+        taille_batch = 100
         range_chunks = range(0, len(elements), taille_batch)
         progress_bar_chunks = ProgressBar(total=len(range_chunks))
         j = 0
@@ -143,6 +145,7 @@ class ContextualRetrievalIndexation:
     def run_pipeline(
         self,
         config_server,
+        model: str,
         chunk_size: int = 500,
         chunk_overlap: bool = True,
         reset_preprocess = False,
@@ -178,6 +181,7 @@ class ContextualRetrievalIndexation:
                 executor.submit(process_single_doc,
                                 self.data_manager,
                                 path_doc,
+                                model,
                                 i,
                                 config_server,
                                 self.splitter,

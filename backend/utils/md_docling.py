@@ -162,28 +162,23 @@ class ImageAnalyzer:
 
 
     def __init__(self, config_server):
-        self.agent = get_Agent(config_server, image_description=True)
+        self.agent = get_Agent(config_server,
+                               image_description=True)
         self.config_server=config_server 
 
     def analyze_bytes(self, image_bytes: bytes, context) -> ImageDescription:
         image_b64 = base64.b64encode(image_bytes).decode("utf-8")
         data_url = f"data:image/png;base64,{image_b64}"
-
-        if self.config_server["params_host_llm"]["type"]=="ollama":
-            temperature=0
-        else:
-            temperature=1
-        print("test")
+            
         category=self.agent.predict_image(prompt=classification_prompt,
                                           data_url=data_url,
                                           json_format=ImageClassification,
-                                          temperature=temperature)
-        print(category)
+                                          temperature=0.1)
         description_prompt=get_prompt(category.category, context)
         response=self.agent.predict_image(prompt=description_prompt,
                                           data_url=data_url,
                                           json_format=ImageDescription,
-                                          temperature=temperature)
+                                          temperature=0.1)
 
 
         return response

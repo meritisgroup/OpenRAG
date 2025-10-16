@@ -32,7 +32,7 @@ def save_modification():
         "all_system_prompt"
     ]
     st.session_state["config_server"]["chunk_length"] = st.session_state["chunk_length"]
-    with open("streamlit_/utils/base_config_server.json", "w") as file:
+    with open("data/base_config_server.json", "w") as file:
         json.dump(st.session_state["config_server"], file, indent=4)
 
 

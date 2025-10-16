@@ -29,29 +29,35 @@ class AgentEvaluator:
         dataframe: pd.DataFrame,
         rags_available: list[str],
         config_server: dict,
+        models_infos: dict
     ):
         """This Agent takes a Dataframe as input and run all evaluations on it.
         The dataframe must includes a "QUERY" and a "GROUND_TRUTH" columns along with all the rags answers from the rag we are evaluating.
         In every rag column, and for each query, we need a dictionary with "answer" and "context" keys to evaluate both of them relatively to each rag
         """
-        self.agent = get_Agent(config_server)
-
+        self.agent = get_Agent(config_server=config_server,
+                               models_infos=models_infos)
+        self.model = config_server["model"]
         self.dataframe = dataframe
 
         self.gt_dataframe = dataframe[dataframe["GROUND_TRUTH"].notna()]
 
-        self.arena = ArenaBattle(dataframe=self.gt_dataframe, agent=self.agent)
+        self.arena = ArenaBattle(dataframe=self.gt_dataframe,
+                                 agent=self.agent,
+                                 model=self.model)
         self.ground_truth_comparator = GroundTruthComparator(
-            dataframe=self.gt_dataframe, agent=self.agent
+            dataframe=self.gt_dataframe,
+            agent=self.agent,
+            model=self.model
         )
         self.context_faithfulness_comparator = ContextFaithfulnessComparator(
-            dataframe=self.gt_dataframe, agent=self.agent
+            dataframe=self.gt_dataframe, agent=self.agent, model=self.model
         )
         self.context_relevance_comparator = ContextRelevanceComparator(
-            dataframe=self.dataframe, agent=self.agent
+            dataframe=self.dataframe, agent=self.agent, model=self.model
         )
         self.ndcg_comparator = nDCGComparator(
-            dataframe=self.dataframe, agent=self.agent
+            dataframe=self.dataframe, agent=self.agent, model=self.model
 
         )
         self.rags_available = rags_available

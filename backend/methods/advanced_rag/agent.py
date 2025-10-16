@@ -23,6 +23,7 @@ class AdvancedRag(NaiveRagAgent):
     def __init__(
         self,
         config_server: dict,
+        models_infos: dict,
         dbs_name: list[str],
         data_folders_name: list[str]
     ) -> None:
@@ -36,17 +37,13 @@ class AdvancedRag(NaiveRagAgent):
 
         super().__init__(
             config_server=config_server,
+            models_infos=models_infos,
             dbs_name=dbs_name,
-            data_folders_name=data_folders_name,
-        )
+            data_folders_name=data_folders_name)
 
         self.reranker_model = config_server["reranker_model"]
-        self.reformulate_query = config_server["reformulate_query"]
-        self.language = config_server["language"]
         self.type_processor_chunks = config_server["ProcessorChunks"]
-        self.nb_chunks = config_server["nb_chunks"]
-        self.nb_input_tokens = 0
-        self.nb_output_tokens = 0
+
         if self.reranker_model is not None:
             self.reranker = Reranker(
                 agent=self.agent, reranking_model=self.reranker_model
@@ -55,10 +52,6 @@ class AdvancedRag(NaiveRagAgent):
         else:
             self.rerank = False
 
-        if self.reformulate_query:
-            self.reformulater = query_reformulation(
-                agent=self.agent, language=self.language
-            )
 
     def indexation_phase(
         self,
@@ -85,6 +78,7 @@ class AdvancedRag(NaiveRagAgent):
             type_text_splitter=self.type_text_splitter,
             agent=self.agent,
             embedding_model=self.embedding_model,
+            llm_model=self.llm_model,
             type_processor_chunks=self.type_processor_chunks,
             language=self.language,
         )
@@ -109,7 +103,8 @@ class AdvancedRag(NaiveRagAgent):
         Output:
             context (list[str]) : All retrieved chunks
         """
-        ns = NaiveSearch(data_manager=self.data_manager, nb_chunks=nb_chunks)
+        ns = NaiveSearch(data_manager=self.data_manager, 
+                         nb_chunks=nb_chunks)
         chunk_lists = ns.get_context(query=query)
         return chunk_lists
 
@@ -149,7 +144,8 @@ class AdvancedRag(NaiveRagAgent):
         else:
             queries = [query]
 
-        chunk_lists = self.get_rag_context(query=queries[0], nb_chunks=nb_chunks)
+        chunk_lists = self.get_rag_context(query=queries[0], 
+                                           nb_chunks=nb_chunks)
         chunk_list = [chunk for chunk_list in chunk_lists for chunk in chunk_list]
 
         if len(chunk_list) > 0 and self.rerank:
@@ -167,11 +163,11 @@ class AdvancedRag(NaiveRagAgent):
         if options_generation is None:
             options_generation = self.config_server["options_generation"]
 
-        answer = agent.predict(
-            prompt=prompt,
-            system_prompt=self.system_prompt,
-            options_generation=options_generation,
-        )
+        answer = agent.predict(prompt=prompt,
+                               system_prompt=self.system_prompt,
+                               options_generation=options_generation,
+                               model=self.llm_model)
+        
         nb_input_tokens += np.sum(answer["nb_input_tokens"])
         nb_output_tokens += np.sum(answer["nb_output_tokens"])
 

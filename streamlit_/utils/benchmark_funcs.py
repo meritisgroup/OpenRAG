@@ -247,17 +247,9 @@ def show_benchmark(results, session_state=None):
     session_state["time"] = time
 
     arena_graph = arena_graphs(session_state=session_state)
-    if session_state["config_server"]["params_host_llm"]["type"] in [
-        "openai",
-        "mistral",
-        "vllm"
-    ]:
-        impacts_graph = impact_graph(session_state=session_state)
-        energies_graph = energy_graph(session_state=session_state)
+    impacts_graph = impact_graph(session_state=session_state)
+    energies_graph = energy_graph(session_state=session_state)
 
-    else:
-        impacts_graph = None
-        energies_graph = None
 
     plots = {
         "token_graph": token_graph(session_state=session_state),
@@ -280,6 +272,7 @@ def generate_benchmark(
     databases,
     queries_doc_mane,
     config_server,
+    models_infos,
     report_dir,
     session_state=None,
 ):
@@ -309,8 +302,10 @@ def generate_benchmark(
                                          log_file=log_file)
 
     df = dataframe_preparator.get_dataframe()
-    evaluation_agent = AgentEvaluator(
-        dataframe=df, rags_available=rag_names, config_server=config_server
+    evaluation_agent = AgentEvaluator(dataframe=df,
+                                      rags_available=rag_names,
+                                      config_server=config_server,
+                                      models_infos=models_infos
     )
 
     evals = evaluation_agent.get_evals(log_file=log_file)
@@ -420,8 +415,7 @@ def token_graph(session_state=None):
                 "Nb Tokens": tokens[rag]["indexation_output_tokens"],
             }
         )
-    host = session_state["config_server"]["params_host_llm"]["type"]
-    tickstext = [session_state["all_rags"][host][tick] for tick in ticksval]
+    tickstext = [session_state["all_rags"][tick] for tick in ticksval]
     fig = px.bar(
         data,
         x="RAG Method",
@@ -475,8 +469,7 @@ def context_graph(session_state=None):
                 "Metric": "Context nDCG Score",
             }
         )
-    host = session_state["config_server"]["params_host_llm"]["type"]
-    tickstext = [session_state["all_rags"][host][tick] for tick in ticksval]
+    tickstext = [session_state["all_rags"][tick] for tick in ticksval]
     fig = px.bar(
         data,
         x="Score",
@@ -531,8 +524,7 @@ def ground_truth_graph(session_state=None):
         orientation="h",
         color_discrete_sequence=color_discrete_sequence,
     )
-    host = session_state["config_server"]["params_host_llm"]["type"]
-    tickstext = [session_state["all_rags"][host][tick] for tick in ticksval]
+    tickstext = [session_state["all_rags"][tick] for tick in ticksval]
     fig.update_layout(
         title=dict(text="Ground Truth Analysis", x=0.5, xanchor="center"),
         xaxis={"title": {"text": "Score"}},
@@ -555,19 +547,18 @@ def arena_graphs(session_state=None):
         rag1 = match[:mid]
         rag2 = match[mid + 3 :]
         data = []
-        host = session_state["config_server"]["params_host_llm"]["type"]
         for metric in arena_matrix[match].keys():
             data.append(
                 {
                     "Metric": metric,
-                    "RAG": session_state["all_rags"][host][rag1],
+                    "RAG": session_state["all_rags"][rag1],
                     "Score": arena_matrix[match][metric][0],
                 }
             )
             data.append(
                 {
                     "Metric": metric,
-                    "RAG": session_state["all_rags"][host][rag2],
+                    "RAG": session_state["all_rags"][rag2],
                     "Score": arena_matrix[match][metric][1],
                 }
             )
@@ -594,12 +585,11 @@ def report_arena_graph(arena_graphs, session_state=None):
     n_cols = max(1, int((-1 + sqrt(1 + 8 * len(arena_graphs))) / 2))
 
     rag_list = []
-    host = session_state["config_server"]["params_host_llm"]["type"]
     session_state["benchmark"]["matches"] = list(arena_graphs.keys())
     for match in list(arena_graphs.keys())[0:n_cols]:
         mid = match.find("_v_")
         rag_b = match[mid + 3 :]
-        rag_list.append(session_state["all_rags"][host][rag_b])
+        rag_list.append(session_state["all_rags"][rag_b])
 
     while len(rag_list) < n_cols**2:
         rag_list.append("")
@@ -619,7 +609,7 @@ def report_arena_graph(arena_graphs, session_state=None):
         if rag_a != prev_rag_a:
             row += 1
             col = 1
-            y_titles.append(session_state["all_rags"][host][rag_a])
+            y_titles.append(session_state["all_rags"][rag_a])
 
         for trace in figure.data:
             fig.add_trace(trace, row=row, col=col)
@@ -651,9 +641,8 @@ def match_name_cleaner(match_name):
 
     rag_a = match_name[:mid]
     rag_b = match_name[mid + 3 :]
-    host = st.session_state["config_server"]["params_host_llm"]["type"]
     try:
-        new_rag_name = f"{st.session_state['all_rags'][host][rag_a]} - {st.session_state['all_rags'][host][rag_b]}"
+        new_rag_name = f"{st.session_state['all_rags'][rag_a]} - {st.session_state['all_rags'][rag_b]}"
     except Exception:
         new_rag_name = f"{rag_a} - {rag_b}"
 
@@ -705,12 +694,11 @@ def impact_graph(session_state=None):
         session_state = st.session_state
 
     impacts = session_state["benchmark"]["impacts"]
-    host = session_state["config_server"]["params_host_llm"]["type"]
     data = []
     for rag in impacts.keys():
         data.append(
             {
-                "RAG Method": session_state["all_rags"][host][rag],
+                "RAG Method": session_state["all_rags"][rag],
                 "center": (impacts[rag][0] + impacts[rag][1]) / 2,
                 "error": (impacts[rag][0] - impacts[rag][1]) / 2,
             }
@@ -741,12 +729,11 @@ def energy_graph(session_state=None):
         session_state = st.session_state
 
     energies = session_state["benchmark"]["energy"]
-    host = session_state["config_server"]["params_host_llm"]["type"]
     data = []
     for rag in energies.keys():
         data.append(
             {
-                "RAG Method": session_state["all_rags"][host][rag],
+                "RAG Method": session_state["all_rags"][rag],
                 "center": (energies[rag][0] + energies[rag][1]) / 2,
                 "error": (energies[rag][0] - energies[rag][1]) / 2,
             }
@@ -776,10 +763,9 @@ def time_graph(session_state=None):
 
     raw_data = session_state["time"]
     data = []
-    host = session_state["config_server"]["params_host_llm"]["type"]
     for rag in raw_data:
         rag_data = {
-            "RAG Method": session_state["all_rags"][host][rag],
+            "RAG Method": session_state["all_rags"][rag],
             "Answering Time": raw_data[rag],
         }
         data.append(rag_data)

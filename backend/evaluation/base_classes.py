@@ -8,11 +8,13 @@ class Evaluator(ABC):
     def __init__(
         self,
         agent: Agent,
+        model: str,
         max_attempts=5,
         batch_size: int = 10,
     ) -> None:
         super().__init__()
         self.agent = agent
+        self.model = model
         self.language = agent.language
         self.max_attempts = max_attempts
 

@@ -20,6 +20,7 @@ class ArenaBattle:
         self,
         dataframe: pd.DataFrame,
         agent: Agent,
+        model: str,
         eval_number=1,
         max_attempts=5,
         batch_size=10,
@@ -39,10 +40,12 @@ class ArenaBattle:
             if col != "QUERIES" and col != "GROUND_TRUTH"
         ]
         self.agent = agent
+        self.model = model
         self.temperature = agent.temperature
 
         self.metric_evaluator = MetricComparaison(
-            agent=self.agent, max_attemps=max_attempts, batch_size=batch_size
+            agent=self.agent, max_attemps=max_attempts, batch_size=batch_size,
+            model=self.model
         )
         self.language = self.agent.language
         self.metrics: dict = PROMPTS[self.language]["metrics"]
@@ -132,13 +135,17 @@ class GroundTruthComparator:
         self,
         dataframe: pd.DataFrame,
         agent: Agent,
+        model: str,
         eval_number=1,
         max_attempts=5,
         batch_size=10,
     ):
 
         self.agent = agent
-        self.comparator = GroundTruthComparison(agent, max_attempts, batch_size)
+        self.comparator = GroundTruthComparison(agent=agent, 
+                                                model=model,
+                                                max_attemps=max_attempts,
+                                                batch_size=batch_size)
         self.language = self.agent.language
         self.metrics: dict = PROMPTS[self.language]["gt_metrics"]
 
@@ -214,14 +221,17 @@ class ContextRelevanceComparator:
         self,
         dataframe: pd.DataFrame,
         agent: Agent,
+        model: str,
         eval_number=1,
         max_attempts=5,
         batch_size=10,
     ):
 
         self.agent = agent
+        self.model = model
         self.evaluator = ContextRelevanceEvaluator(
-            agent=self.agent, max_attemps=max_attempts, batch_size=batch_size
+            agent=self.agent, model=model,
+            max_attemps=max_attempts, batch_size=batch_size
         )
         self.eval_number = eval_number
 
@@ -286,14 +296,16 @@ class ContextFaithfulnessComparator:
         self,
         dataframe: pd.DataFrame,
         agent: Agent,
+        model: str,
         eval_number=1,
         max_attempts=5,
         batch_size=10,
     ):
 
         self.agent = agent
+        self.model = model
         self.evaluator = ContextFaithfulnessEvaluator(
-            agent=self.agent, max_attempts=max_attempts, batch_size=batch_size
+            agent=self.agent, model = model, max_attempts=max_attempts, batch_size=batch_size
         )
         self.eval_number = eval_number
 
@@ -363,14 +375,17 @@ class nDCGComparator:
         self,
         dataframe: pd.DataFrame,
         agent: Agent,
+        model: str,
         eval_number=1,
         max_attempts=5,
         batch_size=10,
     ):
 
         self.agent = agent
+        self.model = model
         self.evaluator = nDCGEvaluator(
-            agent=self.agent, max_attempts=max_attempts, batch_size=batch_size
+            agent=self.agent, model=model, 
+            max_attempts=max_attempts, batch_size=batch_size
         )
         self.eval_number = eval_number
 

@@ -1,0 +1,88 @@
+{
+    "gpt-4o-mini": {
+        "url": null,
+        "api_key": ""
+    },
+    "gpt-4.1-mini": {
+        "url": null,
+        "api_key": ""
+    },
+    "gpt-4.1-nano-2025-04-14": {
+        "url": null,
+        "api_key": ""
+    },
+    "text-embedding-3-small": {
+        "url": null,
+        "api_key": ""
+    },
+    "text-embedding-3-large": {
+        "url": null,
+        "api_key": "",
+        "type": "embedding"
+    },
+    "text-embedding-ada-002": {
+        "url": null,
+        "api_key": "",
+        "type": "embedding"
+    },
+    "google/gemma-3-12b-it": {
+        "url": "http://localhost:8000",
+        "api_key": "vllm",
+        "type": "llm"
+    },
+    "google/gemma-3-4b-it": {
+        "url": "http://localhost:8000",
+        "api_key": "vllm",
+        "type": "llm"
+    },
+    "BAAI/bge-m3": {
+        "url": "http://localhost:30000",
+        "api_key": "vllm",
+        "type": "embedding"
+    },
+    "mixedbread-ai/mxbai-embed-large-v1": {
+        "url": "http://localhost:30000",
+        "api_key": "vllm",
+        "type": "embedding"
+    },
+    "Qwen/Qwen3-Embedding-0.6B": {
+        "url": "http://localhost:30000",
+        "api_key": "vllm",
+        "type": "embedding"
+    },
+    "sentence-transformers/all-MiniLM-L6-v2": {
+        "url": "http://localhost:30000",
+        "api_key": "vllm",
+        "type": "embedding"
+    },
+    "BAAI/bge-reranker-v2-m3": {
+        "url": "http://localhost:30001",
+        "api_key": "vllm",
+        "type": "reranker"
+    },
+    "gemma3:4b": {
+        "url": "http://localhost:11434",
+        "api_key": "",
+        "type": "llm"
+    },
+    "gemma3:12b": {
+        "url": "http://localhost:4510",
+        "api_key": "ollama",
+        "type": "llm"
+    },
+    "mxbai-embed-large:latest": {
+        "url": "http://localhost:451",
+        "api_key": "ollama",
+        "type": "embedding"
+    },
+    "bge-m3:latest": {
+        "url": "http://localhost:451",
+        "api_key": "ollama",
+        "type": "embedding"
+    },
+    "all-minilm:22m": {
+        "url": "http://localhost:451",
+        "api_key": "ollama",
+        "type": "embedding"
+    }
+}

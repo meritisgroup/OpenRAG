@@ -13,6 +13,7 @@ class GlobalSearch(Search):
     def __init__(
         self,
         agent: Agent,
+        model: str,
         data_manager,
         pre_filter_size: int = 3,
         language: str = "EN",
@@ -22,6 +23,7 @@ class GlobalSearch(Search):
         self.pre_filter = pre_filter_size
         self.language = language
         self.agent = agent
+        self.model = model
 
     def get_context(self, query: str) -> str:
         """Generate the context from the query"""
@@ -103,5 +105,6 @@ class GlobalSearch(Search):
         prompt = prompt_template.format(**context_base)
 
         answer = self.agent.predict(system_prompt=system_prompt,
-                                    prompt=prompt)
+                                    prompt=prompt,
+                                    model=self.model)
         return answer

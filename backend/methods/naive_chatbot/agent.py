@@ -16,10 +16,12 @@ from backend.database.rag_classes import Chunk
 
 class NaiveChatbot(NaiveRagAgent):
 
-    def __init__(self, config_server: dict, *args) -> None:
+    def __init__(self, config_server: dict, models_infos: dict, *args) -> None:
 
+        self.llm_model = config_server["model"]
         self.language = config_server["language"]
-        self.agent = get_Agent(config_server)
+        self.agent = get_Agent(config_server,
+                               models_infos=models_infos)
         self.config_server = config_server
 
         self.prompts = prompts[self.language]
@@ -79,6 +81,7 @@ class NaiveChatbot(NaiveRagAgent):
             prompt=prompt,
             system_prompt=self.system_prompt,
             options_generation=options_generation,
+            model=self.llm_model
         )
         nb_input_tokens += np.sum(answer["nb_input_tokens"])
         nb_output_tokens += np.sum(answer["nb_output_tokens"])
@@ -89,6 +92,7 @@ class NaiveChatbot(NaiveRagAgent):
             "context": [],
             "impacts": answer["impacts"],
             "energy": answer["energy"],
+            "original_query": query
         }
 
     def release_gpu_memory(self):

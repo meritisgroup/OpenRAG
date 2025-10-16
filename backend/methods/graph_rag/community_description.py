@@ -22,13 +22,14 @@ class CommunityDescription:
     This is the class built to describe communities of a graph and save it in a database
     """
 
-    def __init__(self, agent: Agent, graph: Graph, db) -> None:
+    def __init__(self, agent: Agent, model: str, graph: Graph, db) -> None:
         """ """
         if graph.communities == []:
             graph.create_communities()
 
         self.graph = graph
         self.agent = agent
+        self.llm_model = model
         self.db = db
 
     def get_context_for_community(
@@ -135,15 +136,13 @@ class CommunityDescription:
                 prompts_to_process.append(prompt)
                 system_prompts_to_process.append(system_prompt)
 
-        outputs = self.agent.multiple_predict(
-            prompts_to_process, system_prompts_to_process
-        )
         tokens = 0
-        taille_batch = 500
+        taille_batch = 100
         outputs = None
         for i in range(0, len(prompts_to_process), taille_batch):
             results = self.agent.multiple_predict(prompts=prompts_to_process[i:i + taille_batch],
-                                                  system_prompts=system_prompts_to_process[i:i + taille_batch])
+                                                  system_prompts=system_prompts_to_process[i:i + taille_batch],
+                                                  model=self.llm_model)
             if outputs is None:
                 outputs = results
             else:
