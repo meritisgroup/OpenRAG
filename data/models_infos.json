@@ -1,19 +1,23 @@
 {
     "gpt-4o-mini": {
         "url": null,
-        "api_key": ""
+        "api_key": "",
+        "type": "llm"
     },
     "gpt-4.1-mini": {
         "url": null,
-        "api_key": ""
+        "api_key": "",
+        "type": "llm"
     },
     "gpt-4.1-nano-2025-04-14": {
         "url": null,
-        "api_key": ""
+        "api_key": "",
+        "type": "llm"
     },
     "text-embedding-3-small": {
         "url": null,
-        "api_key": ""
+        "api_key": "",
+        "type": "embedding"
     },
     "text-embedding-3-large": {
         "url": null,

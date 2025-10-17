@@ -1,7 +1,8 @@
+import re
 
 
 def get_name(rag_name, config_server, additionnal_name=""):
-    name = "{}_".format(config_server["embedding_model"])
+    name = "{}_".format(re.sub(r'[\\/:*?"<>|]', '_', config_server["embedding_model"]))
     if (
         rag_name == "naive"
         or rag_name == "crag"

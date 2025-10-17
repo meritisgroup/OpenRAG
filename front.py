@@ -70,27 +70,11 @@ st.sidebar.divider()
 if "config_server" not in st.session_state:
     with open("data/base_config_server.json", "r") as file:
         base_config_server = json.load(file)
-        if base_config_server["params_vectorbase"]["backend"] == "elasticsearch":
-            base_config_server["params_vectorbase"]["url"] = (
-                os.getenv("ES_LOCAL_URL") + ":" + os.getenv("ES_LOCAL_PORT")
-            )
-            base_config_server["params_vectorbase"]["auth"] = [
-                "elastic",
-                os.getenv("ES_LOCAL_PASSWORD"),
-            ]
         st.session_state["config_server"] = base_config_server
 
     for file in glob.glob(f"data/custom_rags/*.json"):
         with open(file, "r") as f:
             config = json.load(f)
-        if config["params_vectorbase"]["backend"] == "elasticsearch":
-            config["params_vectorbase"]["url"] = (
-                os.getenv("ES_LOCAL_URL") + ":" + os.getenv("ES_LOCAL_PORT")
-            )
-            config["params_vectorbase"]["auth"] = [
-                "elastic",
-                os.getenv("ES_LOCAL_PASSWORD"),
-            ]
         with open(file, "w") as f:
             json.dump(config, f, indent=4)
 

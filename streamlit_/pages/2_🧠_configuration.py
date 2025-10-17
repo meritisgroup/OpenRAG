@@ -11,7 +11,6 @@ from streamlit_.utils.params_func import modify_env
 
 st.markdown("# Set Configuration")
 
-# Setting params_host_llm
 host_llm = {"vllm" : "vLLM", "ollama" : "Ollama",
             "openai" : "OpenAI", "mistral": "Mistral"}
 def set_false():
@@ -78,19 +77,18 @@ else:
         new_model_url = st.text_input("URL du modèle")
         new_model_api_key = st.text_input("Clé API", type="password")
         
-        # 🔽 Nouveau champ Type
-        new_model_type = st.selectbox("Type du modèle", ["llm", "reranker", "embedding"])
+        new_model_type = st.selectbox("Type du modèle", ["llm",
+                                                         "reranker",
+                                                         "embedding"])
 
         if st.button("Ajouter le modèle"):
             if new_model_name and new_model_url:
                 if new_model_name in models_infos:
                     st.warning("Ce modèle existe déjà !")
                 else:
-                    models_infos[new_model_name] = {
-                        "url": new_model_url,
-                        "api_key": new_model_api_key,
-                        "type": new_model_type  # ✅ Sauvegarde du type
-                    }
+                    models_infos[new_model_name] = {"url": new_model_url,
+                                                    "api_key": new_model_api_key,
+                                                    "type": new_model_type }
                     with open("data/models_infos.json", "w") as file:
                         json.dump(models_infos, file, indent=4)
                     st.success(f"Modèle '{new_model_name}' ajouté ✅")
@@ -110,9 +108,11 @@ else:
             )
                 
             with col2:
-                new_api_key = st.text_input("Clé API", value=selected_model.get('api_key', ''), type="password")
+                new_api_key = st.text_input("Clé API", 
+                                            value=selected_model.get('api_key', ''), type="password")
 
-            new_url = st.text_input("URL", value=selected_model.get('url', ''))
+            new_url = st.text_input("URL",
+                                    value=selected_model.get('url', ''))
 
         col_empty, col1_btn, col_empty1, col2_btn, col_empty2 = st.columns([0.5, 2, 0.5, 2, 0.5])
         with col1_btn:
@@ -147,6 +147,7 @@ else:
                         "model_for_image": ["llm"],
                         "embedding_model": ["embedding"]
                         }
+        
         def sort_with_priority(model_name, config_key):
             model_type = models_infos[model_name]["type"]
             priorities = task_mapping.get(config_key, [])
@@ -155,10 +156,8 @@ else:
 
         config = {}
         st.subheader("📌 Configuration des modèles par rôle")
-
         for role_label, config_key in roles.items():
-            
-            if config_key not in st.session_state:
+            if config_key not in st.session_state["config_server"].keys():
                 st.session_state[config_key] = config.get(config_key, None)
             
             valid_tasks = task_mapping.get(config_key, [])
@@ -170,13 +169,15 @@ else:
             col1, col2 = st.columns([0.5, 2])
 
             with col1:
-                st.markdown(f"**Modèle pour {role_label}** {'✅' if st.session_state[config_key] else '❌'}")
-
+                st.markdown(f"**Modèle pour {role_label}** {'✅' if st.session_state['config_server'][config_key] else '❌'}")
+            #print(options, config_key)
+            print(st.session_state["config_server"][config_key])
+            #print("\n\n\n", st.session_state)
             with col2:
                 selected_model = st.selectbox(
                     label="", 
                     options=options,
-                    index=options.index(st.session_state[config_key]),
+                    index=options.index(st.session_state["config_server"][config_key]),
                     format_func=lambda x: "Aucun modèle" if x is None else x,
                     key=f"model_select_{config_key}"
                 )
@@ -198,8 +199,26 @@ else:
         st.markdown("<br><br>", unsafe_allow_html=True)
 
 
+    st.subheader("📌 Configuration Vectorbase")
+    new_elastic_url = st.text_input("URL Elasticsearch",
+                                    value=st.session_state["config_server"]["params_vectorbase"]["url"])
+    col1, col2 = st.columns([2, 2])
+    with col1:  
+        new_elastic_auth = st.text_input("Auth",
+                                         value=st.session_state["config_server"]["params_vectorbase"]["auth"][0])
+    with col2:
+        new_elastic_api_key = st.text_input("Clé API", type="password",
+                                            value=st.session_state["config_server"]["params_vectorbase"]["auth"][1])
 
+    st.session_state["config_server"]["params_vectorbase"]["url"] = new_elastic_url
+    st.session_state["config_server"]["params_vectorbase"]["auth"][0] = new_elastic_auth
+    st.session_state["config_server"]["params_vectorbase"]["auth"][1] = new_elastic_api_key
+    
+    if st.button("💾 Sauvegarder elasticsearch params", use_container_width=True):
+        with open("data/base_config_server.json" , "w") as file:
+            json.dump(st.session_state["config_server"], file, indent=4)
 
+    st.markdown("<br><br>", unsafe_allow_html=True)
 
 
 

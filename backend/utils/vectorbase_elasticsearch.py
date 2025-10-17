@@ -1,5 +1,6 @@
 from typing import Union
 import numpy as np
+import time 
 from elasticsearch import Elasticsearch, helpers
 from .base_classes import VectorBase
 from .utils_vlm import load_element
@@ -144,7 +145,10 @@ class VectorBase_embeddings_elasticsearch(VectorBase):
             basic_auth=self.auth,
             request_timeout=60,
             max_retries=3,
+            connections_per_node=10,
             retry_on_timeout=True,
+            verify_certs=False,
+            ssl_show_warn=False
         )
 
     def create_collection(self, name=None, add_fields=[]) -> None:
@@ -183,6 +187,7 @@ class VectorBase_embeddings_elasticsearch(VectorBase):
         else:
             return False
 
+
     def add_str_batch_elements(
         self,
         chunks: list[Chunk],
@@ -198,12 +203,14 @@ class VectorBase_embeddings_elasticsearch(VectorBase):
         data = []
         if chunks != []:
             texts = [chunk.text for chunk in chunks]
-
-            embeddings = self.agent.embeddings(texts=texts, model=self.embedding_model)
+            a = time.time()
+            embeddings = self.agent.embeddings(texts=texts, 
+                                               model=self.embedding_model)
+            print("embedding", time.time()-a)
             nb_embeddings_tokens = embeddings["nb_tokens"]
             if type(nb_embeddings_tokens) is list:
                 nb_embeddings_tokens = np.sum(nb_embeddings_tokens)
-
+        a = time.time()
         for k, chunk in enumerate(chunks):
             source = chunk_to_dict_vb_embedding(
                 chunk=chunk, embedding=embeddings["embeddings"][k]
@@ -215,7 +222,10 @@ class VectorBase_embeddings_elasticsearch(VectorBase):
             }
 
             data.append(temp)
+        print("convert embedding", time.time()-a)
+        a = time.time()
         res = helpers.bulk(self.client, data)
+        print("indexing", time.time()-a)
         if display_message:
             print(
                 f"{len(data)} elements have been successfuly added in the vector base"

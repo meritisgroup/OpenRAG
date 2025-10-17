@@ -6,22 +6,22 @@
     "params_vectorbase": {
         "backend": "elasticsearch",
         "batch": true,
-        "url": "http://localhost:9200",
+        "url": "https://localhost:9200",
         "auth": [
             "elastic",
-            "UDY9ydMS"
+            "2Sqi+pqrJ_QpRtobko1w"
         ]
     },
     "max_workers": 10,
     "device": "cpu",
-    "model": "gemma3:4b",
+    "model": "gpt-4.1-nano-2025-04-14",
     "model_for_image": "gpt-4o-mini",
-    "embedding_model": "text-embedding-3-small",
-    "language": "EN",
+    "embedding_model": "BAAI/bge-m3",
+    "language": "FR",
     "type_retrieval": "hybrid",
-    "TextSplitter": "Semantic_TextSplitter",
+    "TextSplitter": "TextSplitter",
     "reformulate_query": false,
-    "reranker_model": "BAAI/bge-reranker-v2-m3",
+    "reranker_model": "gpt-4.1-nano-2025-04-14",
     "max_attempts": 5,
     "nb_chunks": 10,
     "nb_chunks_reranker": 20,

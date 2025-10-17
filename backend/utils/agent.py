@@ -277,7 +277,6 @@ class Agent_openai(Agent):
         self.clients = {}
         for key in self.models_infos.keys():
             if "api_key" in self.models_infos[key].keys() and "url" in self.models_infos[key].keys():
-                print("url", self.models_infos[key]["url"])
                 if self.models_infos[key]["url"] is not None:
                     url = self.models_infos[key]["url"] + "/v1"
                 self.clients[key] = OpenAI(api_key=self.models_infos[key]["api_key"],

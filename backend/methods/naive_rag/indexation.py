@@ -7,6 +7,7 @@ import os
 import numpy as np
 import concurrent.futures
 from pathlib import Path
+import time
 from ...database.rag_classes import Chunk
 from ...utils.threading_utils import get_executor_threads
 
@@ -23,7 +24,7 @@ def indexation(data_manager, doc_chunks, path_docs):
         """
 
         tokens = 0
-        taille_batch = 100
+        taille_batch = 5000
         range_chunks = range(0, len(doc_chunks), taille_batch)
         for i in range_chunks:
             tokens += np.sum(
@@ -47,12 +48,13 @@ def process_single_doc(
     reset_preprocess: bool
 ) -> dict:
     
+    a = time.time()
     doc = DocumentText(path=path_doc,
                        doc_index=doc_index,
                        config_server=config_server,
                        splitter=splitter,
                        reset_preprocess=reset_preprocess)
-
+    a = time.time()
     doc_chunks = doc.chunks(chunk_size=chunk_size,
                             chunk_overlap=chunk_overlap)
     path_docs = [str(Path(path_doc).parent)] * len(doc_chunks)
@@ -62,7 +64,6 @@ def process_single_doc(
     doc_indexation_tokens = indexation(data_manager=data_manager,
                                        doc_chunks=doc_chunks,
                                        path_docs=path_docs)
-
     return {
         "name": str(Path(path_doc).name),
         "path": str(path_doc),

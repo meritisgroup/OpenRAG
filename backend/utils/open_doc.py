@@ -42,13 +42,8 @@ def open_pdf(path_pdf: str) -> str:
     """
     Permet d'extraire tout le texte d'un PDF enregistré au chemin path_pdf
     """
-    document = fitz.open(path_pdf)
-    content = ""
-    for page_num in range(len(document)):
-        page = document.load_page(page_num)
-        content += page.get_text()
-
-    return content
+    with fitz.open(path_pdf) as document:
+       return "".join(page.get_text("text") for page in document)
 
 
 def open_excel(path_excel: str) -> str:
@@ -153,7 +148,7 @@ def open_doc_without_save(path_file: str) -> str:
 
 
 class Opener:
-    def __init__(self, save=True, overwrite=False) -> None:
+    def __init__(self, save=False, overwrite=False) -> None:
         self._save = save
         self.overwrite = overwrite
 
