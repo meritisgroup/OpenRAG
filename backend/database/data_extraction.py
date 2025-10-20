@@ -110,22 +110,25 @@ class DocumentText:
 
         try:
             if self.data_preprocessing == "md_with_images":
-                if self.reset_preprocess or not self.load_md__():
+                if self.reset_preprocess or not self.load_content__("md"):
                     self.content = MarkdownOpener(
                         config_server=self.config_server,
                         image_description=True
                     ).open_doc(path_file=path)
-                    self.save_md__()
+                    self.save_content__(format="md")
             elif self.data_preprocessing == "md_without_images":
-                if self.reset_preprocess or not self.load_md__():
+                if self.reset_preprocess or not self.load_content__("md"):
                     self.content = MarkdownOpener(
                         config_server=self.config_server,
                         image_description=False
                     ).open_doc(path_file=path)
-                    self.save_md__()
+                    self.save_content__(format="md")
             else:
-                self.content = Opener(save=False).open_doc(path)
+                if not self.load_content__("txt"):
+                    self.content = Opener(save=True).open_doc(path)
+                    self.save_content__(format="txt")
             
+
         except Exception as e:
             self.content = ""
             print(f'Error "{e}" while trying to open doc {self.name_with_extension}')
@@ -140,10 +143,10 @@ class DocumentText:
         else:
             self.text_splitter = splitter
     
-    def load_md__(self):
+    def load_content__(self, format: str):
         file = os.path.join(Path(self.path).parent,
                             self.data_preprocessing,
-                            Path(self.name_with_extension).with_suffix(".md").name)
+                            Path(self.name_with_extension).with_suffix("."+format).name)
         if os.path.exists(file):
             with open(file, "r", encoding="utf-8") as f:
                 self.content = f.read()  
@@ -151,13 +154,14 @@ class DocumentText:
         else:
             return False
 
-    def save_md__(self):
+    def save_content__(self, format: str):
         file_save = os.path.join(Path(self.path).parent, self.data_preprocessing)
         os.makedirs(file_save, exist_ok=True)
         file_save = os.path.join(file_save,
-                                Path(self.name_with_extension).with_suffix(".md").name)
+                                Path(self.name_with_extension).with_suffix("."+format).name)
         with open(file_save, "w", encoding="utf-8") as f:
             f.write(self.content)
+
 
     def get_content(self):
         return self.content

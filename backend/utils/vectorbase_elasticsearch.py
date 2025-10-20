@@ -145,7 +145,7 @@ class VectorBase_embeddings_elasticsearch(VectorBase):
             basic_auth=self.auth,
             request_timeout=60,
             max_retries=3,
-            connections_per_node=10,
+            connections_per_node=50,
             retry_on_timeout=True,
             verify_certs=False,
             ssl_show_warn=False
@@ -206,7 +206,7 @@ class VectorBase_embeddings_elasticsearch(VectorBase):
             a = time.time()
             embeddings = self.agent.embeddings(texts=texts, 
                                                model=self.embedding_model)
-            print("embedding", time.time()-a)
+            #print("embedding", time.time()-a)
             nb_embeddings_tokens = embeddings["nb_tokens"]
             if type(nb_embeddings_tokens) is list:
                 nb_embeddings_tokens = np.sum(nb_embeddings_tokens)
@@ -222,10 +222,10 @@ class VectorBase_embeddings_elasticsearch(VectorBase):
             }
 
             data.append(temp)
-        print("convert embedding", time.time()-a)
+        #print("convert embedding", time.time()-a)
         a = time.time()
         res = helpers.bulk(self.client, data)
-        print("indexing", time.time()-a)
+        #print("indexing", time.time()-a)
         if display_message:
             print(
                 f"{len(data)} elements have been successfuly added in the vector base"
@@ -351,6 +351,8 @@ class VectorBase_BM25_elasticsearch(VectorBase):
             request_timeout=60,
             max_retries=3,
             retry_on_timeout=True,
+            verify_certs=False,
+            ssl_show_warn=False
         )
 
     def create_collection(self, name=None, add_fields=[]) -> None:

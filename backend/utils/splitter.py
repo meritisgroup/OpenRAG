@@ -268,44 +268,40 @@ class TextSplitter(Splitter):
     def split_text(
         self, text: str, chunk_size: int = 500, overlap: bool = True
     ) -> list[str]:
-        """
-        Add text's pieces together to have chunk with approximatively the rigth size
-        """
+
         pieces = self.pieces_from_text(text=text, characters=[".", "!", "?", "\n"])
+        if not pieces:
+            return []
+
+        chunks = []         
+        seen_chunks = set()   
         index = 0
-        chunks = []
+        
+        while index < len(pieces):
+            start_index_of_current_chunk = index
+            
+            current_chunk_pieces = []
+            current_chunk_len = 0
 
-        start_time = time.time()
-
-        for _ in range(len(pieces)):
-            start_index = index
-            chunk = ""
-            while len(chunk) < chunk_size and index < len(pieces):
-                chunk += pieces[index]
+            while current_chunk_len < chunk_size and index < len(pieces):
+                piece = pieces[index]
+                current_chunk_pieces.append(piece)
+                current_chunk_len += len(piece)
                 index += 1
+                
+                if len(current_chunk_pieces) == 1 and current_chunk_len >= chunk_size:
+                    break
 
-                if time.time() - start_time > 3:
-                    index += 1
+            chunk = "".join(current_chunk_pieces)
 
-            if chunk not in chunks:
+            if chunk and chunk not in seen_chunks:
+                seen_chunks.add(chunk)
                 chunks.append(chunk)
 
-            else:
-                index += 1
-
-            if index >= len(pieces):
-                chunks.append("".join(pieces[start_index:]))
-                break
-
-            if overlap:
-                index -= 1
-
-        final_chunks = []
-        for chunk in chunks:
-            if chunk not in final_chunks:
-                final_chunks.append(chunk)
-
-        return final_chunks
+            if overlap and index < len(pieces):
+                index = max(start_index_of_current_chunk + 1, index - 1)
+                
+        return chunks
 
 
 class Recursive_TextSplitter(Splitter):

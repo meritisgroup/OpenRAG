@@ -24,7 +24,7 @@ def indexation(data_manager, doc_chunks, path_docs):
         """
 
         tokens = 0
-        taille_batch = 5000
+        taille_batch = 1000
         range_chunks = range(0, len(doc_chunks), taille_batch)
         for i in range_chunks:
             tokens += np.sum(
@@ -54,16 +54,21 @@ def process_single_doc(
                        config_server=config_server,
                        splitter=splitter,
                        reset_preprocess=reset_preprocess)
+    #print("lecture doc :", time.time() - a)
     a = time.time()
+    
     doc_chunks = doc.chunks(chunk_size=chunk_size,
                             chunk_overlap=chunk_overlap)
+    
+    #print("decoupage doc :", time.time() - a)
     path_docs = [str(Path(path_doc).parent)] * len(doc_chunks)
 
     doc_indexation_tokens = 0
-
+    
     doc_indexation_tokens = indexation(data_manager=data_manager,
                                        doc_chunks=doc_chunks,
                                        path_docs=path_docs)
+    
     return {
         "name": str(Path(path_doc).name),
         "path": str(path_doc),
@@ -136,6 +141,8 @@ class NaiveRagIndexation:
         if max_workers<=get_executor_threads():
             max_workers = 1
 
+
+        print("max workers used :", max_workers)
 
         self.data_manager.create_collection()
         progress_bar = ProgressBar(total=len(docs_to_process))

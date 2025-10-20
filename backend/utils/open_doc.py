@@ -153,15 +153,7 @@ class Opener:
         self.overwrite = overwrite
 
     def open_doc(self, path_file, path_to_save=""):
-        if self._save:
-
-            if not os.path.exists(path_to_save):
-                os.mkdir(path_to_save)
-
-            return open_doc_with_save(path_file, path_to_save, self.overwrite)
-
-        else:
-            return open_doc_without_save(path_file)
+        return open_doc_without_save(path_file)
 
     @property
     def save(self):
