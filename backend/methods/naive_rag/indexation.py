@@ -12,6 +12,11 @@ from ...database.rag_classes import Chunk
 from ...utils.threading_utils import get_executor_threads
 
 
+
+from tqdm import tqdm
+import os
+import json
+
 def indexation(data_manager, doc_chunks, path_docs):
         """
         Adds a batch of chunks from doc_chunks to the indexation vectorbase
@@ -24,7 +29,7 @@ def indexation(data_manager, doc_chunks, path_docs):
         """
 
         tokens = 0
-        taille_batch = 1000
+        taille_batch = 100
         range_chunks = range(0, len(doc_chunks), taille_batch)
         for i in range_chunks:
             tokens += np.sum(
@@ -36,6 +41,8 @@ def indexation(data_manager, doc_chunks, path_docs):
             )
         return tokens
 
+
+LIST_CHUNKS=[]
 
 def process_single_doc(
     data_manager,
@@ -60,15 +67,18 @@ def process_single_doc(
     doc_chunks = doc.chunks(chunk_size=chunk_size,
                             chunk_overlap=chunk_overlap)
     
+    LIST_CHUNKS.extend(doc_chunks)
     #print("decoupage doc :", time.time() - a)
     path_docs = [str(Path(path_doc).parent)] * len(doc_chunks)
 
     doc_indexation_tokens = 0
     
+    
     doc_indexation_tokens = indexation(data_manager=data_manager,
                                        doc_chunks=doc_chunks,
                                        path_docs=path_docs)
     
+                                       
     return {
         "name": str(Path(path_doc).name),
         "path": str(path_doc),
@@ -112,7 +122,7 @@ class NaiveRagIndexation:
                      reset_preprocess: bool = False,
                      chunk_size: int = 500,
                      chunk_overlap: bool = True,
-                     max_workers: int = 10) -> None:
+                     max_workers: int = 1) -> None:
         """
         Split texts from self.data_path, embed them and save them in a vector base.
 
@@ -141,7 +151,7 @@ class NaiveRagIndexation:
         if max_workers<=get_executor_threads():
             max_workers = 1
 
-
+        max_workers = 25
         print("max workers used :", max_workers)
 
         self.data_manager.create_collection()
@@ -178,7 +188,27 @@ class NaiveRagIndexation:
                                            path=result["parent_path"]
                     )
         progress_bar.clear()
+        
 
+
+        
+        jsonl_path: str = "chunks_output.jsonl"
+        doc_ids = {}
+        num_doc = 0
+
+        os.makedirs(os.path.dirname(jsonl_path) or ".", exist_ok=True)
+
+        with open(jsonl_path, "a", encoding="utf-8") as f:
+            for c in tqdm(LIST_CHUNKS, desc="Écriture des chunks", unit="chunk"):
+                record = {col.name: getattr(c, col.name) for col in c.__table__.columns}
+                if c.document not in doc_ids:
+                    num_doc += 1
+                    doc_ids[c.document] = num_doc
+
+                record["doc_id"] = doc_ids[c.document]
+                f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+        return None
 
 
 def contexts_to_prompts(contexts, docs_name):

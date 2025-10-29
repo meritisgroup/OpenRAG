@@ -304,82 +304,103 @@ class TextSplitter(Splitter):
         return chunks
 
 
+
+
 class Recursive_TextSplitter(Splitter):
     def __init__(self):
-        pass
-
-    def split_markdown(self, text, max_chunk_size=1, overlap=0):
-
+        super().__init__()
+ 
+    def split_markdown(self, text):
         sections = re.split(r"(?=\n#{1,6} )", text)
         chunks = []
         current_chunk = ""
-
+ 
         for section in sections:
-            if len(current_chunk) + len(section) <= max_chunk_size:
-                current_chunk += section
-            else:
-                chunks.append(current_chunk.strip())
-                current_chunk = section
-
+            chunks.append(current_chunk.strip())
+            current_chunk = section
         if current_chunk:
             chunks.append(current_chunk.strip())
-
-        if overlap > 0 and len(chunks) > 1:
-            overlapping_chunks = []
-            for i in range(len(chunks)):
-                if i > 0:
-                    overlap_text = chunks[i - 1][-overlap:]
-                    overlapping_chunks.append(overlap_text + "\n" + chunks[i])
-                else:
-                    overlapping_chunks.append(chunks[i])
-            return overlapping_chunks
-
+ 
         return chunks
-
-    def __split(self, text, max_chunk_size=500, overlap=0):
+ 
+    def __split(self, text, max_chunk_size=500):
+        """
+        Méthode "récursive" pour diviser un chunk déjà trop grand.
+        Tente de diviser par paragraphe, puis par phrase.
+        """
         paragraphs = text.strip().split("\n\n")
         chunks = []
-
         temp_paragraph = ""
+ 
         for paragraph in paragraphs:
-            if len(temp_paragraph) + len(paragraph) <= max_chunk_size:
-                temp_paragraph += "\n\n" + paragraph
+            paragraph_to_add = paragraph
+            if temp_paragraph:
+                paragraph_to_add = "\n\n" + paragraph
+ 
+            if len(temp_paragraph) + len(paragraph_to_add) <= max_chunk_size:
+                temp_paragraph += paragraph_to_add
             else:
-                chunks.append(temp_paragraph)
-                temp_paragraph = ""
-                sentences = re.split(r"(?<=[.!?])\s+", paragraph)
-                temp_chunk = ""
-
-                for sentence in sentences:
-                    if len(temp_chunk) + len(sentence) <= max_chunk_size:
-                        temp_chunk += sentence + " "
-                    else:
-                        chunks.append(temp_chunk.strip())
-                        temp_chunk = sentence + " "
-
-                if len(temp_chunk) > 0:
-                    chunks.append(temp_chunk.strip())
-
-        return chunks
-    
-    def split_text(
-        self, text: str, chunk_size: int = 500, overlap: bool = False
-    ) -> list[str]:
-        chunks = self.split_markdown(text=text)
-        final_chunks = []
-        for i in range(len(chunks)):
-            if len(chunks[i]) > 0:
-                if len(chunks[i]) < chunk_size:
-                    final_chunks.append(chunks[i])
+                if temp_paragraph:
+                    chunks.append(temp_paragraph.strip())
+               
+                if len(paragraph) <= max_chunk_size:
+                    temp_paragraph = paragraph
                 else:
-                    temp = self.__split(text=chunks[i], max_chunk_size=chunk_size)
-                    for j in range(len(temp)):
-                        if len(temp[j]) > 0:
-                            final_chunks.append(temp[j])
-
-        final_chunks = self.break_chunks(chunks=final_chunks, 
-                                         max_size_chunk=chunk_size)
+                    temp_paragraph = ""
+                    sentences = re.split(r"(?<=[.!?])\s+", paragraph)
+                    temp_chunk = ""
+ 
+                    for sentence in sentences:
+                        sentence_to_add = sentence
+                        if temp_chunk:
+                            sentence_to_add = " " + sentence
+ 
+                        if len(temp_chunk) + len(sentence_to_add) <= max_chunk_size:
+                            temp_chunk += sentence_to_add
+                        else:
+                            if temp_chunk:
+                                chunks.append(temp_chunk.strip())
+                            temp_chunk = sentence
+                   
+                    if temp_chunk:
+                        chunks.append(temp_chunk.strip())
+        if temp_paragraph:
+            chunks.append(temp_paragraph.strip())
+       
+        return [c for c in chunks if c]
+   
+    def split_text(
+        self, text: str, chunk_size: int = 500, overlap: int = 0
+    ) -> list[str]:
+        """
+        Méthode principale pour diviser le texte.
+        """
+       
+        chunks = self.split_markdown(text=text)
+       
+        final_chunks = []
+        for chunk in chunks:
+            if len(chunk) <= chunk_size:
+                if len(chunk) > 0:
+                    final_chunks.append(chunk)
+            else:
+                temp = self.__split(text=chunk, max_chunk_size=chunk_size)
+                for item in temp:
+                    if len(item) > 0:
+                        final_chunks.append(item)
+ 
+        if overlap > 0 and len(final_chunks) > 1:
+            overlapping_chunks = []
+            for i in range(len(final_chunks)):
+                if i > 0:
+                    overlap_text = final_chunks[i - 1][-overlap:]
+                    overlapping_chunks.append(overlap_text + "\n" + final_chunks[i])
+                else:
+                    overlapping_chunks.append(final_chunks[i])
+            return overlapping_chunks
+ 
         return final_chunks
+
 
 
 class Semantic_TextSplitter(Splitter):
