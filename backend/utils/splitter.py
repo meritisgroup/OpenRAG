@@ -397,6 +397,8 @@ class TextSplitter(Splitter):
         return chunks
 
 
+
+
 class Recursive_TextSplitter(Splitter):
     def __init__(self):
         super().__init__()
@@ -405,8 +407,10 @@ class Recursive_TextSplitter(Splitter):
         sections = re.split(r"(?=\n#{1,6} )", text)
         chunks = []
         current_chunk = ""
-
+ 
         for section in sections:
+            chunks.append(current_chunk.strip())
+            current_chunk = section
             chunks.append(current_chunk.strip())
             current_chunk = section
         if current_chunk:
@@ -493,6 +497,7 @@ class Recursive_TextSplitter(Splitter):
         final_chunks = self.break_chunks(max_size_chunk=chunk_size*1.2,
                                          chunks=final_chunks)
         return final_chunks
+
 
 
 class Semantic_TextSplitter(Splitter):

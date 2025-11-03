@@ -12,6 +12,8 @@ from sqlalchemy import Integer, String
 from typing import Type
 
 
+
+
 def get_mapping_vb_embedding(class_: Type[DeclarativeMeta], vector_dims: int) -> dict:
     """
     Generate an Elastic search mapping
@@ -201,42 +203,63 @@ class VectorBase_embeddings_elasticsearch(VectorBase):
             self.create_collection(name=collection_name)
 
         data = []
-        if chunks != []:
-            texts = [chunk.text for chunk in chunks]
-            a = time.time()
-            embeddings = self.agent.embeddings(texts=texts, 
+        if chunks :
+           
+            try:
+                
+                texts = [chunk.text for chunk in chunks]
+                embeddings = self.agent.embeddings(texts=texts, 
                                                model=self.embedding_model)
-            #print("embedding", time.time()-a)
+            
+            except Exception as e:
+
+                print(f"ERROR DURING embedding insertion: {e}")
+
+                import tiktoken
+                encoding = tiktoken.encoding_for_model("text-embedding-3-small")
+
+                valid_chunks = [c for c in chunks if len(encoding.encode(c.text)) < 8000]
+
+                chunks=valid_chunks
+                texts = [chunk.text for chunk in chunks]
+
+                try:
+                    embeddings = self.agent.embeddings(texts=texts, model=self.embedding_model)
+                except Exception as e:
+                    print(f"Second embedding attempt failed: {e}")
+                    return 0
+
             nb_embeddings_tokens = embeddings["nb_tokens"]
+
             if type(nb_embeddings_tokens) is list:
                 nb_embeddings_tokens = np.sum(nb_embeddings_tokens)
-        a = time.time()
-        for k, chunk in enumerate(chunks):
-            source = chunk_to_dict_vb_embedding(
-                chunk=chunk, embedding=embeddings["embeddings"][k]
-            )
 
-            temp = {
+            for k, chunk in enumerate(chunks):
+                source = chunk_to_dict_vb_embedding(
+                chunk=chunk, embedding=embeddings["embeddings"][k]
+                )
+
+                temp = {
                 "_index": collection_name,
                 "_source": source,
-            }
+                }
 
-            data.append(temp)
-        #print("convert embedding", time.time()-a)
-        a = time.time()
-        res = helpers.bulk(self.client, data)
-        #print("indexing", time.time()-a)
-        if display_message:
-            print(
-                f"{len(data)} elements have been successfuly added in the vector base"
-            )
-        else:
+                data.append(temp)
+       
+
+            res = helpers.bulk(self.client, data)
+        
             if display_message:
                 print(
-                    f"All the elements already were in the collection {collection_name}"
+                f"{len(data)} elements have been successfully added in the vector base"
                 )
-        self.nb_tokens_embeddings += nb_embeddings_tokens
-        return nb_embeddings_tokens
+
+            self.nb_tokens_embeddings += nb_embeddings_tokens
+            return nb_embeddings_tokens
+        
+        elif not chunks :
+            return 0
+        
 
     def add_str_elements(
         self,
@@ -254,6 +277,7 @@ class VectorBase_embeddings_elasticsearch(VectorBase):
 
         if not self.check_collection_exist(collection_name=collection_name):
             self.create_collection(name=collection_name)
+
 
         data = []
         if chunks != []:
@@ -401,6 +425,7 @@ class VectorBase_BM25_elasticsearch(VectorBase):
 
         if not self.check_collection_exist(collection_name=collection_name):
             self.create_collection(name=collection_name)
+
 
         data = []
         if chunks != []:

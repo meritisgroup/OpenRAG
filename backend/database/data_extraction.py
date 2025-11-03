@@ -11,27 +11,30 @@ from ..utils.splitter import MarkdownHeaderTextSplitter
 from ..utils.splitter import get_splitter
 from .rag_classes import Chunk, Document
 
+import secrets
+import string
+
+# Alphabet base62 (URL/file-safe)
+_ALPHABET = string.ascii_letters + string.digits  # 26+26+10 = 62
+
+
+def make_chunk_id() -> str:
+    return "".join(secrets.choice(_ALPHABET) for _ in range(15))
+
 
 def save_chunks_to_jsonl(
-    doc_id, chunks: List["Chunk"], jsonl_path: str = "chunks_output.jsonl"
+    doc_id, chunks: List[Chunk], jsonl_path: str = "chunks_output.jsonl"
 ):
 
     os.makedirs(os.path.dirname(jsonl_path) or ".", exist_ok=True)
 
     with open(jsonl_path, "a", encoding="utf-8") as f:
         for c in chunks:
-            record = {
-                "name_doc": getattr(c, "document", None),
-                "doc_id": doc_id,
-                "chunk_id": getattr(c, "id", None),
-                "chunk_content": str(getattr(c, "text", "")),
-            }
+            record = {col.name: getattr(c, col.name) for col in c.__table__.columns}
+            record["doc_id"] = doc_id
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
     return None
-
-
-
 
 
 class DocumentText:
@@ -115,13 +118,16 @@ class DocumentText:
                                                chunk_size=chunk_size, 
                                                overlap=chunk_overlap)
 
-        for k, chunk in enumerate(chunks):
-            results.append(Chunk(text=chunk,
-                                 document=self.name_with_extension,
-                                 id=k + 1))
+            for k, text in enumerate(texts):
+                results.append(
+                    Chunk(text=text, 
+                          document=self.name_with_extension, 
+                          position_in_doc=k + 1,
+                          id=make_chunk_id())
+                )
 
         # save chunks
-        save_chunks_to_jsonl(self.doc_index, results)
+        #save_chunks_to_jsonl(self.doc_index, results)
         return results
 
     def convert_in_base(self) -> Document:
