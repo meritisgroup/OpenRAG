@@ -186,7 +186,6 @@ else:
                                           format_func=lambda x: "Aucun modèle" if x is None else x,
                                           key=f"model_select_{config_key}")
 
-            print("sel", selected_model)
         st.session_state[config_key] = selected_model
         config[config_key] = selected_model
         st.session_state["config_server"][config_key] = selected_model

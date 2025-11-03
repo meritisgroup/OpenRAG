@@ -118,7 +118,7 @@ class DocumentText:
                                                chunk_size=chunk_size, 
                                                overlap=chunk_overlap)
 
-            for k, text in enumerate(texts):
+        for k, text in enumerate(chunks):
                 results.append(
                     Chunk(text=text, 
                           document=self.name_with_extension, 
