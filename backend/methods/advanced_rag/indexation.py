@@ -22,6 +22,7 @@ def process_single_doc(
     path_doc: str,
     doc_index: int,
     config_server: dict,
+    agent,
     splitter, 
     chunk_size: int,
     chunk_overlap: bool,
@@ -33,6 +34,7 @@ def process_single_doc(
     doc = DocumentText(path=path_doc,
                        doc_index=doc_index,
                        config_server=config_server,
+                       agent=agent,
                        splitter=splitter,
                        reset_preprocess=reset_preprocess)
 
@@ -65,6 +67,7 @@ class AdvancedIndexation:
         agent: Agent,
         embedding_model: str,
         llm_model: str,
+        data_preprocessing: str,
         language: str = "EN",
         type_text_splitter: str = "TextSplitter",
         type_processor_chunks: list[str] = [],
@@ -90,6 +93,7 @@ class AdvancedIndexation:
 
         self.splitter = get_splitter(
             type_text_splitter=type_text_splitter,
+            data_preprocessing = data_preprocessing,
             agent=self.agent,
             embedding_model=self.embedding_model,
         )
@@ -101,7 +105,7 @@ class AdvancedIndexation:
     def run_pipeline(
         self,
         config_server,
-        chunk_size: int = 500,
+        chunk_size: int = 1024,
         chunk_overlap: bool = True,
         batch: bool = True,
         reset_preprocess = False,
@@ -138,6 +142,7 @@ class AdvancedIndexation:
         self.data_manager.create_collection()
         progress_bar = ProgressBar(total=len(docs_to_process))
         index = 0
+        print("max workers", max_workers)
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {
                 executor.submit(process_single_doc,
@@ -147,6 +152,7 @@ class AdvancedIndexation:
                                 path_doc,
                                 i,
                                 config_server,
+                                self.agent,
                                 self.splitter,
                                 chunk_size,
                                 chunk_overlap,

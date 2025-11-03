@@ -24,7 +24,7 @@ def indexation(data_manager, doc_chunks, path_docs):
         """
 
         tokens = 0
-        taille_batch = 1000
+        taille_batch = 100
         range_chunks = range(0, len(doc_chunks), taille_batch)
         for i in range_chunks:
             tokens += np.sum(
@@ -37,34 +37,28 @@ def indexation(data_manager, doc_chunks, path_docs):
         return tokens
 
 
-def process_single_doc(
-    data_manager,
-    path_doc: str,
-    doc_index: int,
-    config_server: dict,
-    splitter, 
-    chunk_size: int,
-    chunk_overlap: bool,
-    reset_preprocess: bool
-) -> dict:
+def process_single_doc(data_manager,
+                       path_doc: str,
+                       doc_index: int,
+                       config_server: dict,
+                       agent,
+                       splitter, 
+                       chunk_size: int,
+                       chunk_overlap: bool,
+                       reset_preprocess: bool) -> dict:
     
-    a = time.time()
     doc = DocumentText(path=path_doc,
                        doc_index=doc_index,
                        config_server=config_server,
+                       agent=agent,
                        splitter=splitter,
                        reset_preprocess=reset_preprocess)
-    #print("lecture doc :", time.time() - a)
-    a = time.time()
     
     doc_chunks = doc.chunks(chunk_size=chunk_size,
                             chunk_overlap=chunk_overlap)
-    
-    #print("decoupage doc :", time.time() - a)
     path_docs = [str(Path(path_doc).parent)] * len(doc_chunks)
 
     doc_indexation_tokens = 0
-    
     doc_indexation_tokens = indexation(data_manager=data_manager,
                                        doc_chunks=doc_chunks,
                                        path_docs=path_docs)
@@ -84,6 +78,7 @@ class NaiveRagIndexation:
         data_manager,
         agent,
         embedding_model,
+        data_preprocessing: str,
         type_text_splitter="TextSplitter",
     ) -> None:
         """
@@ -103,6 +98,7 @@ class NaiveRagIndexation:
         self.embedding_model = embedding_model
 
         self.splitter = get_splitter(type_text_splitter=type_text_splitter,
+                                     data_preprocessing=data_preprocessing,
                                      agent=self.agent,
                                      embedding_model=self.embedding_model)
 
@@ -110,7 +106,7 @@ class NaiveRagIndexation:
     def run_pipeline(self,
                      config_server,
                      reset_preprocess: bool = False,
-                     chunk_size: int = 500,
+                     chunk_size: int = 1024,
                      chunk_overlap: bool = True,
                      max_workers: int = 10) -> None:
         """
@@ -141,9 +137,6 @@ class NaiveRagIndexation:
         if max_workers<=get_executor_threads():
             max_workers = 1
 
-
-        print("max workers used :", max_workers)
-
         self.data_manager.create_collection()
         progress_bar = ProgressBar(total=len(docs_to_process))
         index = 0
@@ -154,6 +147,7 @@ class NaiveRagIndexation:
                                 path_doc,
                                 i,
                                 config_server,
+                                self.agent,
                                 self.splitter,
                                 chunk_size,
                                 chunk_overlap,

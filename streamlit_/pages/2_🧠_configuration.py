@@ -82,7 +82,7 @@ else:
                                                          "embedding"])
 
         if st.button("Ajouter le modèle"):
-            if new_model_name and new_model_url:
+            if new_model_name:
                 if new_model_name in models_infos:
                     st.warning("Ce modèle existe déjà !")
                 else:
@@ -91,6 +91,7 @@ else:
                                                     "type": new_model_type }
                     with open("data/models_infos.json", "w") as file:
                         json.dump(models_infos, file, indent=4)
+                    st.session_state["models_infos"] = models_infos
                     st.success(f"Modèle '{new_model_name}' ajouté ✅")
             else:
                 st.warning("Merci de remplir tous les champs !")
@@ -131,72 +132,76 @@ else:
                 del models_infos[selected_model_name]
                 with open("data/models_infos.json", "w") as file:
                     json.dump(models_infos, file, indent=4)
+                st.session_state["models_infos"] = models_infos
                 st.success(f"Modèle '{selected_model_name}' supprimé ✅")
 
-        st.markdown("<br><br>", unsafe_allow_html=True)
+    st.markdown("<br><br>", unsafe_allow_html=True)
 
-        roles = {
+    roles = {
                 "LLM de base": "model",
                 "Reranker": "reranker_model",
                 "Modèle pour décrire les images": "model_for_image",
                 "Modèle d'embedding": "embedding_model"
                 }
-        task_mapping = {
+    task_mapping = {
                         "model": ["llm"],
                         "reranker_model": ["reranker", "llm"],
                         "model_for_image": ["llm"],
                         "embedding_model": ["embedding"]
                         }
         
-        def sort_with_priority(model_name, config_key):
-            model_type = models_infos[model_name]["type"]
-            priorities = task_mapping.get(config_key, [])
-            priority_index = priorities.index(model_type) if model_type in priorities else len(priorities)
-            return (priority_index, model_name)
+    def sort_with_priority(model_name, config_key):
+        model_type = models_infos[model_name]["type"]
+        priorities = task_mapping.get(config_key, [])
+        priority_index = priorities.index(model_type) if model_type in priorities else len(priorities)
+        return (priority_index, model_name)
 
-        config = {}
-        st.subheader("📌 Configuration des modèles par rôle")
-        for role_label, config_key in roles.items():
-            if config_key not in st.session_state["config_server"].keys():
-                st.session_state[config_key] = config.get(config_key, None)
+    config = {}
+    st.subheader("📌 Configuration des modèles par rôle")
+    for role_label, config_key in roles.items():
+        if config_key not in st.session_state["config_server"].keys():
+            st.session_state[config_key] = config.get(config_key, None)
             
-            valid_tasks = task_mapping.get(config_key, [])
-            filtered_models = [name for name, info in models_infos.items()
+        valid_tasks = task_mapping.get(config_key, [])
+        filtered_models = [name for name, info in models_infos.items()
                             if info.get("type") in valid_tasks
                             ]
-            options = [None] + sorted(filtered_models)
 
-            col1, col2 = st.columns([0.5, 2])
+        options = [None] + sorted(filtered_models)
 
-            with col1:
-                st.markdown(f"**Modèle pour {role_label}** {'✅' if st.session_state['config_server'][config_key] else '❌'}")
-            #print(options, config_key)
-            print(st.session_state["config_server"][config_key])
-            #print("\n\n\n", st.session_state)
-            with col2:
-                selected_model = st.selectbox(
-                    label="", 
-                    options=options,
-                    index=options.index(st.session_state["config_server"][config_key]),
-                    format_func=lambda x: "Aucun modèle" if x is None else x,
-                    key=f"model_select_{config_key}"
-                )
+        col1, col2 = st.columns([0.5, 2])
 
-            st.session_state[config_key] = selected_model
-            config[config_key] = selected_model
-            st.session_state["config_server"][config_key] = selected_model
+        with col1:
+            st.markdown(f"**Modèle pour {role_label}** {'✅' if st.session_state['config_server'][config_key] else '❌'}")
+        with col2:
+            print("confi", config_key)
+            if st.session_state["config_server"][config_key] in options:
+                index = options.index(st.session_state["config_server"][config_key])
+            else:
+                index = 0
+
+            selected_model = st.selectbox(label="", 
+                                          options=options,
+                                          index=index,
+                                          format_func=lambda x: "Aucun modèle" if x is None else x,
+                                          key=f"model_select_{config_key}")
+
+            print("sel", selected_model)
+        st.session_state[config_key] = selected_model
+        config[config_key] = selected_model
+        st.session_state["config_server"][config_key] = selected_model
 
         col_empty, col_save, col_empty1 = st.columns([1, 2, 1])
 
-        st.markdown("<br>", unsafe_allow_html=True)
-        with col_save:
-            if st.button("💾 Sauvegarder les modèles par défaut", use_container_width=True):
-                with open("data/base_config_server.json" , "w") as file:
-                    json.dump(st.session_state["config_server"], file, indent=4)
+    st.markdown("<br>", unsafe_allow_html=True)
+    with col_save:
+        if st.button("💾 Sauvegarder les modèles par défaut", use_container_width=True):
+            with open("data/base_config_server.json" , "w") as file:
+                json.dump(st.session_state["config_server"], file, indent=4)
                                 
-                st.success("✅ Modèles par défaut enregistrés !")
+            st.success("✅ Modèles par défaut enregistrés !")
 
-        st.markdown("<br><br>", unsafe_allow_html=True)
+    st.markdown("<br><br>", unsafe_allow_html=True)
 
 
     st.subheader("📌 Configuration Vectorbase")
@@ -317,7 +322,7 @@ if "chunk" not in st.session_state:
 st.slider(
     label="**Choose number of chunks to retrieve per query:**",
     min_value=0,
-    max_value=200,
+    max_value=500,
     step=5,
     value=st.session_state["chunk"],
     help="""The higher the number of value, the better the results of the RAG agent will be.

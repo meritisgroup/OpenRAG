@@ -76,6 +76,7 @@ class AdvancedRag(NaiveRagAgent):
         index = AdvancedIndexation(
             data_manager=self.data_manager,
             type_text_splitter=self.type_text_splitter,
+            data_preprocessing=self.config_server["data_preprocessing"],
             agent=self.agent,
             embedding_model=self.embedding_model,
             llm_model=self.llm_model,
@@ -149,12 +150,12 @@ class AdvancedRag(NaiveRagAgent):
         chunk_list = [chunk for chunk_list in chunk_lists for chunk in chunk_list]
 
         if len(chunk_list) > 0 and self.rerank:
-            rerank_chunk_list, additional_data, nb_input_tokens = self.reranker.rerank(
-                query=query,
-                chunk_list=chunk_list,
-                max_contexts=len(chunk_list),
-            )
-            self.nb_input_tokens += np.sum(nb_input_tokens)
+            rerank_chunk_list, additional_data, nb_input_tokens_rerank = self.reranker.rerank(
+                                                                    query=query,
+                                                                    chunk_list=chunk_list,
+                                                                    max_contexts=self.config_server["nb_chunks_reranker"],
+                                                                )
+            #nb_input_tokens += np.sum(nb_input_tokens_rerank)
         else:
             rerank_chunk_list = chunk_list
 

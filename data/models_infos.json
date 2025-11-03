@@ -1,46 +1,34 @@
 {
     "gpt-4o-mini": {
         "url": null,
-        "api_key": "",
-        "type": "llm"
-    },
-    "gpt-4.1-mini": {
-        "url": null,
-        "api_key": "",
-        "type": "llm"
+        "api_key": ""
     },
     "gpt-4.1-nano-2025-04-14": {
         "url": null,
-        "api_key": "",
-        "type": "llm"
-    },
-    "text-embedding-3-small": {
-        "url": null,
-        "api_key": "",
-        "type": "embedding"
+        "api_key": ""
     },
     "text-embedding-3-large": {
         "url": null,
-        "api_key": "",
+        "api_key": "null",
         "type": "embedding"
     },
     "text-embedding-ada-002": {
         "url": null,
-        "api_key": "",
+        "api_key": "null",
         "type": "embedding"
     },
     "google/gemma-3-12b-it": {
-        "url": "http://localhost:8000",
+        "url": "http://localhost:30002",
         "api_key": "vllm",
         "type": "llm"
     },
     "google/gemma-3-4b-it": {
-        "url": "http://localhost:8000",
+        "url": "http://localhost:30002",
         "api_key": "vllm",
         "type": "llm"
     },
     "BAAI/bge-m3": {
-        "url": "http://localhost:30000",
+        "url": "http://localhost:30002",
         "api_key": "vllm",
         "type": "embedding"
     },
@@ -80,13 +68,37 @@
         "type": "embedding"
     },
     "bge-m3:latest": {
-        "url": "http://localhost:451",
+        "url": "http://localhost:30000",
         "api_key": "ollama",
         "type": "embedding"
     },
     "all-minilm:22m": {
         "url": "http://localhost:451",
         "api_key": "ollama",
+        "type": "embedding"
+    },
+    "nanonets/Nanonets-OCR2-3B": {
+        "url": "http://localhost:30002",
+        "api_key": "vllm",
+        "type": "llm"
+    },
+    "openai/gpt-oss-20b": {
+        "url": "http://localhost:30000",
+        "api_key": "vllm",
+        "type": "llm"
+    },
+    "gpt-4.1-mini": {
+        "url": null,
+        "api_key": "null",
+        "type": "llm"
+    },
+    "text-embedding-3-small": {
+        "url": null,
+        "api_key": ""
+    },
+    "bge-m3-finetune": {
+        "url": "http://localhost:30000",
+        "api_key": "vllm",
         "type": "embedding"
     }
 }

@@ -1,14 +1,15 @@
 from .agent_functions import (
     predict,
     multiple_predict,
-    predict_vllm,
     predict_json,
+    predict_images,
     predict_image,
     predict_mistral,
     multiple_predict_mistral,
     rerank,
     RerankedChunk,
 )
+from ecologits import EcoLogits
 from openai import OpenAI
 from mistralai import Mistral
 from jsonschema import validate
@@ -279,6 +280,9 @@ class Agent_openai(Agent):
             if "api_key" in self.models_infos[key].keys() and "url" in self.models_infos[key].keys():
                 if self.models_infos[key]["url"] is not None:
                     url = self.models_infos[key]["url"] + "/v1"
+                else:
+                    url = None
+
                 self.clients[key] = OpenAI(api_key=self.models_infos[key]["api_key"],
                                            base_url=url)
 
@@ -288,24 +292,34 @@ class Agent_openai(Agent):
         self.temperature = 0
         self.max_workers = max_workers
 
-    def predict_image(self, 
-                      prompt: str, 
+    def predict_images(self, 
+                      prompts: list[str],
                       model: str,
-                      data_url,
-                      json_format: BaseModel,
-                      temperature=0) -> BaseModel:
-        """
-        It formats the queries with good prompts, then gives these prompts to the LLM and return the cleaned outputs following the given BaseModel format
-        """
-        answer = predict_image(
-            prompt,
-            model,
-            data_url,
-            self.clients[model],
-            json_format,
-            temperature,
-        )
-        return answer
+                      images: list[np.ndarray],
+                      json_format: BaseModel = None,
+                      temperature: float = None,
+                      max_workers: int = 10):
+        return predict_images(prompts=prompts,
+                                model=model,
+                                images=images,
+                                client=self.clients[model],
+                                json_format=json_format,
+                                temperature=temperature,
+                                max_workers=max_workers)
+    
+    def predict_image(self, 
+                      prompt: str,
+                      model: str,
+                      image: np.ndarray,
+                      json_format: BaseModel = None,
+                      temperature: float = None):
+        return predict_image(prompt=prompt,
+                             model=model,
+                             img=image,
+                             client=self.clients[model],
+                             json_format=json_format,
+                             temperature=temperature)
+        
 
     def predict(
         self,
@@ -349,6 +363,10 @@ class Agent_openai(Agent):
 
     def reranking(self, query: str, chunk_list: list[Chunk],
                   model, max_workers: int = 10):
+        if not getattr(EcoLogits, "_initialized", False):
+            EcoLogits.init()
+            EcoLogits._initialized = True
+
         if self.models_infos[model]["type"]=="reranker":
             documents = [chunk.text for chunk in chunk_list]
             url = self.models_infos[model]['url'] + "/v1/rerank"
@@ -362,9 +380,11 @@ class Agent_openai(Agent):
                 "accept": "application/json",
                 "Content-Type": "application/json"
             }
+            a = time.time()
             response = requests.post(url,
                                      json=payload,
                                      headers=headers).json()
+
             input_tokens = [response["usage"]["total_tokens"]]
             ordered_by_index = sorted(response["results"], key=lambda x: x["index"])
 
@@ -395,9 +415,9 @@ class Agent_openai(Agent):
             if max_workers <= get_executor_threads():
                 max_workers = 1
 
-            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-                futures = []
-                for chunk in chunk_list:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:  
+                future_to_index = {}
+                for i, chunk in enumerate(chunk_list):
                     prompt = f" Context : {chunk.text}\n Query : {query}"
                     future = executor.submit(rerank,
                                             system_prompt,
@@ -405,18 +425,24 @@ class Agent_openai(Agent):
                                             model,
                                             self.clients[model],
                                             temperature=None)
-                    futures.append(future)
+                    future_to_index[future] = i 
 
-                for future in concurrent.futures.as_completed(futures):
-                    json_response, nb_input_tokens = future.result()
-                    scores.append(json_response.score)
-                    input_tokens.append(nb_input_tokens)
+                unordered_results = []
+                for future in concurrent.futures.as_completed(future_to_index):
+                    original_index = future_to_index[future]
+                    try:
+                        json_response, nb_input_tokens = future.result()
+                        unordered_results.append((original_index, json_response.score, nb_input_tokens))
+                    except Exception as exc:
+                        print(f'La tâche {original_index} a échoué: {exc}')
 
+                unordered_results.sort(key=lambda x: x[0])
 
-        return {
-            "scores": scores,
-            "nb_input_tokens": input_tokens,
-            }
+                scores = [result[1] for result in unordered_results]
+                input_tokens = [result[2] for result in unordered_results]
+
+        return {"scores": scores,
+                "nb_input_tokens": input_tokens}
 
     def release_memory(self):
         None

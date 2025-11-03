@@ -7,14 +7,14 @@ from backend.evaluation.agent_evaluator import DataFramePreparator, AgentEvaluat
 from backend.evaluation.prompts import PROMPTS
 import pandas as pd
 import os
+import concurrent.futures
 from datetime import datetime
-import json
+import re
 import numpy as np
 import ast
-
+import json
 from streamlit_.utils.chat_funcs import get_chat_agent
 from backend.utils.progress import ProgressBar
-
 
 import base64
 import random
@@ -22,6 +22,11 @@ from pydantic import BaseModel
 from io import BytesIO
 from backend.utils.agent import get_Agent
 import fitz
+
+
+from backend.utils.open_doc import Opener
+from backend.utils.threading_utils import get_executor_threads
+from backend.database.utils import get_list_path_documents
 
 
 color_discrete_sequence = [
@@ -40,13 +45,13 @@ color_discrete_sequence = [
 
 question_generation_prompt = """
 You are an assistant specialized in generating questions from documents.  
-You are given an image of a single page from a PDF.  
+You are given content from a document.  
 
 Your task:  
-1. Carefully read ONLY the content visible on this page.  
-2. Generate ONE clear and direct question based strictly on the content of this page.  
+1. Carefully read ONLY the content.  
+2. Generate ONE clear and direct question based strictly on the content.  
    - The question must stand on its own: do NOT reference the page, the document, or the source (never use phrases like "according to this document" or "on this page").  
-   - The question should be specific and test understanding of the page’s content.  
+   - The question should be specific and test understanding of content.  
    - Do NOT invent information not present on this page.  
 3. Provide the correct answer to the question, also written directly, without mentioning the document.  
 
@@ -64,65 +69,93 @@ class QuestionGenerator:
     """Image analysis via Ollama with minimal JSON output."""
 
 
-    def __init__(self, config_server):
+    def __init__(self, config_server, databases_path):
         self.agent = get_Agent(config_server, image_description=True)
         self.config_server=config_server 
+        self.databases_path = databases_path
 
-    def generate_question(self, image_bytes: bytes) -> QuestionOnPage:
-        image_b64 = base64.b64encode(image_bytes).decode("utf-8")
-        data_url = f"data:image/png;base64,{image_b64}"
+    def generate_question(self) -> QuestionOnPage:    
+        content = ""
+        while len(content)<100 and nb_try<10:
+            content = get_random_contexte_sentences(databases_paths=self.databases_paths)
+            nb_try+=1
 
-        if self.config_server["params_host_llm"]["type"]=="ollama":
-            temperature=0
-        else:
-            temperature=1
-
-        print("test")
-    
-        response=self.agent.predict_image(prompt=question_generation_prompt,
-                                          data_url=data_url,
-                                          json_format=QuestionOnPage,
-                                          temperature=temperature)
+        response=self.agent.predict_json(prompt=question_generation_prompt,
+                                         model=self.config_server["model"],
+                                         system_prompt="",
+                                         json_format=QuestionOnPage)
         return response
 
+    def generate_questions(self, nb_questions) -> list[QuestionOnPage]:
+        max_workers = self.config_server["max_workers"]
+        if max_workers<=get_executor_threads():
+            max_workers = 1
 
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_index = {
+                executor.submit(
+                    self.generate_question
+                ): i
+                for i in range(len(nb_questions))
+            }
+
+            results = [None] * len(nb_questions)
+            for future in concurrent.futures.as_completed(future_to_index):
+                index = future_to_index[future]
+                result = future.result()
+                results[index] = result
+        
+        return results
+    
+
+def get_random_contexte_sentences(databases_paths):
+    db_path = random.choice(databases_paths)
+
+    files = get_list_path_documents(db_path)
+    file_path = os.path.join(db_path, random.choice(files))
+
+    content = Opener(save=False).open_doc(file_path)
+    sentences = re.split(r'(?<=[.!?])\s+', content)
+    index = random.randint(0, len(sentences) - 1)
+
+    context = [sentences[index]]
+    total_length = len(sentences[index])
+
+    i_prev = index - 1
+    i_next = index + 1
+
+    while total_length < 8000 and (i_prev >= 0 or i_next < len(sentences)):
+        if i_prev >= 0:
+            context.insert(0, sentences[i_prev])
+            total_length += len(sentences[i_prev])
+            i_prev -= 1
+
+        if total_length >= 8000:
+            break
+
+        if i_next < len(sentences):
+            context.append(sentences[i_next])
+            total_length += len(sentences[i_next])
+            i_next += 1
+
+    content = " ".join(context)
+    return content
 
 
 def generate_questions(n_questions, databases, config_server):
 
     databases_paths = [os.path.join("data/databases", db) for db in databases]
-    print(databases_paths)
-    question_generator=QuestionGenerator(config_server=config_server)
+    question_generator = QuestionGenerator(config_server=config_server,
+                                           databases_paths=databases_paths)
+
+    questions = question_generator.generate_questions(nb_questions=n_questions)
+
     list_queries, list_answers=[],[]
-
-    for _ in range(n_questions):
-        #choose a random db
-        db_path = random.choice(databases_paths)
-
-        #choose a random pdf
-        pdf_files = [f for f in os.listdir(db_path) if f.lower().endswith(".pdf")]
-        if not pdf_files:
-            continue 
-        pdf_path = os.path.join(db_path, random.choice(pdf_files))
-
-        #choose a random page
-        doc = fitz.open(pdf_path)
-        page_number = random.randint(0, len(doc) - 1)
-        page = doc.load_page(page_number)
-        
-        #convert this page into bytes
-        pix = page.get_pixmap()
-        image_bytes = pix.tobytes("png")
-
-        generation = question_generator.generate_question(image_bytes=image_bytes)
-        list_queries.append(generation.query)
-        list_answers.append(generation.answer)
-
-        doc.close()
+    for question in questions:
+        list_queries.append(question.query)
+        list_answers.append(question.answer)
 
     return list_queries, list_answers
-    
-    
 
 
 def get_folder_saved_benchmark():

@@ -127,6 +127,7 @@ class NaiveRagAgent(RagAgent):
 
         index = NaiveRagIndexation(data_manager=self.data_manager,
                                   type_text_splitter=self.type_text_splitter,
+                                  data_preprocessing=self.config_server["data_preprocessing"],
                                   agent=self.agent,
                                   embedding_model=self.embedding_model)
 

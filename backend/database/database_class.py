@@ -10,6 +10,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Session, Query
 from ..utils.factory_vectorbase import get_vectorbase
+from .utils import get_list_path_documents
 import os
 from pathlib import Path
 from sqlalchemy.orm import DeclarativeMeta
@@ -595,16 +596,8 @@ class DataBase:
         except Exception as e:
             self.session.rollback()
             print(f'An error "{e}" occurred when trying to clean the database')
-
     def get_list_path_documents(self):
-        all_files = os.listdir(self.path_data)
-        all_files = [
-            os.path.join(self.path_data, doc_name)
-            for doc_name in all_files
-            if doc_name != "metadatas.json" and not Path(os.path.join(self.path_data, doc_name)).is_dir()
-        ]
-        all_docs = [f for f in all_files]
-        return all_docs
+        return get_list_path_documents(path_data=self.path_data)
 
 
 class ContextDatabase:
@@ -629,7 +622,7 @@ class ContextDatabase:
             rag_name,
             self.metadata,
             Column("query", String, primary_key=True),
-            Column("context", JSON),  # Stores list[dict]
+            Column("context", JSON),
             extend_existing=True,
         )
         self.metadata.create_all(self.engine)
@@ -639,12 +632,10 @@ class ContextDatabase:
         """Insert one row (query + list of chunk dicts) into a given RAG table."""
         dict_chunks = [chunk.to_dict() for chunk in chunks]
         with self.engine.begin() as conn:
-            # Check if query already exists
             sel = rag_table.select().where(rag_table.c.query == query)
             result = conn.execute(sel).first()
 
             if result is None:
-                # Insert only if not present
                 ins = rag_table.insert().values(query=query, 
                                                 context=dict_chunks)
                 conn.execute(ins)

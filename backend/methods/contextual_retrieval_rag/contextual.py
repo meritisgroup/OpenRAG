@@ -24,7 +24,8 @@ def get_neighbors_chunks(doc_chunks, index, max_context_len=8192):
     return local_context
 
 
-def run_contextual(agent, model, doc_chunks, doc_content, language="EN"):
+def run_contextual(agent, model, doc_chunks, doc_content,
+                   language="EN", first_process=True):
     chunk_with_context = []
     user_prompts = []
     system_prompts = []
@@ -41,7 +42,7 @@ def run_contextual(agent, model, doc_chunks, doc_content, language="EN"):
         user_prompts.append(prompt)
         system_prompts.append(system_prompt)
 
-    taille_batch = 100
+    taille_batch = 500
     contexts = None
     range_chunks = range(0, len(user_prompts), taille_batch)
     progress_bar_chunks = ProgressBar(total=len(range_chunks))
@@ -68,7 +69,11 @@ def run_contextual(agent, model, doc_chunks, doc_content, language="EN"):
     nb_input_tokens = np.sum(contexts["nb_input_tokens"])
     for i in range(len(contexts["texts"])):
         context = contexts["texts"][i]
-        new_chunk = f"Chunk context:\n {context} \n\nChunk:\n {doc_chunks[i].text}"
+        if first_process:
+            new_chunk = f"<Chunk_context>\n {context}</Chunk_context> \n\n<Chunk>\n {doc_chunks[i].text}\n<Chunk>"
+        else:
+            new_chunk = f"<Chunk_context>\n {context}</Chunk_context> \n\n {doc_chunks[i].text}"
+
         chunk_with_context.append(new_chunk)
     return {
             "texts": chunk_with_context,

@@ -5,7 +5,7 @@
     },
     "openai": {
         "url": null,
-        "api_key": ""
+        "api_key": null
     },
     "ollama": {
         "url": "http://localhost:451/v1",

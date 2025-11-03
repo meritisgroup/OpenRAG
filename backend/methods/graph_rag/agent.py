@@ -86,6 +86,7 @@ class GraphRagAgent(RagAgent):
             language=self.language,
             agent=self.agent,
             type_text_splitter=self.type_text_splitter,
+            data_preprocessing=self.config_server["data_preprocessing"],
             embedding_model=self.embedding_model,
             llm_model = self.llm_model
         )

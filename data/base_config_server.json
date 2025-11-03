@@ -6,22 +6,22 @@
     "params_vectorbase": {
         "backend": "elasticsearch",
         "batch": true,
-        "url": "https://localhost:9200",
+        "url": "http://localhost:9200",
         "auth": [
             "elastic",
-            "2Sqi+pqrJ_QpRtobko1w"
+            "UDY9ydMS"
         ]
     },
-    "max_workers": 10,
+    "max_workers": 45,
     "device": "cpu",
-    "model": "gpt-4.1-nano-2025-04-14",
-    "model_for_image": "gpt-4o-mini",
+    "model": "openai/gpt-oss-20b",
+    "model_for_image": "gpt-4.1-mini",
     "embedding_model": "BAAI/bge-m3",
     "language": "FR",
-    "type_retrieval": "hybrid",
+    "type_retrieval": "embeddings",
     "TextSplitter": "TextSplitter",
     "reformulate_query": false,
-    "reranker_model": "gpt-4.1-nano-2025-04-14",
+    "reranker_model": "openai/gpt-oss-20b",
     "max_attempts": 5,
     "nb_chunks": 10,
     "nb_chunks_reranker": 20,
@@ -37,7 +37,7 @@
         "forced_system_prompt": false,
         "generation_system_prompt_name": "default"
     },
-    "chunk_length": 730,
+    "chunk_length": 1024,
     "all_system_prompt": {
         "default": "You are an AI assistant, answer honestly to the user using your knowledge and the provided context. You must be exhaustive and concise. You must answer in English"
     },

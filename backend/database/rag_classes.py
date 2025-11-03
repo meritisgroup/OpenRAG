@@ -126,7 +126,7 @@ class DocumentText:
         self.input_tokens = 0
         self.output_tokens = 0
 
-    def chunks(self, chunk_size: int = 500, chunk_overlap: bool = True) -> list[Chunk]:
+    def chunks(self, chunk_size: int = 1024, chunk_overlap: bool = True) -> list[Chunk]:
         """
         Split the text according to parameters and return associated chunks
         """

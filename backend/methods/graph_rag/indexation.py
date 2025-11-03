@@ -29,6 +29,7 @@ class GraphRagIndexation:
         storage_path: str,
         agent: Agent,
         type_text_splitter: str,
+        data_preprocessing: str,
         embedding_model: str,
         llm_model: str,
         language: str = "EN",
@@ -42,6 +43,7 @@ class GraphRagIndexation:
 
         self.splitter = get_splitter(
             type_text_splitter=type_text_splitter,
+            data_preprocessing=data_preprocessing,
             embedding_model=embedding_model,
             agent=self.agent,
         )
@@ -69,7 +71,7 @@ class GraphRagIndexation:
                          to_process_norm, 
                          config_server,
                          reset_preprocess,
-                         chunk_size: int = 500,
+                         chunk_size: int = 1024,
                          overlap: bool = True):
         """
         Extract entities and relations from texts located in the folder self.data_path and save all the results in the data base self.db
@@ -84,6 +86,7 @@ class GraphRagIndexation:
 
             document = DocumentText(path=path_doc,
                                     doc_index=k,
+                                    agent=self.agent,
                                     config_server=config_server,
                                     splitter=self.splitter,
                                     reset_preprocess=reset_preprocess)
@@ -91,11 +94,6 @@ class GraphRagIndexation:
                                      chunk_overlap=overlap)
             name_docs = [str(Path(path_doc).name) for i in range(len(chunks))]
             path_docs = [str(Path(path_doc).parent) for i in range(len(chunks))]
-            """
-            for chunk in chunks:
-                self.data_manager.add_instance(chunk,
-                                               path=str(Path(path_doc).parent))
-            """
 
             entities, relations, input_tokens, output_tokens = (
                     extract_entities_relations(agent=self.agent,
@@ -260,7 +258,7 @@ class GraphRagIndexation:
                                        db=db)
 
 
-    def run_pipeline(self, config_server, chunk_size: int = 500,
+    def run_pipeline(self, config_server, chunk_size: int = 1024,
                      overlap: bool = True, reset_preprocess: bool = False):
         """
         Indexation phase for graph rag, from entities extraction to community description.

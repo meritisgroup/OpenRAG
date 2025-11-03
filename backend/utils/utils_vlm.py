@@ -1,12 +1,14 @@
 import requests
 import io
 import fitz
-from PIL import Image, ImageDraw, ImageFont
-import base64
 import numpy as np
 import os
 import pandas as pd
+import cv2
 from .agent import Agent
+
+
+
 
 
 def make_request_vlm_ollama(url, image, model, prompt):

@@ -158,13 +158,10 @@ def get_prompt(type_image, context):
 
 
 class ImageAnalyzer:
-    """Image analysis via Ollama with minimal JSON output."""
 
-
-    def __init__(self, config_server):
-        self.agent = get_Agent(config_server,
-                               image_description=True)
-        self.config_server=config_server 
+    def __init__(self, config_server, agent):
+        self.agent = agent
+        self.config_server = config_server 
 
     def analyze_bytes(self, image_bytes: bytes, context) -> ImageDescription:
         image_b64 = base64.b64encode(image_bytes).decode("utf-8")
@@ -256,8 +253,6 @@ class DoclingConverter:
 
         lines = markdown_text.splitlines(keepends=True)
         final_lines = []
-
-        
         
         pictures_and_stacks = [
     (item, tuple(stack))  # or stack.copy()

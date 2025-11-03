@@ -76,14 +76,34 @@ config_new_rag["TextSplitter"] = st.selectbox(
 )
 
 if config_new_rag["base"]=="advanced_rag" or config_new_rag["base"]=="agentic":
-    pre_proccessor_dic = {"Contextual integration": "Contextual"}
+    pre_proccessor_dic = {"Contextual integration": "Contextual",
+                          "Global Sum up document integration": "Global_sum_up",
+                          "Extract metadata": "Extractor_metadata"}
     selected_processors = []
-
+    
+    list_keys_processor = list(pre_proccessor_dic.keys())
+    nb_processor = len(list_keys_processor)
+    processor_per_column = nb_processor // 3 if nb_processor % 3 == 0 else nb_processor // 3 + 1
     st.write("**Choose Pre-Processor Chunks**")
-    for i, (label, value) in enumerate(pre_proccessor_dic.items()):
-        checked = st.checkbox(label, key=f"preproc_{i}")
-        if checked:
-            selected_processors.append(value)
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        for i in range(processor_per_column):
+            checked = st.checkbox(list_keys_processor[i],
+                                  key=f"preproc_{i}")
+            if checked:
+                selected_processors.append(pre_proccessor_dic[list_keys_processor[i]])
+    with col2:
+        for i in range(processor_per_column, 2 * processor_per_column):
+            checked = st.checkbox(list_keys_processor[i],
+                                  key=f"preproc_{i}")
+            if checked:
+                selected_processors.append(pre_proccessor_dic[list_keys_processor[i]])
+    with col3:
+        for i in range(2*processor_per_column, nb_processor):
+            checked = st.checkbox(list_keys_processor[i],
+                                  key=f"preproc_{i}")
+            if checked:
+                selected_processors.append(pre_proccessor_dic[list_keys_processor[i]])
 
     config_new_rag["ProcessorChunks"] = selected_processors
 
@@ -91,7 +111,7 @@ if config_new_rag["base"]=="advanced_rag" or config_new_rag["base"]=="agentic":
     nb_reranker = st.slider(
             label="**Choose number of chunks after reranker**",
             min_value=0,
-            max_value=200,
+            max_value=500,
             step=5,
             value=st.session_state["config_server"]["nb_chunks_reranker"],
             help=(
@@ -102,8 +122,7 @@ if config_new_rag["base"]=="advanced_rag" or config_new_rag["base"]=="agentic":
         )
 
     config_new_rag["nb_chunks_reranker"] = nb_reranker
-
-
+    
 if st.session_state["mode_interface"]=="Simple":
     possible_embeddings = get_possible_embeddings_model(provider=st.session_state["config_server"]["default_mode_provider"])
     possible_embeddings.insert(0, "default")
@@ -146,7 +165,7 @@ else:
 config_new_rag["nb_chunks"] = st.slider(
     label="**Choose number of chunks to retrieve per query**",
     min_value=0,
-    max_value=200,
+    max_value=500,
     step=5,
     value=st.session_state["config_server"]["nb_chunks"],
     help="""The higher the number of value, the better the results of the RAG agent will be.
@@ -231,7 +250,7 @@ if st.button(
 
         local_params = {
             "generation_system_prompt_name": system_prompt,
-            "forced_system_prompt": True,
+            "forced_system_prompt": False,
         }
         config_new_rag["local_params"] = local_params
         config_new_rag["chunk_length"] = st.session_state["chunk_length"]
@@ -317,7 +336,7 @@ if rag_to_del in st.session_state["custom_rags"]:
         "Vectorbase Type": [backend_vectorbase[config["params_vectorbase"]["backend"]]],
         "Retrieval Method": [retrieval_methods[config["type_retrieval"]]],
         "Splitter": [splitter_dic[config["TextSplitter"]]],
-        "Embedding model": [embeddings_dic[config["embedding_model"]]],
+        "Embedding model": [config["embedding_model"]],
         "Nb chunks": [str(config["nb_chunks"])],
         "Chunk length": [str(config["chunk_length"])]
     }

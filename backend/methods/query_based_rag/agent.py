@@ -58,6 +58,7 @@ class QueryBasedRagAgent(AdvancedRag):
             agent=self.agent,
             data_manager=self.data_manager,
             type_text_splitter=self.type_text_splitter,
+            data_preprocessing=self.config_server["data_preprocessing"],
             embedding_model=self.embedding_model,
             llm_model=self.llm_model
         )
@@ -65,7 +66,8 @@ class QueryBasedRagAgent(AdvancedRag):
         qb_index.run_pipeline(chunk_size=self.chunk_size,
                               config_server=self.config_server,
                               chunk_overlap=overlap,                              
-                              reset_preprocess=reset_preprocess)
+                              reset_preprocess=reset_preprocess,
+                              max_workers=self.config_server["max_workers"])
         
     def remove_duplicate_chunks(self, chunks):
         seen_texts = set()

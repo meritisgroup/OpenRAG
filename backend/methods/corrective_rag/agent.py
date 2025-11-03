@@ -33,6 +33,7 @@ class CragAgent(NaiveRagAgent):
         self.prompts = prompts[self.language]
         self.websplitter = get_splitter(
             type_text_splitter=self.type_text_splitter,
+            data_preprocessing=self.config_server["data_preprocessing"],
             agent=self.agent,
             embedding_model=self.embedding_model,
         )

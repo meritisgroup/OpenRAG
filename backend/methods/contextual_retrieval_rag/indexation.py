@@ -34,6 +34,7 @@ def process_single_doc(
     doc = DocumentText(path=path_doc,
                       doc_index=doc_index,
                       config_server=config_server,
+                      agent=agent,
                       splitter=splitter,
                       reset_preprocess=reset_preprocess)
     doc_content = doc.content
@@ -88,6 +89,7 @@ class ContextualRetrievalIndexation:
                  language: str,
                  agent,
                  embedding_model :str,
+                 data_preprocessing: str,
                  type_text_splitter = "TextSplitter") -> None:
         """
         Args:
@@ -107,6 +109,7 @@ class ContextualRetrievalIndexation:
         self.agent = agent
         self.prompts = prompts[language]
         self.splitter = get_splitter(type_text_splitter=type_text_splitter,
+                                     data_preprocessing=data_preprocessing,
                                      agent=self.agent, 
                                      embedding_model=embedding_model)
         self.input_tokens = 0
@@ -146,7 +149,7 @@ class ContextualRetrievalIndexation:
         self,
         config_server,
         model: str,
-        chunk_size: int = 500,
+        chunk_size: int = 1024,
         chunk_overlap: bool = True,
         reset_preprocess = False,
         max_workers: int = 10,
@@ -180,6 +183,7 @@ class ContextualRetrievalIndexation:
             futures = {
                 executor.submit(process_single_doc,
                                 self.data_manager,
+                                self.agent,
                                 path_doc,
                                 model,
                                 i,

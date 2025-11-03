@@ -19,18 +19,21 @@ class Splitter(ABC):
 
     def break_chunks(self, chunks, max_size_chunk=512):
         final_chunks = []
-        for i in range(len(chunks)):
-            if len(chunks[i]) < max_size_chunk:
-                final_chunks.append(chunks[i])
+
+        for text in chunks:
+            if len(text) < max_size_chunk:
+                final_chunks.append(text)
             else:
-                sentences = nltk.sent_tokenize(chunks[i])
-                current_chunk = sentences[0]
-                for j in range(1, len(sentences)):
-                    if len(current_chunk) + len(sentences[j]) < max_size_chunk:
-                        current_chunk += sentences[j]
+                words = text.split()
+                current_chunk = words[0]
+                for w in words[1:]:
+                    if len(current_chunk) + 1 + len(w) <= max_size_chunk:
+                        current_chunk += " " + w
                     else:
                         final_chunks.append(current_chunk)
-                        current_chunk = sentences[j]
+                        current_chunk = w
+
+                final_chunks.append(current_chunk)
         return final_chunks
     
 

@@ -16,17 +16,16 @@ def get_name(rag_name, config_server, additionnal_name=""):
             config_server["TextSplitter"],
         )
     elif rag_name == "graph":
-        name = "graph_rag_{}{}_{}".format(name,
+        name = "graph_rag_{}_{}_{}".format(name,
                                           config_server["type_retrieval"],
                                           config_server["TextSplitter"])
     elif rag_name == "query_based":
-        name = "query_rag_{}{}_{}".format(name,
+        name = "query_rag_{}_{}_{}".format(name,
                                           config_server["type_retrieval"],
                                           config_server["TextSplitter"],
                                         )
     elif rag_name == "advanced_rag":
-        name = "{}{}_{}".format(name,
-            config_server["type_retrieval"],
+        name = name + "{}_{}".format(config_server["type_retrieval"],
             config_server["TextSplitter"],
         )
         if len(config_server["ProcessorChunks"]) > 0:
@@ -34,15 +33,15 @@ def get_name(rag_name, config_server, additionnal_name=""):
                 name += "_{}".format(config_server["ProcessorChunks"][i])
 
     elif rag_name == "semantic_chunking":
-        name = "{}{}_{}".format(name,
+        name = "{}_{}_{}".format(name,
             config_server["type_retrieval"],
             "Semantic_TextSplitter",
         )
     elif rag_name == "contextual_retrieval":
-        name = "{}{}_{}".format(name,
+        name = "{}_{}_{}_{}".format(name,
             config_server["type_retrieval"],
             config_server["TextSplitter"],
-            "Contextual"
+            "contextual"
         )
 
     name += "_{}".format(config_server["data_preprocessing"])

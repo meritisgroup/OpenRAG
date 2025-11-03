@@ -10,6 +10,5 @@
     "naive_chatbot": "Naive Chatbot",
     "advanced_rag": "Advanced RAG",
     "reranker_rag": "Reranker RAG",
-    "agentic": "Agentic RAG",
-    "test_i": "test_i"
+    "agentic": "Agentic RAG"
 }
