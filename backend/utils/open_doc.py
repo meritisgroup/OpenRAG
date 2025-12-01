@@ -42,6 +42,7 @@ def open_pdf(path_pdf: str) -> str:
     """
     Permet d'extraire tout le texte d'un PDF enregistré au chemin path_pdf
     """
+
     with fitz.open(path_pdf) as document:
        return "".join(page.get_text("text") for page in document)
 
@@ -138,9 +139,9 @@ def open_doc_without_save(path_file: str) -> str:
     elif ".pdf" in path_file:
         content = open_pdf(path_file)
 
-    elif ".txt" in path_file:
+    elif ".txt" in path_file or ".md" in path_file:
         content = open_txt(path_file)
-
+        
     else:
         content = "\nExtension de fichier inconnu\n"
 

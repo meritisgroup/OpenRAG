@@ -29,8 +29,7 @@ def indexation(data_manager, doc_chunks, path_docs):
         """
 
         tokens = 0
-        taille_batch = 100
-        taille_batch = 100
+        taille_batch = 500
         range_chunks = range(0, len(doc_chunks), taille_batch)
         for i in range_chunks:
             tokens += np.sum(
@@ -66,7 +65,6 @@ def process_single_doc(data_manager,
                             chunk_overlap=chunk_overlap)
     
     LIST_CHUNKS.extend(doc_chunks)
-    #print("decoupage doc :", time.time() - a)
     path_docs = [str(Path(path_doc).parent)] * len(doc_chunks)
 
     doc_indexation_tokens = 0
@@ -81,7 +79,6 @@ def process_single_doc(data_manager,
         "embedding_tokens": int(doc_indexation_tokens),
         "parent_path": str(Path(path_doc).parent),
     }
-
 
 
 class NaiveRagIndexation:
@@ -109,10 +106,15 @@ class NaiveRagIndexation:
         self.agent = agent
         self.embedding_model = embedding_model
 
+        if type(self.embedding_model) == list:
+            embedding_model = self.embedding_model[0]
+        else:
+            embedding_model = self.embedding_model
+            
         self.splitter = get_splitter(type_text_splitter=type_text_splitter,
                                      data_preprocessing=data_preprocessing,
                                      agent=self.agent,
-                                     embedding_model=self.embedding_model)
+                                     embedding_model=embedding_model)
 
 
     def run_pipeline(self,
@@ -193,7 +195,6 @@ class NaiveRagIndexation:
         num_doc = 0
 
         os.makedirs(os.path.dirname(jsonl_path) or ".", exist_ok=True)
-
         with open(jsonl_path, "a", encoding="utf-8") as f:
             for c in tqdm(LIST_CHUNKS, desc="Écriture des chunks", unit="chunk"):
                 record = {col.name: getattr(c, col.name) for col in c.__table__.columns}

@@ -25,15 +25,16 @@ class Splitter(ABC):
                 final_chunks.append(text)
             else:
                 words = text.split()
-                current_chunk = words[0]
-                for w in words[1:]:
-                    if len(current_chunk) + 1 + len(w) <= max_size_chunk:
-                        current_chunk += " " + w
-                    else:
-                        final_chunks.append(current_chunk)
-                        current_chunk = w
+                if words:
+                    current_chunk = words[0]
+                    for w in words[1:]:
+                        if len(current_chunk) + 1 + len(w) <= max_size_chunk:
+                            current_chunk += " " + w
+                        else:
+                            final_chunks.append(current_chunk)
+                            current_chunk = w
 
-                final_chunks.append(current_chunk)
+                    final_chunks.append(current_chunk)
         return final_chunks
     
 

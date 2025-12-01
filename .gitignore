@@ -11,4 +11,6 @@
 /docker/*
 venv
 .env
-chunks_output.jsonl
+chunks*.jsonl
+*.pkl
+rerank_contexts.py

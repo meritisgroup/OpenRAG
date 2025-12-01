@@ -190,14 +190,6 @@ def update_num_from_slider():
     st.session_state["indexing"] = True
 
 
-st.number_input(
-    "Chunk length",
-    value=st.session_state["numeric"],
-    key="numeric",
-    on_change=update_slider_from_num,
-    step=10,
-)
-
 st.slider(
     label="**Choose length of chunks for indexing phases:**",
     min_value=0,
@@ -259,26 +251,6 @@ if st.button(
                 f"data/custom_rags/{config_new_rag['name']}.json", "w"
         ) as config:
             json.dump(config_new_rag, config, ensure_ascii=False, indent=4)
-
-
-
-        provider = st.session_state["config_server"]["default_mode_provider"]
-        with open("data/models_infos.json") as file:
-            models_infos = json.load(file)
-    
-        for key in ["model", "model_for_image", "embedding_model", "reranker_model"]:
-            model = st.session_state["config_server"][key]
-            if key not in models_infos.keys():
-                models_infos[model] = {}
-
-            models_infos[model]["url"] = st.session_state["providers_infos"][provider]["url"]
-            models_infos[model]["api_key"] = st.session_state["providers_infos"][provider]["api_key"]
-
-        with open("data/models_infos.json" , "w") as file:
-            json.dump(models_infos, file, indent=4)
-
-        
-        st.session_state["models_infos"] = models_infos
 
         st.session_state["all_rags"][config_new_rag["name"]] = (
                     config_new_rag["name"]
@@ -363,39 +335,45 @@ st.selectbox(
 
 
 rag_method = st.session_state["managed_rag"]
-
-if (
-    "custom_rags" in st.session_state.keys()
-    and rag_method in st.session_state["custom_rags"]
-):
-    with open(f"data/custom_rags/{rag_method}.json", "r") as file:
+file = f"data/custom_rags/{rag_method}.json"
+if os.path.exists(file):
+    with open(file, "r") as file:
         custom_config = json.load(file)
 
-    name = custom_config["name"]
+    names = get_name(rag_name=custom_config["base"],
+                     config_server=custom_config, additionnal_name="")
     base = custom_config["base"]
 else:
-    name = get_name(rag_method, st.session_state["config_server"])
-    pointer = name.find("_rag")
-    name = name[:pointer]
+    names = get_name(rag_method,
+                    st.session_state["config_server"])
+    cleaned_names = []
+    for n in names:
+        pointer = n.find("_rag")
+        cleaned_names.append(n[:pointer] if pointer != -1 else n)
+
+    names = cleaned_names
     base = rag_method
+
 list_indexation = []
-
-
 es = Elasticsearch(
     [st.session_state["config_server"]["params_vectorbase"]["url"]],
+    verify_certs=False,
+    ssl_show_warn=False,
     basic_auth=(
         st.session_state["config_server"]["params_vectorbase"]["auth"][0],
         st.session_state["config_server"]["params_vectorbase"]["auth"][1],
     ),
 )
+print("es", es.indices.get_alias(index="*"))
+print("\n\n\n\nnames", names)
 for index_name in es.indices.get_alias(index="*"):
-    if index_name.startswith(name):
+    if any(index_name.startswith(prefix) for prefix in names):
         list_indexation.append(index_name)
 
 left, right = st.columns([0.85, 0.15])
-st.session_state["indexation"] = left.selectbox(
-    label="indexations", label_visibility="collapsed", options=list_indexation
-)
+st.session_state["indexation"] = left.selectbox(label="indexations",
+                                                label_visibility="collapsed",
+                                                options=list_indexation)
 
 if right.button(label="Delete indexation", use_container_width=True, type="primary"):
     if base == "graph":

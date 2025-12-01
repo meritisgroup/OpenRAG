@@ -48,10 +48,9 @@ class NaiveRagAgent(RagAgent):
 
         self.llm_model = config_server["model"]
         self.embedding_model = config_server["embedding_model"]
-
+        print("self embedd", self.embedding_model)
         self.storage_path = config_server["storage_path"]
         self.nb_chunks = config_server["nb_chunks"]
-        self.embedding_model = config_server["embedding_model"]
         self.language = config_server["language"]
         self.type_text_splitter = config_server["TextSplitter"]
         self.type_retrieval = config_server["type_retrieval"]

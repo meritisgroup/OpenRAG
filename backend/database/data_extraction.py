@@ -126,8 +126,6 @@ class DocumentText:
                           id=make_chunk_id())
                 )
 
-        # save chunks
-        #save_chunks_to_jsonl(self.doc_index, results)
         return results
 
     def convert_in_base(self) -> Document:

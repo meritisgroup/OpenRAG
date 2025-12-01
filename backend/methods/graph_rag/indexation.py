@@ -18,7 +18,6 @@ import numpy as np
 from sqlalchemy.orm import Session
 import os
 
-from ...utils.factory_name_dataset_vectorbase import get_name
 from ...utils.progress import ProgressBar
 
 

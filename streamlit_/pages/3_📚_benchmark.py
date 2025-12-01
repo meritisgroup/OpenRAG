@@ -18,6 +18,8 @@ from streamlit_.utils.benchmark_funcs import (
     show_already_done_benchmark,
     get_report_path, generate_questions
 )
+
+from backend.evaluation import end_to_end_evaluators
 from streamlit_.utils.chat_funcs import get_chat_agent, change_default_prompt
 from backend.utils.progress import ProgressBar
 
@@ -148,13 +150,15 @@ st.session_state["benchmark"]["number_of_questions"] = left.number_input(
 if right.button(label="Generate queries", type="primary", use_container_width=True):
     file_path = "./data/queries/generated_queries.xlsx"
     config_server=st.session_state["config_server"]
+    model_infos = st.session_state["models_infos"]
 
 
     number = st.session_state["benchmark"]["number_of_questions"]
     list_queries, list_answers = generate_questions(
         n_questions=number,
         databases=st.session_state["benchmark_database"],
-        config_server=config_server
+        config_server=config_server,
+        model_infos=model_infos
     )
 
     df = pd.DataFrame({
@@ -315,8 +319,24 @@ if col2.button(
                       reset_preprocess=reset_preprocess,
                       background=False)
         
-
 if col3.button(
+    "Generate ground truth comparisons",
+    on_click=handle_click,
+    disabled=st.session_state["benchmark_clicked"],
+    use_container_width=True,
+    type="primary",
+):
+    if st.session_state["benchmark_database"] is None:
+        st.session_state["benchmark_clicked"] = False
+        st.error("Choose a database")
+    else:
+        run_benchmark(type_bench="ground_truth", 
+                      reset_index=reset_index,
+                      reset_preprocess=reset_preprocess,
+                      background=background_running)
+    put_default_local_parameters()
+
+if col4.button(
     "Generate Benchmark",
     on_click=handle_click,
     disabled=st.session_state["benchmark_clicked"],
@@ -345,6 +365,36 @@ if "report_path" in st.session_state["benchmark"]:
         "***Benchmark terminé !***",
     )
 
+    SCORES = end_to_end_evaluators.SCORES
+    report_path = st.session_state["benchmark"]["report_path"]
+    csv_path = os.path.join(report_path, "bench_df.csv")
+    print("scores", SCORES, report_path)
+    if os.path.exists(csv_path):
+        bench_df = pd.read_csv(csv_path)
+
+        def score_to_emoji(score):
+            if score == 5:
+                return "🟢"
+            elif score == 0:
+                return "🔴"
+            return "⚪"   
+
+        for rag_name, score_list in SCORES.items():
+            bench_df[rag_name + "_correct"] = [score_to_emoji(score) for score in score_list]
+
+        with st.expander("See the RAGs' answers", expanded=False):
+            st.write("### Answers with evaluation indicators")
+
+            st.dataframe(
+                bench_df,
+                use_container_width=True,
+                height=600
+            )
+
+    else:
+        st.info("Aucun fichier bench_df.csv trouvé dans le dossier du benchmark.")
+    #ajout jusqu'ici
+
     with open(
         st.session_state["benchmark"]["report_path"] + "/plot_report.pdf", "rb"
     ) as file:
@@ -372,9 +422,11 @@ if "report_path" in st.session_state["benchmark"]:
         st.session_state["benchmark"]["report_path"] + "/config_server.json", "w"
     ) as file:
         json.dump(st.session_state["config_server"], file, indent=4)
-    match = st.selectbox(
-        label="**Choose arena match to analyse**",
-        options=st.session_state["benchmark"]["matches"],
-        format_func=match_name_cleaner,
-    )
-    st.plotly_chart(st.session_state["benchmark"]["plots"]["arena_graphs"][match])
+    if "matches" in st.session_state["benchmark"]:
+        match = st.selectbox(
+            label="**Choose arena match to analyse**",
+            options=st.session_state["benchmark"]["matches"],
+            format_func=match_name_cleaner,
+        )
+    if "arena_graphs" in st.session_state["benchmark"]["plots"] and match in st.session_state["benchmark"]["plots"]["arena_graphs"]:
+        st.plotly_chart(st.session_state["benchmark"]["plots"]["arena_graphs"][match])

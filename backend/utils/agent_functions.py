@@ -43,7 +43,7 @@ list_entities = (
     "[rôle, humain, évènement, journal, entreprise, date, lieu, objet, chiffre]"
 )
 
-
+"""
 def predict_json(
     system_prompt: str,
     prompt: str,
@@ -53,12 +53,51 @@ def predict_json(
     temperature: float = None,
     options_generation=None,
 ) -> str:
-    
     if not getattr(EcoLogits, "_initialized", False):
         EcoLogits.init()
         EcoLogits._initialized = True
 
+    if (
+        options_generation is not None
+        and options_generation["type_generation"] == "no_generation"
+    ):
+        return ""
+    if True:
+        params = {
+            "model": model,
+            "input": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt},
+            ],
+            "text_format": json_format,
+        }
+        if temperature is not None:
+            params["temperature"] = temperature
 
+        if type(client) is OpenAI:
+            response = client.responses.parse(**params)
+        
+        if type(client) is Mistral:
+            response = client.chat.parse(**params)
+
+        json_response = response.output[0].content[0]
+        print("\n\njson_response:", json_response)
+        if json_response.parsed:
+
+            return json_response.parsed
+        else:
+            print("refusal ", json_response.refusal)
+"""
+
+def predict_json(
+    system_prompt: str,
+    prompt: str,
+    model: str,
+    client: OpenAI,
+    json_format: BaseModel,
+    temperature: float = None,
+    options_generation=None,
+) -> str:
     if (
         options_generation is not None
         and options_generation["type_generation"] == "no_generation"
@@ -73,14 +112,10 @@ def predict_json(
             ],
             "response_format": json_format,
         }
-        # Only add temperature if not None
         if temperature is not None:
             params["temperature"] = temperature
-        if type(client) is OpenAI:
-            response = client.beta.chat.completions.parse(**params)
 
-        if type(client) is Mistral:
-            response = client.chat.parse(**params)
+        response = client.beta.chat.completions.parse(**params)
 
         json_response = response.choices[0].message
         if json_response.parsed:
@@ -91,7 +126,6 @@ def predict_json(
 
     except Exception as e:
         print(f"Error: {e}")
-
 
 def predict_image(
     prompt: str,
@@ -199,20 +233,26 @@ def predict(
             "impacts": [0, 0, ""],
             "energy": [0, 0, ""],
         }
-    
-    response = client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": prompt},
-        ],
-        temperature=temperature,
-    )
     try:
-        answer = response.choices[0].message.content
+        params = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt},
+            ],
+        }
+        if temperature is not None:
+            params["temperature"] = temperature
 
-    except Exception:
-        print("Error in answer generation but still running")
+        params.pop("impacts", None)
+        if "gpt-oss" in model:
+            params["extra_body"] = {"reasoning_effort": "low"}
+
+        response = client.beta.chat.completions.parse(**params)
+        
+        answer = response.choices[0].message.content
+    except Exception as e:
+        print("Error in answer generation but still running: ", e)
         answer = ""
 
     try:

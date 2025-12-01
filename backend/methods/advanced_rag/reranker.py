@@ -33,7 +33,6 @@ class Reranker:
         scores = self.agent.reranking(
             query=query, chunk_list=chunk_list, model=self.reranking_model
         )
-
         nb_input_tokens = np.sum(scores["nb_input_tokens"])
         scores = scores["scores"]
         for i, chunk in enumerate(chunk_list):

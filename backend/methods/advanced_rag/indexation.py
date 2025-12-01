@@ -142,7 +142,7 @@ class AdvancedIndexation:
         self.data_manager.create_collection()
         progress_bar = ProgressBar(total=len(docs_to_process))
         index = 0
-        print("max workers", max_workers)
+
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {
                 executor.submit(process_single_doc,

@@ -9,10 +9,10 @@ from .vectorbase_elasticsearch import (
 
 def get_vectorbase(vb_name: str,
                    config_server: dict,
+                   embedding_model: str,
                    agent: Agent = None):
     
     params_vectorbase = config_server["params_vectorbase"]
-    embedding_model = config_server["embedding_model"]
     type_retrieval = config_server["type_retrieval"]
 
     if params_vectorbase["backend"] == "elasticsearch":

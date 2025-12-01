@@ -1,26 +1,26 @@
 {
     "gpt-4o-mini": {
         "url": null,
-        "api_key": ""
+        "api_key": "",
+        "type": "llm"
     },
     "gpt-4.1-nano-2025-04-14": {
-        "url": null,
-        "api_key": ""
+        "url": "http://localhost:30000",
+        "api_key": "vllm"
     },
     "text-embedding-3-large": {
         "url": null,
-        "api_key": "null",
+        "api_key": "",
         "type": "embedding"
     },
     "text-embedding-ada-002": {
         "url": null,
-        "api_key": "null",
+        "api_key": "",
         "type": "embedding"
     },
     "google/gemma-3-12b-it": {
-        "url": "http://localhost:30002",
-        "api_key": "vllm",
-        "type": "llm"
+        "url": "http://localhost:30000",
+        "api_key": "vllm"
     },
     "google/gemma-3-4b-it": {
         "url": "http://localhost:30002",
@@ -28,12 +28,12 @@
         "type": "llm"
     },
     "BAAI/bge-m3": {
-        "url": "http://localhost:30002",
+        "url": "http://localhost:30001",
         "api_key": "vllm",
         "type": "embedding"
     },
     "mixedbread-ai/mxbai-embed-large-v1": {
-        "url": "http://localhost:30000",
+        "url": "http://localhost:30004",
         "api_key": "vllm",
         "type": "embedding"
     },
@@ -43,12 +43,12 @@
         "type": "embedding"
     },
     "sentence-transformers/all-MiniLM-L6-v2": {
-        "url": "http://localhost:30000",
+        "url": "http://localhost:30003",
         "api_key": "vllm",
         "type": "embedding"
     },
     "BAAI/bge-reranker-v2-m3": {
-        "url": "http://localhost:30001",
+        "url": "http://localhost:30007",
         "api_key": "vllm",
         "type": "reranker"
     },
@@ -83,21 +83,40 @@
         "type": "llm"
     },
     "openai/gpt-oss-20b": {
-        "url": "http://localhost:30000",
+        "url": "http://localhost:30002",
         "api_key": "vllm",
         "type": "llm"
     },
     "gpt-4.1-mini": {
         "url": null,
-        "api_key": "null",
-        "type": "llm"
+        "api_key": ""
     },
     "text-embedding-3-small": {
         "url": null,
-        "api_key": ""
+        "api_key": "",
+        "type": "embedding"
     },
     "bge-m3-finetune": {
         "url": "http://localhost:30000",
+        "api_key": "vllm",
+        "type": "embedding"
+    },
+    "null": {
+        "url": "http://localhost:30000",
+        "api_key": "vllm"
+    },
+    "Qwen/Qwen3-30B-A3B-Instruct-2507": {
+        "url": "http://localhost:30002",
+        "api_key": "vllm",
+        "type": "llm"
+    },
+    "Qwen/Qwen3-Embedding-8B": {
+        "url": "http://localhost:30005",
+        "api_key": "vllm",
+        "type": "embedding"
+    },
+    "jinaai/jina-embeddings-v4-vllm-retrieval": {
+        "url": "http://localhost:30006",
         "api_key": "vllm",
         "type": "embedding"
     }

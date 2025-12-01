@@ -373,6 +373,7 @@ class VectorBase_BM25_elasticsearch(VectorBase):
             self.url_elasticsearch,
             basic_auth=self.auth,
             request_timeout=60,
+            connections_per_node=50,
             max_retries=3,
             retry_on_timeout=True,
             verify_certs=False,
@@ -593,7 +594,6 @@ class VectorBase_hybrid_elasticsearch(VectorBase_embeddings_elasticsearch):
         results = []
         for l in range(len(res)):
             result = []
-            # print("res", res[l]["hits"]["hits"], len(res[l]["hits"]["hits"]))
             for i in range(np.min([len(res[l]["hits"]["hits"]), k])):
                 source = res[l]["hits"]["hits"][i]["_source"]
                 result.append(reconstruct_chunk_after_k_search(source, type_output))

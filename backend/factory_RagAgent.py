@@ -10,6 +10,7 @@ from backend.methods.reranker_rag.agent import RerankerRag
 from .methods.semantic_chunking_rag.agent import SemanticChunkingRagAgent
 from .methods.contextual_retrieval_rag.agent import ContextualRetrievalRagAgent
 from .methods.advanced_rag.agent import AdvancedRag
+from .methods.agentic_rag_router.agent import AgenticRouterRAG
 from .methods.naive_chatbot.agent import NaiveChatbot
 
 from .utils.factory_name_dataset_vectorbase import get_name
@@ -75,14 +76,33 @@ def put_default_local_parameters():
 
 
 def get_rag_agent(rag_name, config_server, models_infos, databases_name=[""]):
-    names = [get_name(rag_name=rag_name,
-                      config_server=config_server,
-                      additionnal_name=databases_name[i]) for i in range(len(databases_name))]
+    names = []    
+    extended_databases = []
+    for i in range(len(databases_name)):
+        name = get_name(rag_name=rag_name,
+                        config_server=config_server,
+                        additionnal_name=databases_name[i])
+        extended_databases.extend([databases_name[i]] * len(name))
+        names+=name
+    if type(config_server["embedding_model"])==list:
+        config_server["embedding_model"] = [config_server["embedding_model"].copy()] * (len(databases_name))
+        config_server["embedding_model"] = [item for sublist in config_server["embedding_model"] for item in sublist]
+    
+    databases_name = extended_databases
+    
+    print("tt", config_server["embedding_model"])
+
+    print(names)
     if rag_name == "naive":
         agent = NaiveRagAgent(config_server=config_server,
                               models_infos=models_infos,
-                             dbs_name=names,
-                             data_folders_name=databases_name)
+                              dbs_name=names,
+                              data_folders_name=databases_name)
+    elif rag_name == "agentic_router":
+        agent = AgenticRouterRAG(config_server=config_server,
+                                 models_infos=models_infos,
+                                 dbs_name=names,
+                                 data_folders_name=databases_name)
         
     elif rag_name == "agentic":
         agent = AgenticRagAgent(config_server=config_server,

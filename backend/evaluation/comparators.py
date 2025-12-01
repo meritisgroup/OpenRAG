@@ -1,3 +1,4 @@
+from polars import len
 from ..utils.agent import Agent
 from .end_to_end_evaluators import MetricComparaison, GroundTruthComparison
 from .context_evaluators import ContextFaithfulnessEvaluator, ContextRelevanceEvaluator, nDCGEvaluator
@@ -159,25 +160,27 @@ class GroundTruthComparator:
         ]
         self.eval_number = eval_number
 
-    def process_evaluation(self, rag_answers: list[str]):
+
+    def process_evaluation(self, rag_answers: list[str], rag_name:str):
 
         final_scores = {metric: 0.0 for metric in self.metrics.keys()}
+        final_evaluation = {metric: [0] * len(self.queries) for metric in self.metrics.keys()}
 
         for eval_idx in range(self.eval_number):
-
-            dict_scores = self.comparator.run_evaluation_pipeline(
-                self.queries, self.ground_truth, rag_answers
-            )
+            dict_scores = self.comparator.run_evaluation_pipeline(self.queries,
+                                                                  self.ground_truth,
+                                                                  rag_answers,
+                                                                  rag_name=rag_name)
             for metric in self.metrics.keys():
-                mean = final_scores[metric]
-                result = dict_scores[metric]
-
                 try:
-                    final_scores[metric] = (result + mean * eval_idx) / (eval_idx + 1)
+                    final_scores[metric] = (dict_scores[metric]["mean"] + final_scores[metric] * eval_idx) / (eval_idx + 1)
+                    for i in range(len(dict_scores[metric]["total_evaluations"])):
+                        final_evaluation[metric][i] = (dict_scores[metric]["total_evaluations"][i] * eval_idx) / (eval_idx + 1)
                 except Exception as e:
                     final_scores[metric] = None
 
-        return final_scores
+        return final_scores, final_evaluation
+    
 
     def run_evaluations(self, log_file):
 
@@ -189,7 +192,7 @@ class GroundTruthComparator:
         all_scores_dict = {
             rag: {metric: 0 for metric in self.metrics} for rag in self.rag_list
         }
-
+        all_evaluations = {rag: {metric: [0] * len(self.queries) for metric in self.metrics} for rag in self.rag_list}
         progress_bar = ProgressBar(total=num_rags, desc="Ground Truth Comparison")
         n = len(self.rag_list)
         for i, rag in enumerate(self.rag_list):
@@ -198,11 +201,11 @@ class GroundTruthComparator:
                 text=f"Processing ground truth comparisons for {rag} rag ({i+1} / {n})",
             )
             rag_answers = [row["ANSWER"] for row in self.dataframe[rag]]
-            scores = self.process_evaluation(rag_answers)
-
+            scores, evaluations = self.process_evaluation(rag_answers, rag_name=rag)
             for metric in self.metrics:
                 all_scores[metric][i] = scores[metric]
                 all_scores_dict[rag][metric] = scores[metric]
+                all_evaluations[rag][metric] = evaluations[metric]
 
             data_logs["Ground Truth comparison"] = int(((i + 1) / n) * 100)
             with open(log_file, "w") as f:
@@ -212,7 +215,7 @@ class GroundTruthComparator:
 
         self.all_scores_dict = all_scores_dict
 
-        return all_scores
+        return all_scores, all_evaluations
 
 
 class ContextRelevanceComparator:
@@ -322,10 +325,6 @@ class ContextFaithfulnessComparator:
     def process_evaluation(self, answers: list[str], contexts: list[list[Chunk]]):
         final_scores = 0
         mean = 0
-
-        model_contexts = [concat_chunks(context) for context in contexts]
-
-        model_contexts = [concat_chunks(context) for context in contexts]
 
         model_contexts = [concat_chunks(context) for context in contexts]
         for eval_idx in range(self.eval_number):

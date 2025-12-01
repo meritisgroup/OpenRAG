@@ -3,6 +3,7 @@ from streamlit_.utils.benchmark_funcs import (
     get_report_path,
     run_indexation_benchmark,
     generate_benchmark,
+    generate_benchmark_ground_truth_only,
     generate_only_answers,
     generate_only_contexts,
 )
@@ -27,7 +28,6 @@ def task(
     session_state=None,
     background=False,
 ):
-
     rag_agents, rag_names = run_indexation_benchmark(
         reset_index=reset_index,
         reset_preprocess=reset_preprocess,
@@ -50,6 +50,23 @@ def task(
                     rag_agents=rag_agents,
                     report_dir=report_dir
                 )
+            elif type_bench == "ground_truth":
+                generate_benchmark_ground_truth_only(
+                    rag_names,
+                    rag_agents,
+                    databases=databases,
+                    config_server=config_server,
+                    models_infos=models_infos,
+                    report_dir=report_dir,
+                    queries_doc_mane=queries_doc_name,
+                    session_state=session_state,
+                )
+                if not background:
+                    databases = st.session_state["benchmark_database"]
+                    markdown_text = "Benchmark runned on the following database:\n"
+                    for db in databases:
+                        markdown_text += f"- {db}\n"
+                    st.markdown(markdown_text)
             elif type_bench == "full_bench":
                 generate_benchmark(
                     rag_names,
@@ -75,7 +92,8 @@ def task(
 
 
 def run_benchmark(
-    type_bench, reset_index=False, reset_preprocess=False, background=False
+    type_bench, reset_index=False,
+    reset_preprocess=False, background=False
 ):
     rag_to_run = [
         rag
@@ -115,7 +133,6 @@ def run_benchmark(
             env = os.environ.copy()
             env["PYTHONUTF8"] = "1"
             env["PYTHONPATH"] = project_root + os.pathsep + env.get("PYTHONPATH", "")
-
             args = [
                 python_exe,
                 script_path,
@@ -142,8 +159,8 @@ def run_benchmark(
                 process = subprocess.Popen(
                     args,
                     env=env,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
+                    stdout=log_f,
+                    stderr=log_f,
                     stdin=subprocess.DEVNULL,
                     preexec_fn=os.setpgrp,
                     close_fds=True,
@@ -200,8 +217,8 @@ if __name__ == "__main__":
     config_server = json.loads(args.config_server)
     models_infos = json.loads(args.models_infos)
     databases = json.loads(args.databases)
-    reset_index = args.reset_index
-    reset_preprocess = args.reset_preprocess
+    reset_index = args.reset_index.lower() == "true"
+    reset_preprocess = args.reset_preprocess.lower() == "true"
     report_dir = args.report_dir
     type_bench = args.type_bench
 

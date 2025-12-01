@@ -2,7 +2,6 @@ import streamlit as st
 import os
 from backend.factory_RagAgent import get_rag_agent, change_config_server
 from streamlit_.utils.chat_funcs import get_chat_agent
-from backend.utils.utils_vlm import set_vllm_HF_key
 from streamlit_.utils.params_func import get_custom_rags_name
 import json
 from urllib.parse import urlparse
@@ -11,7 +10,7 @@ from streamlit_.utils.params_func import modify_env
 
 st.markdown("# Set Configuration")
 
-host_llm = {"vllm" : "vLLM", "ollama" : "Ollama",
+host_llm = {"ollama" : "Ollama",
             "openai" : "OpenAI", "mistral": "Mistral"}
 def set_false():
     "When changin LLM host resests rags to perform benchmark on so that no unavailable Rags are called"
@@ -24,9 +23,6 @@ with open("data/providers_infos.json") as file:
         "ollama": {"url": providers["ollama"]['url'], 
                 "type": "ollama",
                 "api_key": providers["ollama"]['api_key']},
-        "vllm": {"url": providers["vllm"]['url'], 
-                "type": "vllm",
-                "api_key": providers["vllm"]['api_key']},
         "openai" : {"url" : providers["openai"]['url'], 
                     "type" : "openai", 
                     "api_key" : providers["openai"]['api_key']}
@@ -43,10 +39,10 @@ if st.session_state["mode_interface"]=="Simple":
         key="llm_host"
     )
 
-    if llm_provider in ["ollama", "vllm"]:
+    if llm_provider == "ollama":
         new_url = st.text_input(label=f"**{llm_provider} endpoint:**",
                                 placeholder=host_dict[llm_provider]["url"],
-                                disabled=False if llm_provider in ["ollama", "vllm"] else True,
+                                disabled=False if llm_provider in ["ollama"] else True,
                                 key  = "endpoint")
 
     if llm_provider in ["openai"]:
@@ -56,12 +52,6 @@ if st.session_state["mode_interface"]=="Simple":
                       disabled=False if llm_provider in ["openai"] else True,
                       key  = "api_key",
                       type="password")
-
-    st.text_input(label="**HuggingFace Token:**",
-                  value=st.session_state["config_server"]["hf_token"],
-                  placeholder="Mandatory for VLLM backend",
-                  type="password",
-                  key="hf_token")
     
 else:
     st.subheader("📌 Configuration des API/modèles")
@@ -342,10 +332,6 @@ if st.button("Save Configuration", type="primary", use_container_width=True):
         st.session_state["config_server"] = change_config_server(rag_name=None,
                                                                 config_server=st.session_state["config_server"],
                                                                 mode=st.session_state["mode_interface"])
-        if type(st.session_state["config_server"]["hf_token"]) is str and len(st.session_state["config_server"]["hf_token"])>0:
-            if st.session_state["config_server"]["default_mode_provider"]=="vllm":
-                set_vllm_HF_key(url=host_dict[llm_provider]["url"],
-                                key=st.session_state["config_server"]["hf_token"])
 
         if 'new_url' in globals() and new_url!="":
             host_dict[llm_provider]["url"] = new_url
@@ -360,12 +346,7 @@ if st.button("Save Configuration", type="primary", use_container_width=True):
                 modify_env(key="ollama_LOCAL_PORT",
                         value=port)
                 host_dict[llm_provider]["url"] = os.getenv("ollama_LOCAL_URL")+":"+os.getenv("ollama_LOCAL_PORT")+"/v1"
-            elif llm_provider=="vllm":
-                modify_env(key="vllm_LOCAL_URL",
-                        value=base_url)
-                modify_env(key="vllm_LOCAL_PORT",
-                        value=port)
-                host_dict[llm_provider]["url"] = os.getenv("VLLM_LOCAL_URL")+":"+os.getenv("VLLM_LOCAL_PORT")
+
         st.session_state["config_server"]["default_mode_provider"] = llm_provider
 
         with open("data/providers_infos.json") as file:

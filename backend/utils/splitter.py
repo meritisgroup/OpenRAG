@@ -50,7 +50,8 @@ def extract_images_and_tables_blocks(section: str) -> list[str]:
     if last_idx < len(section):
         image_blocks.append(("text", section[last_idx:]))
 
-    table_pattern = re.compile(r"((?:^\|[^\n]*\|\s*\n?){2,})", re.MULTILINE)
+    table_pattern = re.compile(r"(<table[\s\S]*?</table>)", re.IGNORECASE)
+
 
     for block_type, content in image_blocks:
         if block_type == "image":
@@ -89,7 +90,7 @@ def get_splitter(type_text_splitter, data_preprocessing,
                                          embedding_model=embedding_model)
     if (data_preprocessing == "md_with_images" 
             or data_preprocessing == "md_without_images"):
-        splitter = MarkdownHeaderTextSplitter(strip_headers=True,
+        splitter = MarkdownHeaderTextSplitter(strip_headers=False,
                                               splitter=splitter)
 
     return splitter
@@ -107,7 +108,7 @@ class MarkdownHeaderTextSplitter(Splitter):
     ("###", "Header 3"),
 ],
         return_each_line: bool = False, 
-        strip_headers: bool = True
+        strip_headers: bool = False
     ):
         """Create a new MarkdownHeaderTextSplitter.
 

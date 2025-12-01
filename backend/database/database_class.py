@@ -34,15 +34,22 @@ from typing import Union
 def get_management_data(
     dbs_name, storage_path, data_folders_name, config_server: dict, agent: Agent = None
 ):
-    db = Merger_Database_Vectorbase(
-        dbs_name=dbs_name,
-        storages_path=storage_path,
-        agent=agent,
-        config_server=config_server,
-        storage_path=storage_path,
-    )
+    db = Merger_Database_Vectorbase(dbs_name=dbs_name,
+                                    storages_path=storage_path,
+                                    agent=agent,
+                                    config_server=config_server,
+                                    storage_path=storage_path)
+    print("dbs_name", dbs_name)
+    print(config_server["embedding_model"])
     for i in range(len(dbs_name)):
-        db.add_database(db_name=dbs_name[i], data_folder_name=data_folders_name[i])
+        if type(config_server["embedding_model"])==list:
+            db.add_database(db_name=dbs_name[i],
+                            data_folder_name=data_folders_name[i],
+                            embedding_model=config_server["embedding_model"][i])
+        else:
+            db.add_database(db_name=dbs_name[i],
+                            data_folder_name=data_folders_name[i],
+                            embedding_model=config_server["embedding_model"])
 
     return db
 
@@ -78,22 +85,21 @@ class Merger_Database_Vectorbase:
         for db_name in self.databases.keys():
             self.databases[db_name]["database"].remove_engine_connection()
 
-
-    def add_database(self, db_name, data_folder_name) -> None:
+    def add_database(self, db_name, data_folder_name, embedding_model) -> None:
         save_path = os.path.join(self.storage_path, db_name)
-        data_path = os.path.join(
-            self.config_server["storage_data_path"], data_folder_name
-        )
+        data_path = os.path.join(self.config_server["storage_data_path"],
+                                 data_folder_name)
 
         self.databases[db_name] = {}
         self.databases[db_name]["path"] = data_path
-        self.databases[db_name]["database"] = DataBase(
-            db_name=db_name, path=self.storage_path, path_data=data_path
-        )
+        self.databases[db_name]["database"] = DataBase(db_name=db_name,
+                                                       path=self.storage_path,
+                                                       path_data=data_path)
         self.databases[db_name]["database"].add_table(Document)
 
         if not self.auto_sharding:
-            self.add_vectorbase(vb_name=db_name)
+            self.add_vectorbase(vb_name=db_name,
+                                embedding_model=embedding_model)
 
     def set_database(self, db, db_name: str):
         self.databases[db_name]["database"] = db
@@ -190,11 +196,12 @@ class Merger_Database_Vectorbase:
                 results += self.databases[db_name]["database"].get_list_path_documents()
             return results
 
-    def add_vectorbase(self, vb_name) -> None:
+    def add_vectorbase(self, vb_name, embedding_model) -> None:
         self.vectorbases[vb_name] = {}
-        self.vectorbases[vb_name]["vectorbase"] = get_vectorbase(
-            vb_name=vb_name, config_server=self.config_server, agent=self.agent
-        )
+        self.vectorbases[vb_name]["vectorbase"] = get_vectorbase(vb_name=vb_name,
+                                                                 config_server=self.config_server,
+                                                                 agent=self.agent,
+                                                                 embedding_model=embedding_model)
 
     def set_vectorbase(self, vb_name, vb):
         self.vectorbases[vb_name]["vectorbase"] = vb

@@ -14,7 +14,6 @@ def get_chat_agent(rag_method,
                    session_state=None):
     if session_state is None:
         session_state = st.session_state
-
     if (
         "custom_rags" in session_state.keys()
         and rag_method in session_state["custom_rags"]

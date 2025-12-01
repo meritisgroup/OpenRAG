@@ -1,30 +1,30 @@
 {
     "storage_path": "./storage",
     "storage_data_path": "./data/databases",
-    "default_mode_provider": "openai",
+    "default_mode_provider": "ollama",
     "mode": "default",
     "params_vectorbase": {
         "backend": "elasticsearch",
         "batch": true,
-        "url": "http://localhost:9200",
+        "url": "https://localhost:9200",
         "auth": [
             "elastic",
-            "UDY9ydMS"
+            "f+zLbNRrzFKZx2yGjGG3"
         ]
     },
     "max_workers": 45,
     "device": "cpu",
     "model": "openai/gpt-oss-20b",
-    "model_for_image": "gpt-4.1-mini",
+    "model_for_image": "openai/gpt-oss-20b",
     "embedding_model": "BAAI/bge-m3",
     "language": "FR",
     "type_retrieval": "embeddings",
     "TextSplitter": "TextSplitter",
     "reformulate_query": false,
-    "reranker_model": "openai/gpt-oss-20b",
+    "reranker_model": "BAAI/bge-reranker-v2-m3",
     "max_attempts": 5,
-    "nb_chunks": 10,
-    "nb_chunks_reranker": 20,
+    "nb_chunks": 200,
+    "nb_chunks_reranker": 200,
     "ProcessorChunks": [],
     "hf_token": null,
     "params_llm_dockling": {
@@ -32,12 +32,12 @@
         "type": "ollama",
         "api_key": null
     },
-    "data_preprocessing": "pdf_text_extraction",
+    "data_preprocessing": "md_without_images",
     "local_params": {
         "forced_system_prompt": false,
         "generation_system_prompt_name": "default"
     },
-    "chunk_length": 1024,
+    "chunk_length": 500,
     "all_system_prompt": {
         "default": "You are an AI assistant, answer honestly to the user using your knowledge and the provided context. You must be exhaustive and concise. You must answer in English"
     },
