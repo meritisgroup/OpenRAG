@@ -307,6 +307,9 @@ class DataFramePreparator:
             answer_time = end_time - start_time
             answers = [rag_result["answer"] for rag_result in rag_results]
             contexts = [rag_result["context"] for rag_result in rag_results]
+
+            
+
             nb_input_tokens = [
                 rag_result["nb_input_tokens"] for rag_result in rag_results
             ]

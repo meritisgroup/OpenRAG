@@ -322,7 +322,9 @@ class VectorBase_embeddings_elasticsearch(VectorBase):
         data = self.agent.embeddings(texts=queries, model=self.embedding_model)
 
         res = []
-        num_candidates = max(500, k*5)
+
+        num_candidates = max(500, min(10000, k*5))
+
         for i in range(len(data["embeddings"])):
             body = {
                 "size": k,
@@ -334,8 +336,17 @@ class VectorBase_embeddings_elasticsearch(VectorBase):
                 },
             }
 
-            response = self.client.search(index=collection_name, body=body)
-            res.append(response)
+            try:
+                response = self.client.search(index=collection_name, body=body)
+                res.append(response)
+            except Exception as e:
+                print("ELASTICSEARCH ERROR")
+                print("Error type:", type(e))
+                print("Error message:", str(e))
+                raise  
+
+        
+
         results = []
         for l in range(len(res)):
             result = []

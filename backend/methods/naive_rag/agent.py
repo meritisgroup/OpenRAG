@@ -148,10 +148,11 @@ class NaiveRagAgent(RagAgent):
         Output:
             context (list[str]) : All retrieved chunks
         """
+
         ns = NaiveSearch(data_manager=self.data_manager,
                          nb_chunks=nb_chunks)
         chunk_lists = ns.get_context(query=query)
-
+        
         return chunk_lists
 
     def build_final_prompt(self, chunk_list: list[Chunk], query: str):

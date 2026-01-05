@@ -309,9 +309,13 @@ class Merger_Database_Vectorbase:
         vb_name: str = None,
         type_output = Chunk
     ):
+        
         if vb_name is not None:
             if collection_name is not None:
                 collection_name = vb_name + "_" + collection_name
+
+
+
             return self.vectorbases[vb_name]["vectorbase"].k_search(
                 queries=queries,
                 k=k,
@@ -320,6 +324,10 @@ class Merger_Database_Vectorbase:
                 collection_name=collection_name,
                 type_output=type_output
             )
+        
+
+
+
         else:
             n = len(self.vectorbases)
             k_per_vectorbase = k // n
@@ -337,6 +345,8 @@ class Merger_Database_Vectorbase:
                 else:
                     collection_name_search = collection_name
 
+
+               
                 result = self.vectorbases[vb_name]["vectorbase"].k_search(
                     queries=queries,
                     k=k_per_db_list[i],
@@ -344,6 +354,8 @@ class Merger_Database_Vectorbase:
                     collection_name=collection_name_search,
                     type_output=type_output
                 )
+                
+
                 if len(chunks) == 0:
                     chunks = result
                 else:

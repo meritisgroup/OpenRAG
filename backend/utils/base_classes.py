@@ -35,6 +35,8 @@ class Splitter(ABC):
                             current_chunk = w
 
                     final_chunks.append(current_chunk)
+                else:
+                    print(f"CE TEXTE N'EST PAS PASSE {text}")
         return final_chunks
     
 

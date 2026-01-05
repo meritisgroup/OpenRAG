@@ -29,6 +29,8 @@ class NaiveSearch(Search):
         if type(query) is str:
             query = [query]
 
+
+
         search_res = self.data_manager.k_search(queries=query, 
                                                 k=self.nb_chunks,
                                                 output_fields=["text", "doc_name"])
