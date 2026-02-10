@@ -1,4 +1,3 @@
-from polars import len
 from ..utils.agent import Agent
 from .end_to_end_evaluators import MetricComparaison, GroundTruthComparison
 from .context_evaluators import ContextFaithfulnessEvaluator, ContextRelevanceEvaluator, nDCGEvaluator
@@ -153,6 +152,7 @@ class GroundTruthComparator:
         self.dataframe = dataframe
         self.queries = dataframe["QUERIES"]
         self.ground_truth = dataframe["GROUND_TRUTH"]
+
         self.rag_list = [
             col
             for col in dataframe.columns

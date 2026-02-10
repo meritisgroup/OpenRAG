@@ -32,6 +32,16 @@ vectorbase_dict = {
         "batch": True,
     },
 }
+vectorbase_dict = {
+    "elasticsearch": {
+        "url": st.session_state["config_server"]["params_vectorbase"]["url"],
+        "backend": "elasticsearch",
+        "auth": [st.session_state["config_server"]["params_vectorbase"]["auth"][0],
+                st.session_state["config_server"]["params_vectorbase"]["auth"][1]],
+        "batch": True,
+    },
+}
+
 
 backend_vectorbase = {"elasticsearch": "Elastic Search"}
 

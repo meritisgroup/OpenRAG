@@ -382,7 +382,6 @@ def show_already_done_benchmark():
     file_eval_save = os.path.join(report_dir, "results_bench.pkl")
     with open(file_eval_save, "rb") as f:
         results = pickle.load(f)
-    print(results)
     plots, impact, energy = show_benchmark(results=results,
                                            type=results["type_bench"])
     st.session_state["benchmark"]["plots"] = plots

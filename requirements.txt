@@ -28,3 +28,4 @@ ecologits
 rapidfuzz
 docling
 ddgs
+polars

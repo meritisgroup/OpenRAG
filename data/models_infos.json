@@ -33,7 +33,7 @@
         "type": "embedding"
     },
     "mixedbread-ai/mxbai-embed-large-v1": {
-        "url": "http://localhost:30004",
+        "url": "http://localhost:30001",
         "api_key": "vllm",
         "type": "embedding"
     },
@@ -119,5 +119,10 @@
         "url": "http://localhost:30006",
         "api_key": "vllm",
         "type": "embedding"
+    },
+    "openai/gpt-oss-safeguard-20b": {
+        "url": "http://localhost:30008",
+        "api_key": "",
+        "type": "llm"
     }
 }

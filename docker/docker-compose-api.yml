@@ -10,3 +10,4 @@ services:
       - ../data:/app/data
       - ../storage:/app/storage
       - ../streamlit_:/app/streamlit_
+      - ../backend:/app/backend
