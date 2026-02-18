@@ -1,0 +1,25 @@
+[theme]
+primaryColor="#E0B55F"
+backgroundColor="#F3F3F3"
+secondaryBackgroundColor="#D9D9D9"
+textColor="#005B6A"
+
+[theme.sidebar]
+primaryColor="#E0B55F"
+backgroundColor="#005B6A"
+secondaryBackgroundColor="#0B3941"
+textColor="#ffffff"
+
+[global]
+disableWidgetStateDuplicationWarning = true
+
+[server]
+port = 8502
+enableCORS = false
+enableXsrfProtection = true
+maxUploadSize = 200
+headless = true
+
+[client]
+showErrorDetails = true
+toolbarMode = "minimal"
