@@ -1,0 +1,56 @@
+from methods.advanced_rag.agent import AdvancedRag
+from .indexation import QbRagIndexation
+from .query import QbSearch
+from database.rag_classes import Question, Document, Chunk
+from .prompts import prompts
+import numpy as np
+
+class QueryBasedRagAgent(AdvancedRag):
+
+    def __init__(self, config_server: dict, models_infos: dict, dbs_name: list[str], data_folders_name: list[str]) -> None:
+        super().__init__(config_server=config_server, models_infos=models_infos, dbs_name=dbs_name, data_folders_name=data_folders_name)
+        self.data_manager.add_table(Question)
+        self.data_manager.add_table(Chunk)
+        self.prompts = prompts[self.language]
+
+    def indexation_phase(self, reset_index: bool=False, reset_preprocess: bool=False, overlap: bool=True) -> None:
+        if reset_preprocess:
+            reset_index = True
+        if reset_index:
+            self.data_manager.delete_collection()
+            self.data_manager.clean_database()
+        qb_index = QbRagIndexation(language=self.language, agent=self.agent, data_manager=self.data_manager, type_text_splitter=self.type_text_splitter, data_preprocessing=self.config_server['data_preprocessing'], embedding_model=self.embedding_model, llm_model=self.llm_model)
+        qb_index.run_pipeline(chunk_size=self.chunk_size, config_server=self.config_server, chunk_overlap=overlap, reset_preprocess=reset_preprocess, max_workers=self.config_server['max_workers'])
+
+    def remove_duplicate_chunks(self, chunks):
+        seen_texts = set()
+        unique_chunks = []
+        for chunk in chunks:
+            if chunk.text not in seen_texts:
+                seen_texts.add(chunk.text)
+                unique_chunks.append(chunk)
+        return chunks
+
+    def get_rag_context(self, query: str, nb_chunks: int=5, model: str=None, to_prompt=False, nb_try=1) -> str:
+        agent = self.agent
+        qs = QbSearch(agent=agent, data_manager=self.data_manager, nb_questions=nb_chunks, language=self.language)
+        chunk_lists = qs.get_context(query=query)[0]
+        for i in range(len(chunk_lists)):
+            chunk_lists[i].text = chunk_lists[i].text_doc
+        chunk_lists = self.remove_duplicate_chunks(chunks=chunk_lists)
+        if len(chunk_lists) < nb_chunks and nb_try < 3:
+            return self.get_rag_context(nb_chunks=nb_chunks * 5, query=query, nb_try=nb_try + 1)
+        else:
+            return [chunk_lists[:nb_chunks]]
+
+    def release_gpu_memory(self):
+        self.agent.release_memory()
+
+    def get_rag_contexts(self, queries: list[str], nb_chunks: int=5):
+        contexts = []
+        names_docs = []
+        for query in queries:
+            (context, name_docs) = self.get_rag_context(query=query, nb_chunks=nb_chunks)
+            contexts.append(context)
+            names_docs.append(name_docs)
+        return (contexts, names_docs)
