@@ -15,16 +15,22 @@ from ...utils.chunk_lists_merger import merge_chunk_lists
 from .prompts import prompts
 import numpy as np
 from sqlalchemy import func
+import concurrent.futures
 from backend.database.rag_classes import Document, Tokens, Chunk
 from ..query_reformulation.query_reformulation import query_reformulation
 from .indexation import concat_chunks
+from ...utils.threading_utils import get_executor_threads
+
+
+import time
 
 
 class NaiveRagAgent(RagAgent):
     "Original RAG with no modification"
 
     def __init__(
-        self, config_server: dict, dbs_name: list[str], data_folders_name: list[str]
+        self, config_server: dict, models_infos: dict,
+          dbs_name: list[str], data_folders_name: list[str]
     ) -> None:
         """
         Args:
@@ -40,40 +46,47 @@ class NaiveRagAgent(RagAgent):
             type_retrieval (str) : How documents will be retrieved (embeddings, BM25, vlm_embeddings are available plus hybrid if using elasticsearch)
         """
 
+        self.llm_model = config_server["model"]
+        self.embedding_model = config_server["embedding_model"]
+        print("self embedd", self.embedding_model)
         self.storage_path = config_server["storage_path"]
         self.nb_chunks = config_server["nb_chunks"]
-        self.embedding_model = config_server["embedding_model"]
         self.language = config_server["language"]
         self.type_text_splitter = config_server["TextSplitter"]
         self.type_retrieval = config_server["type_retrieval"]
-
+        self.nb_input_tokens = 0
+        self.nb_output_tokens = 0
+        
         self.dbs_name = dbs_name
         self.data_folders_name = data_folders_name
 
         self.params_vectorbase = config_server["params_vectorbase"]
 
-        self.agent = get_Agent(config_server)
-        self.data_manager = get_management_data(
-            dbs_name=self.dbs_name,
-            data_folders_name=self.data_folders_name,
-            storage_path=self.storage_path,
-            config_server=config_server,
-            agent=self.agent,
-        )
+        self.agent = get_Agent(config_server,
+                               models_infos=models_infos)
 
+        self.data_manager = get_management_data(dbs_name=self.dbs_name,
+                                                data_folders_name=self.data_folders_name,
+                                                storage_path=self.storage_path,
+                                                config_server=config_server,
+                                                agent=self.agent)
+        
         self.config_server = config_server
 
         self.prompts = prompts[self.language]
-        self.system_prompt = get_system_prompt(self.config_server, self.prompts)
+        self.system_prompt = get_system_prompt(self.config_server,
+                                               self.prompts)
         self.chunk_size = config_server["chunk_length"]
         self.reformulate_query = config_server["reformulate_query"]
 
         if self.reformulate_query:
             self.reformulater = query_reformulation(
-                agent=self.agent, language=self.language
+                agent=self.agent, language=self.language,
+                model=self.llm_model
             )
 
         self.chunk_lists_merger = merge_chunk_lists
+
 
     def get_nb_token_embeddings(self):
         return self.data_manager.get_nb_token_embeddings()
@@ -111,20 +124,17 @@ class NaiveRagAgent(RagAgent):
             self.data_manager.delete_collection()
             self.data_manager.clean_database()
 
-        index = NaiveRagIndexation(
-            data_manager=self.data_manager,
-            type_text_splitter=self.type_text_splitter,
-            agent=self.agent,
-            embedding_model=self.embedding_model,
-        )
+        index = NaiveRagIndexation(data_manager=self.data_manager,
+                                  type_text_splitter=self.type_text_splitter,
+                                  data_preprocessing=self.config_server["data_preprocessing"],
+                                  agent=self.agent,
+                                  embedding_model=self.embedding_model)
 
-        index.run_pipeline(
-            chunk_size=self.chunk_size,
-            chunk_overlap=overlap,
-            batch=self.params_vectorbase["batch"],
-            config_server=self.config_server,
-            reset_preprocess=reset_preprocess
-        )
+        index.run_pipeline(chunk_size=self.chunk_size,
+                           chunk_overlap=overlap,
+                           config_server=self.config_server,
+                           reset_preprocess=reset_preprocess,
+                           max_workers=self.config_server["max_workers"])
 
         return None
 
@@ -138,9 +148,11 @@ class NaiveRagAgent(RagAgent):
         Output:
             context (list[str]) : All retrieved chunks
         """
-        ns = NaiveSearch(data_manager=self.data_manager, nb_chunks=nb_chunks)
-        chunk_lists = ns.get_context(query=query)
 
+        ns = NaiveSearch(data_manager=self.data_manager,
+                         nb_chunks=nb_chunks)
+        chunk_lists = ns.get_context(query=query)
+        
         return chunk_lists
 
     def build_final_prompt(self, chunk_list: list[Chunk], query: str):
@@ -191,6 +203,7 @@ class NaiveRagAgent(RagAgent):
             prompt=prompt,
             system_prompt=self.system_prompt,
             options_generation=options_generation,
+            model=self.llm_model
         )
 
         nb_input_tokens += np.sum(answer["nb_input_tokens"])
@@ -209,27 +222,9 @@ class NaiveRagAgent(RagAgent):
             "context": chunks,
             "impacts": impacts,
             "energy": energies,
+            "original_query": query
         }
 
     def release_gpu_memory(self):
         self.agent.release_memory()
 
-    # def get_rag_contexts(self, queries: list[str], nb_chunks: int = 5):
-    #     contexts = []
-    #     names_docs = []
-    #     for query in queries:
-    #         context, name_docs = self.get_rag_context(query=query, nb_chunks=nb_chunks)
-    #         contexts.append(context)
-    #         names_docs.append(name_docs)
-    #     return contexts, names_docs
-
-    def generate_answers(
-        self, queries: list[str], nb_chunks: int = 2, options_generation=None
-    ):
-        answers = []
-        for query in queries:
-            answer = self.generate_answer(
-                query=query, nb_chunks=nb_chunks, options_generation=options_generation
-            )
-            answers.append(answer)
-        return answers

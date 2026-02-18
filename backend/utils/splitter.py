@@ -23,7 +23,64 @@ class HeaderType(TypedDict):
     data: str
 
 
-def get_splitter(type_text_splitter, agent=None, embedding_model=None):
+def extract_images_and_tables_blocks(section: str) -> list[str]:
+    """
+    Découpe une section Markdown en blocs :
+    - Blocs d'image (délimités par <IMAGE X --> ... <IMAGE X -->)
+    - Blocs de tableau (au moins deux lignes commençant et finissant par '|')
+    - Blocs de texte (tout le reste)
+    """
+    parts = []
+    last_idx = 0
+
+    image_block_pattern = re.compile(r"<img>(.*?)</img>", re.DOTALL)
+
+    image_blocks = []
+    for match in image_block_pattern.finditer(section):
+        start, end = match.span()
+        if start > last_idx:
+            before = section[last_idx:start]
+            image_blocks.append(("text", before))
+
+        image_block = match.group(1)
+        image_blocks.append(("image", image_block))
+
+        last_idx = end
+
+    if last_idx < len(section):
+        image_blocks.append(("text", section[last_idx:]))
+
+    table_pattern = re.compile(r"(<table[\s\S]*?</table>)", re.IGNORECASE)
+
+
+    for block_type, content in image_blocks:
+        if block_type == "image":
+            parts.append(content.strip())
+        else:
+            last_idx = 0
+            for match in table_pattern.finditer(content):
+                start, end = match.span()
+
+                if start > last_idx:
+                    before = content[last_idx:start].strip()
+                    if before:
+                        parts.append(before)
+
+                table_block = match.group(1).strip()
+                parts.append(table_block)
+
+                last_idx = end
+
+            if last_idx < len(content):
+                after = content[last_idx:].strip()
+                if after:
+                    parts.append(after)
+
+    return parts
+
+
+def get_splitter(type_text_splitter, data_preprocessing,
+                 agent=None, embedding_model=None):
     if type_text_splitter == "TextSplitter":
         splitter = TextSplitter()
     elif type_text_splitter == "Recursive_TextSplitter":
@@ -31,22 +88,27 @@ def get_splitter(type_text_splitter, agent=None, embedding_model=None):
     elif type_text_splitter == "Semantic_TextSplitter":
         splitter = Semantic_TextSplitter(agent=agent,
                                          embedding_model=embedding_model)
+    if (data_preprocessing == "md_with_images" 
+            or data_preprocessing == "md_without_images"):
+        splitter = MarkdownHeaderTextSplitter(strip_headers=False,
+                                              splitter=splitter)
+
     return splitter
 
 
-
-class MarkdownHeaderTextSplitter:
+class MarkdownHeaderTextSplitter(Splitter):
     """Splitting markdown files based on specified headers."""
 
     def __init__(
         self,
+        splitter,
         headers_to_split_on: list[tuple[str, str]] =  [
     ("#", "Header 1"),
     ("##", "Header 2"),
     ("###", "Header 3"),
 ],
-        return_each_line: bool = False,  # noqa: FBT001,FBT002
-        strip_headers: bool = True,  # noqa: FBT001,FBT002
+        return_each_line: bool = False, 
+        strip_headers: bool = False
     ):
         """Create a new MarkdownHeaderTextSplitter.
 
@@ -64,6 +126,8 @@ class MarkdownHeaderTextSplitter:
         )
         # Strip headers split headers from the content of the chunk
         self.strip_headers = strip_headers
+        self.text_splitter = splitter
+
 
     def aggregate_lines_to_chunks(self, lines: list[LineType]) -> list[dict]:
         """Combine lines with common metadata into chunks.
@@ -108,7 +172,10 @@ class MarkdownHeaderTextSplitter:
             for chunk in aggregated_chunks
         ]
 
-    def split_text(self, text: str) -> list[dict]:
+    def split_text(self,
+                   text: str,
+                   chunk_size: int = 1024,
+                   overlap: bool = True) -> list[str]:
         """Split markdown file.
 
         Args:
@@ -223,14 +290,38 @@ class MarkdownHeaderTextSplitter:
                 }
             )
 
-        # lines_with_metadata has each line with associated header metadata
-        # aggregate these into chunks based on common metadata
-        if not self.return_each_line:
-            return self.aggregate_lines_to_chunks(lines_with_metadata)
-        return [
-            dict(page_content=chunk["content"], metadata=chunk["metadata"])
-            for chunk in lines_with_metadata
-        ]
+        chunks = []
+        md_sections = self.aggregate_lines_to_chunks(lines_with_metadata)
+        for section in md_sections:
+            section_text = section["page_content"] 
+            section_headers = section["metadata"]
+
+            headers_str = " ".join(
+                    str(v) for v in section_headers.values() if v
+                ).strip()
+
+            parts = extract_images_and_tables_blocks(section_text)
+            section_chunks = []
+            for part in parts:
+                if re.match(r"^<IMAGE\s+\d+\s*-->", part):  # image description bloc
+                    section_chunks.append(part)
+                elif re.match(r"^\s*\|.*\|\s*$", part, re.MULTILINE):  # table bloc
+                    section_chunks.append(part)
+
+                else:
+                    sub_chunks = self.text_splitter.split_text(text=part, 
+                                                               chunk_size=chunk_size,
+                                                               overlap=overlap)
+
+                    section_chunks.extend(sub_chunks)
+
+            for i in range(len(section_chunks)):
+                if headers_str:
+                    section_chunks[i] = headers_str + "\n" + section_chunks[i]
+            chunks+=section_chunks
+        chunks = self.break_chunks(chunks=chunks,
+                                   max_size_chunk=chunk_size*1.2)
+        return chunks
 
 
 
@@ -266,124 +357,148 @@ class TextSplitter(Splitter):
         return final_pieces
 
     def split_text(
-        self, text: str, chunk_size: int = 500, overlap: bool = True
+        self, text: str, chunk_size: int = 1024, overlap: bool = True
     ) -> list[str]:
-        """
-        Add text's pieces together to have chunk with approximatively the rigth size
-        """
+
         pieces = self.pieces_from_text(text=text, characters=[".", "!", "?", "\n"])
+        if not pieces:
+            return []
+
+        chunks = []         
+        seen_chunks = set()   
         index = 0
-        chunks = []
+        
+        while index < len(pieces):
+            start_index_of_current_chunk = index
+            
+            current_chunk_pieces = []
+            current_chunk_len = 0
 
-        start_time = time.time()
-
-        for _ in range(len(pieces)):
-            start_index = index
-            chunk = ""
-            while len(chunk) < chunk_size and index < len(pieces):
-                chunk += pieces[index]
+            while current_chunk_len < chunk_size and index < len(pieces):
+                piece = pieces[index]
+                current_chunk_pieces.append(piece)
+                current_chunk_len += len(piece)
                 index += 1
+                
+                if len(current_chunk_pieces) == 1 and current_chunk_len >= chunk_size:
+                    break
 
-                if time.time() - start_time > 3:
-                    index += 1
+            chunk = "".join(current_chunk_pieces)
 
-            if chunk not in chunks:
+            if chunk and chunk not in seen_chunks:
+                seen_chunks.add(chunk)
                 chunks.append(chunk)
 
-            else:
-                index += 1
+            if overlap and index < len(pieces):
+                index = max(start_index_of_current_chunk + 1, index - 1)
+        le = [len(c) for c in chunks]
+        chunks = self.break_chunks(max_size_chunk=chunk_size*1.2,
+                                   chunks=chunks)
+        le1 = [len(c) for c in chunks]
+        return chunks
 
-            if index >= len(pieces):
-                chunks.append("".join(pieces[start_index:]))
-                break
 
-            if overlap:
-                index -= 1
-
-        final_chunks = []
-        for chunk in chunks:
-            if chunk not in final_chunks:
-                final_chunks.append(chunk)
-
-        return final_chunks
 
 
 class Recursive_TextSplitter(Splitter):
     def __init__(self):
-        pass
+        super().__init__()
 
-    def split_markdown(self, text, max_chunk_size=1, overlap=0):
-
+    def split_markdown(self, text):
         sections = re.split(r"(?=\n#{1,6} )", text)
         chunks = []
         current_chunk = ""
-
+ 
         for section in sections:
-            if len(current_chunk) + len(section) <= max_chunk_size:
-                current_chunk += section
-            else:
-                chunks.append(current_chunk.strip())
-                current_chunk = section
-
+            chunks.append(current_chunk.strip())
+            current_chunk = section
+            chunks.append(current_chunk.strip())
+            current_chunk = section
         if current_chunk:
             chunks.append(current_chunk.strip())
 
-        if overlap > 0 and len(chunks) > 1:
-            overlapping_chunks = []
-            for i in range(len(chunks)):
-                if i > 0:
-                    overlap_text = chunks[i - 1][-overlap:]
-                    overlapping_chunks.append(overlap_text + "\n" + chunks[i])
-                else:
-                    overlapping_chunks.append(chunks[i])
-            return overlapping_chunks
-
         return chunks
 
-    def __split(self, text, max_chunk_size=500, overlap=0):
+    def __split(self, text, max_chunk_size=500):
+        """
+        Méthode "récursive" pour diviser un chunk déjà trop grand.
+        Tente de diviser par paragraphe, puis par phrase.
+        """
         paragraphs = text.strip().split("\n\n")
         chunks = []
-
         temp_paragraph = ""
+
         for paragraph in paragraphs:
-            if len(temp_paragraph) + len(paragraph) <= max_chunk_size:
-                temp_paragraph += "\n\n" + paragraph
+            paragraph_to_add = paragraph
+            if temp_paragraph:
+                paragraph_to_add = "\n\n" + paragraph
+
+            if len(temp_paragraph) + len(paragraph_to_add) <= max_chunk_size:
+                temp_paragraph += paragraph_to_add
             else:
-                chunks.append(temp_paragraph)
-                temp_paragraph = ""
-                sentences = re.split(r"(?<=[.!?])\s+", paragraph)
-                temp_chunk = ""
+                if temp_paragraph:
+                    chunks.append(temp_paragraph.strip())
+                
+                if len(paragraph) <= max_chunk_size:
+                    temp_paragraph = paragraph
+                else:
+                    temp_paragraph = "" 
+                    sentences = re.split(r"(?<=[.!?])\s+", paragraph)
+                    temp_chunk = ""
 
-                for sentence in sentences:
-                    if len(temp_chunk) + len(sentence) <= max_chunk_size:
-                        temp_chunk += sentence + " "
-                    else:
+                    for sentence in sentences:
+                        sentence_to_add = sentence
+                        if temp_chunk:
+                            sentence_to_add = " " + sentence
+
+                        if len(temp_chunk) + len(sentence_to_add) <= max_chunk_size:
+                            temp_chunk += sentence_to_add
+                        else:
+                            if temp_chunk:
+                                chunks.append(temp_chunk.strip())
+                            temp_chunk = sentence
+                    
+                    if temp_chunk:
                         chunks.append(temp_chunk.strip())
-                        temp_chunk = sentence + " "
-
-                if len(temp_chunk) > 0:
-                    chunks.append(temp_chunk.strip())
-
-        return chunks
+        if temp_paragraph:
+            chunks.append(temp_paragraph.strip())
+        
+        return [c for c in chunks if c]
     
     def split_text(
-        self, text: str, chunk_size: int = 500, overlap: bool = False
+        self, text: str, chunk_size: int = 1024, overlap: int = 0
     ) -> list[str]:
+        """
+        Méthode principale pour diviser le texte.
+        """
+        
         chunks = self.split_markdown(text=text)
+        
         final_chunks = []
-        for i in range(len(chunks)):
-            if len(chunks[i]) > 0:
-                if len(chunks[i]) < chunk_size:
-                    final_chunks.append(chunks[i])
-                else:
-                    temp = self.__split(text=chunks[i], max_chunk_size=chunk_size)
-                    for j in range(len(temp)):
-                        if len(temp[j]) > 0:
-                            final_chunks.append(temp[j])
+        for chunk in chunks:
+            if len(chunk) <= chunk_size:
+                if len(chunk) > 0:
+                    final_chunks.append(chunk)
+            else:
+                temp = self.__split(text=chunk, 
+                                    max_chunk_size=chunk_size)
+                for item in temp:
+                    if len(item) > 0:
+                        final_chunks.append(item)
 
-        final_chunks = self.break_chunks(chunks=final_chunks, 
-                                         max_size_chunk=chunk_size)
+        if overlap > 0 and len(final_chunks) > 1:
+            overlapping_chunks = []
+            for i in range(len(final_chunks)):
+                if i > 0:
+                    overlap_text = final_chunks[i - 1][-overlap:]
+                    overlapping_chunks.append(overlap_text + "\n" + final_chunks[i])
+                else:
+                    overlapping_chunks.append(final_chunks[i])
+            return overlapping_chunks
+        final_chunks = self.break_chunks(max_size_chunk=chunk_size*1.2,
+                                         chunks=final_chunks)
         return final_chunks
+
 
 
 class Semantic_TextSplitter(Splitter):
@@ -426,7 +541,7 @@ class Semantic_TextSplitter(Splitter):
         return [i for i, sim in enumerate(similarities) if sim < threshold_value]
 
 
-    def split_text(self, text, chunk_size: int = 500, overlap: bool = False):
+    def split_text(self, text, chunk_size: int = 1024, overlap: bool = False):
         """
         Segmente un texte en chunks sémantiques en fonction de la similarité cosinus entre phrases.
 
@@ -440,7 +555,7 @@ class Semantic_TextSplitter(Splitter):
         sentences = self.break_chunks(chunks=sentences,
                                       max_size_chunk=chunk_size)
 
-        taille_batch = 500
+        taille_batch = 100
         sentence_embeddings = None
         for i in range(0, len(sentences), taille_batch):
             results = self.agent.embeddings(texts=sentences[i:i + taille_batch],
@@ -473,5 +588,5 @@ class Semantic_TextSplitter(Splitter):
             left = bp
         current_chunk.append(". ".join(sentences[left:]) + ".")
         chunks = self.break_chunks(chunks=current_chunk,
-                                   max_size_chunk=chunk_size)
+                                   max_size_chunk=chunk_size*1.2)
         return chunks

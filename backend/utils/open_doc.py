@@ -42,13 +42,9 @@ def open_pdf(path_pdf: str) -> str:
     """
     Permet d'extraire tout le texte d'un PDF enregistré au chemin path_pdf
     """
-    document = fitz.open(path_pdf)
-    content = ""
-    for page_num in range(len(document)):
-        page = document.load_page(page_num)
-        content += page.get_text()
 
-    return content
+    with fitz.open(path_pdf) as document:
+       return "".join(page.get_text("text") for page in document)
 
 
 def open_excel(path_excel: str) -> str:
@@ -143,9 +139,9 @@ def open_doc_without_save(path_file: str) -> str:
     elif ".pdf" in path_file:
         content = open_pdf(path_file)
 
-    elif ".txt" in path_file:
+    elif ".txt" in path_file or ".md" in path_file:
         content = open_txt(path_file)
-
+        
     else:
         content = "\nExtension de fichier inconnu\n"
 
@@ -153,20 +149,12 @@ def open_doc_without_save(path_file: str) -> str:
 
 
 class Opener:
-    def __init__(self, save=True, overwrite=False) -> None:
+    def __init__(self, save=False, overwrite=False) -> None:
         self._save = save
         self.overwrite = overwrite
 
     def open_doc(self, path_file, path_to_save=""):
-        if self._save:
-
-            if not os.path.exists(path_to_save):
-                os.mkdir(path_to_save)
-
-            return open_doc_with_save(path_file, path_to_save, self.overwrite)
-
-        else:
-            return open_doc_without_save(path_file)
+        return open_doc_without_save(path_file)
 
     @property
     def save(self):

@@ -13,9 +13,9 @@ config_new_rag = st.session_state["config_server"].copy()
 st.markdown("# Customize your RAG:")
 
 
-with open("streamlit_/utils/all_rags.json", "r") as file:
+with open("data/all_rags.json", "r") as file:
     base_rags = json.load(file)
-base_rags = base_rags[st.session_state["config_server"]["params_host_llm"]["type"]]
+    
 del base_rags["naive_chatbot"]
 
 config_new_rag["base"] = st.selectbox(
@@ -32,6 +32,16 @@ vectorbase_dict = {
         "batch": True,
     },
 }
+vectorbase_dict = {
+    "elasticsearch": {
+        "url": st.session_state["config_server"]["params_vectorbase"]["url"],
+        "backend": "elasticsearch",
+        "auth": [st.session_state["config_server"]["params_vectorbase"]["auth"][0],
+                st.session_state["config_server"]["params_vectorbase"]["auth"][1]],
+        "batch": True,
+    },
+}
+
 
 backend_vectorbase = {"elasticsearch": "Elastic Search"}
 
@@ -76,14 +86,34 @@ config_new_rag["TextSplitter"] = st.selectbox(
 )
 
 if config_new_rag["base"]=="advanced_rag" or config_new_rag["base"]=="agentic":
-    pre_proccessor_dic = {"Contextual integration": "Contextual"}
+    pre_proccessor_dic = {"Contextual integration": "Contextual",
+                          "Global Sum up document integration": "Global_sum_up",
+                          "Extract metadata": "Extractor_metadata"}
     selected_processors = []
-
+    
+    list_keys_processor = list(pre_proccessor_dic.keys())
+    nb_processor = len(list_keys_processor)
+    processor_per_column = nb_processor // 3 if nb_processor % 3 == 0 else nb_processor // 3 + 1
     st.write("**Choose Pre-Processor Chunks**")
-    for i, (label, value) in enumerate(pre_proccessor_dic.items()):
-        checked = st.checkbox(label, key=f"preproc_{i}")
-        if checked:
-            selected_processors.append(value)
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        for i in range(processor_per_column):
+            checked = st.checkbox(list_keys_processor[i],
+                                  key=f"preproc_{i}")
+            if checked:
+                selected_processors.append(pre_proccessor_dic[list_keys_processor[i]])
+    with col2:
+        for i in range(processor_per_column, 2 * processor_per_column):
+            checked = st.checkbox(list_keys_processor[i],
+                                  key=f"preproc_{i}")
+            if checked:
+                selected_processors.append(pre_proccessor_dic[list_keys_processor[i]])
+    with col3:
+        for i in range(2*processor_per_column, nb_processor):
+            checked = st.checkbox(list_keys_processor[i],
+                                  key=f"preproc_{i}")
+            if checked:
+                selected_processors.append(pre_proccessor_dic[list_keys_processor[i]])
 
     config_new_rag["ProcessorChunks"] = selected_processors
 
@@ -91,7 +121,7 @@ if config_new_rag["base"]=="advanced_rag" or config_new_rag["base"]=="agentic":
     nb_reranker = st.slider(
             label="**Choose number of chunks after reranker**",
             min_value=0,
-            max_value=200,
+            max_value=500,
             step=5,
             value=st.session_state["config_server"]["nb_chunks_reranker"],
             help=(
@@ -102,25 +132,50 @@ if config_new_rag["base"]=="advanced_rag" or config_new_rag["base"]=="agentic":
         )
 
     config_new_rag["nb_chunks_reranker"] = nb_reranker
+    
+if st.session_state["mode_interface"]=="Simple":
+    possible_embeddings = get_possible_embeddings_model(provider=st.session_state["config_server"]["default_mode_provider"])
+    possible_embeddings.insert(0, "default")
 
-possible_embeddings = get_possible_embeddings_model(provider=st.session_state["config_server"]["params_host_llm"]["type"])
-possible_embeddings.insert(0, "default")
+    embeddings_dic = {m: m for m in possible_embeddings}
 
-embeddings_dic = {m: m for m in possible_embeddings}
-config_new_rag["embedding_model"] = st.selectbox(
-    label="**Choose embedding model**",
-    options=embeddings_dic.keys(),
-    format_func=lambda x: embeddings_dic[x],
-)
-if config_new_rag["embedding_model"]!="default":
-    st.warning(f"⚠️ This RAG will be only available for '{st.session_state['config_server']['params_host_llm']['type']}' provider.")
+    config_new_rag["embedding_model"] = st.selectbox(
+        label="**Choose embedding model**",
+        options=embeddings_dic.keys(),
+        format_func=lambda x: embeddings_dic[x],
+    )
+    if config_new_rag["embedding_model"]!="default":
+        st.warning(f"⚠️ This RAG will be only available for '{st.session_state['config_server']['default_mode_provider']}' provider.")
+    else:
+        config_new_rag["embedding_model"] = possible_embeddings[1]
 else:
-    config_new_rag["embedding_model"] = possible_embeddings[1]
+    with open("data/models_infos.json") as file:
+        models_infos = json.load(file)
+    
+    st.subheader("📌 Models configuration")
+    llm_models = list(models_infos.keys())
+    config_new_rag["model"] = st.selectbox(label="**Choose LLm model**",
+                                                     options=llm_models,
+                                                     format_func=lambda x: x)
+    reranker_models = list(models_infos.keys())
+    config_new_rag["reranker_model"] = st.selectbox(label="**Choose Reranker model**",
+                                                     options=reranker_models,
+                                                     format_func=lambda x: x)
+    image_models = list(models_infos.keys())
+    config_new_rag["model_for_image"] = st.selectbox(label="**Choose model for image description**",
+                                                     options=image_models,
+                                                     format_func=lambda x: x)
+    
+    embeddings_models = list(models_infos.keys())
+    config_new_rag["embedding_model"] = st.selectbox(label="**Choose embedding model**",
+                                                     options=embeddings_models,
+                                                     format_func=lambda x: x)
+    st.markdown("<br><br>", unsafe_allow_html=True)
 
 config_new_rag["nb_chunks"] = st.slider(
     label="**Choose number of chunks to retrieve per query**",
     min_value=0,
-    max_value=200,
+    max_value=500,
     step=5,
     value=st.session_state["config_server"]["nb_chunks"],
     help="""The higher the number of value, the better the results of the RAG agent will be.
@@ -144,14 +199,6 @@ def update_num_from_slider():
     st.session_state["numeric"] = st.session_state["chunk_length"]
     st.session_state["indexing"] = True
 
-
-st.number_input(
-    "Chunk length",
-    value=st.session_state["numeric"],
-    key="numeric",
-    on_change=update_slider_from_num,
-    step=10,
-)
 
 st.slider(
     label="**Choose length of chunks for indexing phases:**",
@@ -185,9 +232,8 @@ if st.button(
     help="Your RAG will only be visible in the LLM host at the moment of its creation, if you change LLM host, you must create your RAG again",
     use_container_width=True,
 ):
-    all_rags_name = []
-    for provider in st.session_state["all_rags"].keys():
-        all_rags_name+=st.session_state["all_rags"][provider]
+
+    all_rags_name=st.session_state["all_rags"]
     if (
         config_new_rag["name"]
         in all_rags_name
@@ -196,7 +242,6 @@ if st.button(
             f"{config_new_rag['name']} already exists, please choose another name",
             icon="🚨",
         )
-
     elif not bool(re.fullmatch(r"^[a-z0-9_-]+$", config_new_rag["name"])):
         st.error(
             "Invalid RAG name, only alphanumeric characters, underscores, lowercase letters and hyphens are allowed",
@@ -207,34 +252,21 @@ if st.button(
 
         local_params = {
             "generation_system_prompt_name": system_prompt,
-            "forced_system_prompt": True,
+            "forced_system_prompt": False,
         }
         config_new_rag["local_params"] = local_params
         config_new_rag["chunk_length"] = st.session_state["chunk_length"]
 
+        with open(
+                f"data/custom_rags/{config_new_rag['name']}.json", "w"
+        ) as config:
+            json.dump(config_new_rag, config, ensure_ascii=False, indent=4)
 
-        if config_new_rag["embedding_model"]!="default":
-            folders_save = [config_new_rag["params_host_llm"]["type"]]
-        else:
-            folders_save = ["ollama", "mistral", "openai", "vllm"]
-
-        for folder_creation in folders_save:
-            os.makedirs(f"data/custom_rags/{folder_creation}", exist_ok=True)
-
-        for folder in folders_save:
-            with open(
-                f"data/custom_rags/{folder}/{config_new_rag['name']}.json", "w"
-            ) as config:
-                if config_new_rag["embedding_model"] == "default":
-                    config_new_rag["embedding_model"] = get_default_embeddings_model(provider=folder)
-
-                json.dump(config_new_rag, config, ensure_ascii=False, indent=4)
-
-            st.session_state["all_rags"][folder][config_new_rag["name"]] = (
+        st.session_state["all_rags"][config_new_rag["name"]] = (
                     config_new_rag["name"]
             )
         
-        with open("streamlit_/utils/all_rags.json", "w") as file:
+        with open("data/all_rags.json", "w") as file:
             json.dump(st.session_state["all_rags"], file, ensure_ascii=False, indent=4)
 
         st.session_state["benchmark"]["rags"][config_new_rag["name"]] = False
@@ -255,16 +287,14 @@ rag_to_del = left.selectbox(
 
 if right.button(label="Delete RAG", type="primary", use_container_width=True):
     st.session_state["custom_rags"].remove(rag_to_del)
-
-    for provider in ["ollama", "mistral", "openai", "vllm"]:
-        if (rag_to_del in st.session_state["all_rags"][provider].keys()):
-            del st.session_state["all_rags"][provider][rag_to_del]
+    if (rag_to_del in st.session_state["all_rags"].keys()):
+        del st.session_state["all_rags"][rag_to_del]
     
-        path = f"./data/custom_rags/{provider}/" + rag_to_del + ".json"
-        if os.path.exists(path):
-            os.remove(path)
+    path = f"./data/custom_rags/" + rag_to_del + ".json"
+    if os.path.exists(path):
+        os.remove(path)
 
-    with open("streamlit_/utils/all_rags.json", "w") as file:
+    with open("data/all_rags.json", "w") as file:
         json.dump(st.session_state["all_rags"], file, indent=4)
 
     es = Elasticsearch(
@@ -278,19 +308,17 @@ if right.button(label="Delete RAG", type="primary", use_container_width=True):
         if index_name.startswith(rag_to_del):
             es.indices.delete(index=index_name)
 
-
-current_provider = st.session_state["config_server"]["params_host_llm"]["type"]
 if rag_to_del in st.session_state["custom_rags"]:
-    with open(f"data/custom_rags/{current_provider}/{rag_to_del}.json", "r") as file:
+    with open(f"data/custom_rags/{rag_to_del}.json", "r") as file:
         config = json.load(file)
 
     retrieval_methods = {"embeddings": "Embeddings", "bm25": "BM25", "hybrid": "Hybrid"}
     display_config = {
-        "Base RAG": [st.session_state["all_rags"][current_provider][config["base"]]],
+        "Base RAG": [st.session_state["all_rags"][config["base"]]],
         "Vectorbase Type": [backend_vectorbase[config["params_vectorbase"]["backend"]]],
         "Retrieval Method": [retrieval_methods[config["type_retrieval"]]],
         "Splitter": [splitter_dic[config["TextSplitter"]]],
-        "Embedding model": [embeddings_dic[config["embedding_model"]]],
+        "Embedding model": [config["embedding_model"]],
         "Nb chunks": [str(config["nb_chunks"])],
         "Chunk length": [str(config["chunk_length"])]
     }
@@ -317,40 +345,45 @@ st.selectbox(
 
 
 rag_method = st.session_state["managed_rag"]
-
-if (
-    "custom_rags" in st.session_state.keys()
-    and rag_method in st.session_state["custom_rags"]
-):
-    folder = st.session_state["config_server"]["params_host_llm"]["type"]
-    with open(f"data/custom_rags/{folder}/{rag_method}.json", "r") as file:
+file = f"data/custom_rags/{rag_method}.json"
+if os.path.exists(file):
+    with open(file, "r") as file:
         custom_config = json.load(file)
 
-    name = custom_config["name"]
+    names = get_name(rag_name=custom_config["base"],
+                     config_server=custom_config, additionnal_name="")
     base = custom_config["base"]
 else:
-    name = get_name(rag_method, st.session_state["config_server"])
-    pointer = name.find("_rag")
-    name = name[:pointer]
+    names = get_name(rag_method,
+                    st.session_state["config_server"])
+    cleaned_names = []
+    for n in names:
+        pointer = n.find("_rag")
+        cleaned_names.append(n[:pointer] if pointer != -1 else n)
+
+    names = cleaned_names
     base = rag_method
+
 list_indexation = []
-
-
 es = Elasticsearch(
     [st.session_state["config_server"]["params_vectorbase"]["url"]],
+    verify_certs=False,
+    ssl_show_warn=False,
     basic_auth=(
         st.session_state["config_server"]["params_vectorbase"]["auth"][0],
         st.session_state["config_server"]["params_vectorbase"]["auth"][1],
     ),
 )
+print("es", es.indices.get_alias(index="*"))
+print("\n\n\n\nnames", names)
 for index_name in es.indices.get_alias(index="*"):
-    if index_name.startswith(name):
+    if any(index_name.startswith(prefix) for prefix in names):
         list_indexation.append(index_name)
 
 left, right = st.columns([0.85, 0.15])
-st.session_state["indexation"] = left.selectbox(
-    label="indexations", label_visibility="collapsed", options=list_indexation
-)
+st.session_state["indexation"] = left.selectbox(label="indexations",
+                                                label_visibility="collapsed",
+                                                options=list_indexation)
 
 if right.button(label="Delete indexation", use_container_width=True, type="primary"):
     if base == "graph":
@@ -394,9 +427,7 @@ col1, col2, col3 = st.columns(3)
 
 
 all_rags = list(
-    st.session_state["all_rags"][
-        st.session_state["config_server"]["params_host_llm"]["type"]
-    ].keys()
+    st.session_state["all_rags"].keys()
 )
 nb_rags = len(all_rags)
 rags_per_column = nb_rags // 3 if nb_rags % 3 == 0 else nb_rags // 3 + 1
@@ -408,9 +439,7 @@ with col1:
         else:
             disable = False
         st.session_state["rags_to_merge"]["rags"][all_rags[i]] = st.checkbox(
-            label=st.session_state["all_rags"][
-                st.session_state["config_server"]["params_host_llm"]["type"]
-            ][all_rags[i]],
+            label=st.session_state["all_rags"][all_rags[i]],
             value=st.session_state["rags_to_merge"]["rags"][all_rags[i]],
             disabled=disable,
         )
@@ -418,7 +447,7 @@ with col1:
         if st.session_state["rags_to_merge"]["rags"][all_rags[i]]:
             rags_to_merge_list.append(all_rags[i])
             rags_config_to_merge_list.append(get_config_rag(rag_name=all_rags[i],
-                                                             provider=st.session_state["config_server"]["params_host_llm"]["type"]))
+                                                             provider=st.session_state["config_server"]["default_mode_provider"]))
 
 with col2:
     for i in range(rags_per_column, 2 * rags_per_column):
@@ -427,16 +456,14 @@ with col2:
         else:
             disable = False
         st.session_state["rags_to_merge"]["rags"][all_rags[i]] = st.checkbox(
-            label=st.session_state["all_rags"][
-                st.session_state["config_server"]["params_host_llm"]["type"]
-            ][all_rags[i]],
+            label=st.session_state["all_rags"][all_rags[i]],
             value=st.session_state["rags_to_merge"]["rags"][all_rags[i]],
             disabled=disable,
         )
         if st.session_state["rags_to_merge"]["rags"][all_rags[i]]:
             rags_to_merge_list.append(all_rags[i])
             rags_config_to_merge_list.append(get_config_rag(rag_name=all_rags[i],
-                                                             provider=st.session_state["config_server"]["params_host_llm"]["type"]))
+                                                             provider=st.session_state["config_server"]["default_mode_provider"]))
 
 with col3:
     for i in range(2 * rags_per_column, nb_rags):
@@ -445,16 +472,14 @@ with col3:
         else:
             disable = False
         st.session_state["rags_to_merge"]["rags"][all_rags[i]] = st.checkbox(
-            label=st.session_state["all_rags"][
-                st.session_state["config_server"]["params_host_llm"]["type"]
-            ][all_rags[i]],
+            label=st.session_state["all_rags"][all_rags[i]],
             value=st.session_state["rags_to_merge"]["rags"][all_rags[i]],
             disabled=disable,
         )
         if st.session_state["rags_to_merge"]["rags"][all_rags[i]]:
             rags_to_merge_list.append(all_rags[i])
             rags_config_to_merge_list.append(get_config_rag(rag_name=all_rags[i],
-                                                             provider=st.session_state["config_server"]["params_host_llm"]["type"]))
+                                                            provider=st.session_state["config_server"]["default_mode_provider"]))
 
 
 
@@ -470,10 +495,10 @@ if st.button(
     help="Your merge will only be visible in the LLM host at the moment of its creation, if you change LLM host, you must create your merge again",
     use_container_width=True):
 
-    if (config_merge_rag["name"] in st.session_state["all_rags"][st.session_state["config_server"]["params_host_llm"]["type"]]):
+    if (config_merge_rag["name"] in st.session_state["all_rags"]):
         st.error(f"{config_merge_rag['name']} already exists, please choose another name", icon="🚨")
 
-    elif not bool(re.fullmatch(r'^[a-z0-9_-]+$',config_merge_rag["name"])):
+    elif not bool(re.fullmatch(r'^[a-z0-9_-]+$', config_merge_rag["name"])):
         st.error("Invalid RAG name, only alphanumeric characters, underscores, lowercase letters and hyphens are allowed", icon="🚨")
     else:
         
@@ -484,13 +509,12 @@ if st.button(
         saved_config["base"] = "merger"
         saved_config["rag_list"] = rags_to_merge_list
         saved_config["rag_config_list"] = rags_config_to_merge_list
-        folder = saved_config["params_host_llm"]["type"]
-        with open(f"data/merge/{folder}/{config_merge_rag['name']}.json", "w") as config:
+        with open(f"data/merge{config_merge_rag['name']}.json", "w") as config:
             json.dump(saved_config, config,ensure_ascii=False, indent=4)
 
-        st.session_state["all_rags"][folder][config_merge_rag["name"]] = config_merge_rag["name"]
+        st.session_state["all_rags"][config_merge_rag["name"]] = config_merge_rag["name"]
 
-        with open("streamlit_/utils/all_rags.json", "w") as file:
+        with open("data/all_rags.json", "w") as file:
             json.dump(st.session_state["all_rags"],file,ensure_ascii=False, indent=4)
 
         st.session_state["rags_to_merge"]["rags"][config_merge_rag["name"]] = False
@@ -525,18 +549,16 @@ if right.button(label="Delete merge", type="primary", use_container_width=True):
         st.session_state["merge_rags"].remove(rag_to_del)
 
     # Remove from all_rags categories if present
-    for backend in ["ollama", "openai", "mistral", "vllm"]:
-        if rag_to_del in st.session_state["all_rags"].get(backend, {}):
-            del st.session_state["all_rags"][backend][rag_to_del]
+    if rag_to_del in st.session_state["all_rags"].keys():
+        del st.session_state["all_rags"][rag_to_del]
 
     # Remove corresponding JSON config file
-    for folder in ["vllm", "ollama", "openai", "mistral"]:
-        path = f"./data/merge/{folder}/{rag_to_del}.json"
-        if os.path.exists(path):
-            os.remove(path)
+    path = f"./data/merge/{rag_to_del}.json"
+    if os.path.exists(path):
+        os.remove(path)
 
     # Persist the updated all_rags list
-    with open("streamlit_/utils/all_rags.json", "w") as f:
+    with open("data/all_rags.json", "w") as f:
         json.dump(st.session_state["all_rags"], f, indent=4, ensure_ascii=False)
 
     st.success(f"✅ '{rag_to_del}' has been deleted.")

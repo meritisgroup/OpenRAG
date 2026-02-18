@@ -1,8 +1,11 @@
 from abc import ABC, abstractmethod
 from typing import Union
 import nltk
-from .agent_functions import predict, multiple_predict
+from .agent_functions import predict, multiple_predict, predict_json
 from pydantic import BaseModel
+from typing import List
+from .threading_utils import get_executor_threads
+import concurrent.futures
 
 
 class Splitter(ABC):
@@ -15,45 +18,24 @@ class Splitter(ABC):
 
     def break_chunks(self, chunks, max_size_chunk=512):
         final_chunks = []
-        for chunk in chunks:
-            if len(chunk) < max_size_chunk:
-                final_chunks.append(chunk)
+
+        for text in chunks:
+            if len(text) < max_size_chunk:
+                final_chunks.append(text)
             else:
-                sentences = nltk.sent_tokenize(chunk)
-                current_smaller_chunk = ""
-
-                for sentence in sentences:
-                    test_chunk = (
-                        current_smaller_chunk
-                        + (" " if current_smaller_chunk else "")
-                        + sentence
-                    )
-
-                    if len(test_chunk) <= max_size_chunk:
-                        current_smaller_chunk = test_chunk
-                    else:
-                        if current_smaller_chunk:
-                            if len(current_smaller_chunk) > max_size_chunk:
-                                final_chunks.extend(
-                                    cut_chunk(current_smaller_chunk, max_size_chunk)
-                                )
-                            else:
-                                final_chunks.append(current_smaller_chunk)
-
-                        if len(sentence) > max_size_chunk:
-                            final_chunks.extend(cut_chunk(sentence, max_size_chunk))
-                            current_smaller_chunk = ""
+                words = text.split()
+                if words:
+                    current_chunk = words[0]
+                    for w in words[1:]:
+                        if len(current_chunk) + 1 + len(w) <= max_size_chunk:
+                            current_chunk += " " + w
                         else:
-                            current_smaller_chunk = sentence
+                            final_chunks.append(current_chunk)
+                            current_chunk = w
 
-                    if current_smaller_chunk:
-                        if len(current_smaller_chunk) > max_size_chunk:
-                            final_chunks.extend(
-                                cut_chunk(current_smaller_chunk, max_size_chunk)
-                            )
-                        else:
-                            final_chunks.append(current_smaller_chunk)
-
+                    final_chunks.append(current_chunk)
+                else:
+                    print(f"CE TEXTE N'EST PAS PASSE {text}")
         return final_chunks
 
 
@@ -112,34 +94,98 @@ class VectorBase:
 
 class Agent:
     @abstractmethod
-    def __init__(self, model: str, language: str = "EN", max_attempts: int = 5) -> None:
-        self.model = model
+    def __init__(self, language: str = "EN", max_attempts: int = 5) -> None:
         self.language = language
         self.max_attempts = max_attempts
         self.temperature = None
 
     def predict(
-        self, prompt: str, system_prompt: str, with_tokens: bool = False
+        self, prompt: str, model: str, system_prompt: str, with_tokens: bool = False
     ) -> str:
         """
         It generates the answer of the model given the prompt and the system_prompt
         """
+        return predict(system_prompt, prompt, model, with_tokens)
 
-        return predict(system_prompt, prompt, self.model, with_tokens)
 
+    def multiple_predict_json(self,
+                              prompts: list[str],
+                              system_prompts: list[str],
+                              model: str,
+                              json_format: BaseModel,
+                              temperature=0,
+                              images: list[list[str]] = None,
+                              options_generation=None,
+                              max_workers: int = 10):
+
+        results = [None] * len(prompts)
+        
+        if images is None:
+            images = [None] * len(prompts)
+
+        if max_workers<=get_executor_threads():
+            max_workers = 1
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_index = {
+                executor.submit(
+                    self.predict_json,
+                    prompt=prompts[i],
+                    system_prompt=system_prompts[i],
+                    model=model,
+                    json_format=json_format,
+                    temperature=temperature,
+                    options_generation=options_generation
+                ): i
+                for i in range(len(prompts))
+            }
+
+            for future in concurrent.futures.as_completed(future_to_index):
+                index = future_to_index[future]
+                try:
+                    results[index] = future.result()
+                except Exception as exc:
+                    print(f"Prompt #{index} a généré une exception : {exc}")
+        return results
+    
+    
     def multiple_predict(
-        self, prompts: list[str], system_prompts: list[str]
-    ) -> list[str]:
+        self,
+        model: str,
+        prompts: List[str],
+        system_prompts: List[str],
+        temperature: float = 0,
+        options_generation=None,
+    ) -> str:
         """
-        It batches and generates the answer of the model given the prompts and the system_prompts
+        It formats the queries with good prompts, then gives these prompts to the LLM and return the cleaned outputs
         """
-
-        return multiple_predict(system_prompts, prompts, self.model)
+        answers = multiple_predict(system_prompts,
+                                   prompts,
+                                   model,
+                                   self.clients[model],
+                                   temperature=temperature,
+                                   options_generation=options_generation,
+                                   max_workers=self.max_workers)
+        return answers
 
     def predict_json(
         self,
-        system_prompt: str,
         prompt: str,
+        model: str,
+        system_prompt: str,
         json_format: BaseModel,
+        temperature=0,
+        options_generation=None,
     ) -> BaseModel:
-        pass
+        """
+        It formats the queries with good prompts, then gives these prompts to the LLM and return the cleaned outputs following the given BaseModel format
+        """
+        answer = predict_json(system_prompt,
+                              prompt,
+                              model,
+                              self.clients[model],
+                              json_format,
+                              temperature,
+                              options_generation=options_generation)
+        return answer

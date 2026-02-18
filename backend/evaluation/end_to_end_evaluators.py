@@ -1,16 +1,17 @@
 from .base_classes import Evaluator, MetricAnswer, GroundTruthAnswer
-from .utils import process_prompt_to_json
+from .utils import process_prompts_to_json
 import numpy as np
 import re
 from ..utils.agent import Agent
 from .prompts import PROMPTS
 
-
+SCORES={}
 
 class GroundTruthComparison(Evaluator):
     def __init__(
         self,
         agent: Agent,
+        model: str,
         max_attemps: int = 5,
         batch_size: int = 10,
     ) -> None:
@@ -21,6 +22,7 @@ class GroundTruthComparison(Evaluator):
         """
         super().__init__(agent, max_attemps, batch_size)
         self.agent = agent
+        self.model = model
 
         self.system_prompt = PROMPTS[self.language]["rate_from_ground_truth"][
             "SYSTEM_PROMPT"
@@ -28,6 +30,16 @@ class GroundTruthComparison(Evaluator):
         self.prompt_template = PROMPTS[self.language]["rate_from_ground_truth"][
             "QUERY_TEMPLATE"
         ]
+
+
+        self.system_prompt_absolute = PROMPTS[self.language]["rate_from_ground_truth_absolute"][
+            "SYSTEM_PROMPT"
+        ]
+
+        self.prompt_template_absolute = PROMPTS[self.language]["rate_from_ground_truth_absolute"][
+            "QUERY_TEMPLATE"
+        ]
+
         self.metrics: dict = PROMPTS[self.language]["gt_metrics"]
 
     def _get_prompts(
@@ -37,16 +49,30 @@ class GroundTruthComparison(Evaluator):
         real_answers: list[str],
         model_answers: list[str],
     ) -> tuple[list[str], str]:
-        system_prompt = self.system_prompt
-        prompts = [
-            self.prompt_template.replace("{real_answer}", str(real_answer))
-            .replace("{query}", str(query))
-            .replace("{model_answer}", str(model_answer))
-            .replace("{metric}", str(metric))
-            for query, real_answer, model_answer in zip(
-                queries, real_answers, model_answers
-            )
-        ]
+        
+        if metric.startswith("Abs"):
+            system_prompt = self.system_prompt_absolute
+            prompts = [
+                self.prompt_template_absolute.replace("{real_answer}", str(real_answer))
+                .replace("{query}", str(query))
+                .replace("{model_answer}", str(model_answer))
+                .replace("{metric}", str(metric))
+                for query, real_answer, model_answer in zip(
+                    queries, real_answers, model_answers
+                )
+                ]
+            
+        else:
+            system_prompt = self.system_prompt
+            prompts = [
+                self.prompt_template.replace("{real_answer}", str(real_answer))
+                .replace("{query}", str(query))
+                .replace("{model_answer}", str(model_answer))
+                .replace("{metric}", str(metric))
+                for query, real_answer, model_answer in zip(
+                    queries, real_answers, model_answers
+                )
+            ]
 
         return prompts, system_prompt
 
@@ -56,17 +82,26 @@ class GroundTruthComparison(Evaluator):
         queries: list[str],
         real_answers: list[str],
         proposed_answers: list[str],
+        rag_name : str
+
     ) -> list[GroundTruthAnswer | None]:
         prompts, system_prompt = self._get_prompts(
             metric, queries, real_answers, proposed_answers
         )
+        cleaned_outputs = process_prompts_to_json(prompts=prompts,
+                                                  system_prompts=[system_prompt],
+                                                  max_retry=self.max_attempts,
+                                                  agent=self.agent,
+                                                  model=self.model,
+                                                  json_format=GroundTruthAnswer)
+        
+        if metric.startswith("Abs"):
+            liste_scores = [answer.score for answer in cleaned_outputs]
+            print(f"vérités du rag {rag_name} : les voicis {liste_scores}")
 
-        cleaned_outputs = [
-            process_prompt_to_json(
-                prompt, system_prompt, self.max_attempts, self.agent, GroundTruthAnswer
-            )
-            for prompt in prompts
-        ]
+            SCORES[rag_name]=liste_scores
+            print(SCORES)
+        
         return cleaned_outputs
 
     def _clean_output(self, output: str) -> str | None:
@@ -82,6 +117,7 @@ class GroundTruthComparison(Evaluator):
         queries: list[str],
         real_answers: list[str],
         model_answers: list[str],
+        rag_name : str
     ) -> dict[str, float | None]:
 
         all_scores = {}
@@ -90,11 +126,12 @@ class GroundTruthComparison(Evaluator):
             try:
                 metric_description = f"{metric} : {description}"
                 evaluations = self._get_evaluations_for_specific_metric(
-                    metric_description, queries, real_answers, model_answers
+                    metric_description, queries, real_answers, model_answers, rag_name=rag_name
                 )
-
+                all_scores[metric] = {}
                 if evaluations is None or len(evaluations) == 0:
-                    all_scores[metric] = None
+                    all_scores[metric]["mean"] = None
+                    all_scores[metric]["total_evaluations"] = None
                     continue
 
                 total_evaluations = [
@@ -102,18 +139,22 @@ class GroundTruthComparison(Evaluator):
                     for evaluation in evaluations
                     if evaluation is not None
                 ]
+                
                 if len(total_evaluations) == 0:
-                    all_scores[metric] = None
+                    all_scores[metric]["mean"] = None
+                    all_scores[metric]["total_evaluations"] = None
                 else:
-                    score_metric = np.mean(total_evaluations)
-                    all_scores[metric] = score_metric
+                    all_scores[metric]["mean"] = np.mean(total_evaluations)
+                    all_scores[metric]["total_evaluations"] = total_evaluations
 
             except Exception as e:
                 print(
                     f"Error while processing the evaluations for the metric {metric.split(':')[0]} :",
                     e,
                 )
-                all_scores[metric] = None
+                all_scores[metric]["mean"] = None
+                all_scores[metric]["total_evaluations"] = None
+                
 
         return all_scores
 
@@ -122,13 +163,14 @@ class MetricComparaison(Evaluator):
     def __init__(
         self,
         agent: Agent,
+        model: str,
         max_attemps=5,
         batch_size=10,
     ):
         super().__init__(agent, max_attemps, batch_size)
 
         self.agent = agent
-
+        self.model = model
         self.system_prompt = PROMPTS[self.language]["rate_metric"]["SYSTEM_PROMPT"]
         self.prompt_template = PROMPTS[self.language]["rate_metric"]["QUERY_TEMPLATE"]
         self.metrics = PROMPTS[self.language]["metrics"]
@@ -175,12 +217,12 @@ class MetricComparaison(Evaluator):
             metric, queries, ground_truths, first_answers, second_answers
         )
 
-        cleaned_outputs = [
-            process_prompt_to_json(
-                prompt, system_prompt, self.max_attempts, self.agent, MetricAnswer
-            )
-            for prompt in prompts
-        ]
+        cleaned_outputs =  process_prompts_to_json(prompts=prompts, 
+                                                   system_prompts=[system_prompt],
+                                                   max_retry=self.max_attempts,
+                                                   agent=self.agent,
+                                                   model=self.model,
+                                                   json_format=MetricAnswer)
         return cleaned_outputs
 
     def run_evaluation_pipeline(

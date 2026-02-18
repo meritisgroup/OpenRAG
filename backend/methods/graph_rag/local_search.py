@@ -11,6 +11,7 @@ class LocalSearch:
     def __init__(
         self,
         agent: Agent,
+        model: str,
         data_manager,
         start_node: int = 5,
         language: str = "EN",
@@ -20,6 +21,7 @@ class LocalSearch:
         self.start_node = start_node
         self.language = language
         self.agent = agent
+        self.model = model
 
         self.tokens_counter = {}
 
@@ -31,7 +33,8 @@ class LocalSearch:
         system_prompt, prompt = self._get_extraction_query_prompt(query)
 
         answer = self.agent.predict(prompt=prompt,
-                                    system_prompt=system_prompt)
+                                    system_prompt=system_prompt,
+                                    model=self.model)
 
         self.tokens_counter["nb_input_tokens"] = answer["nb_input_tokens"]
         self.tokens_counter["nb_output_tokens"] = answer["nb_output_tokens"]

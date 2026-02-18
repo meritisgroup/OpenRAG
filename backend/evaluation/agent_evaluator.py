@@ -29,130 +29,149 @@ class AgentEvaluator:
         dataframe: pd.DataFrame,
         rags_available: list[str],
         config_server: dict,
+        models_infos: dict
     ):
         """This Agent takes a Dataframe as input and run all evaluations on it.
         The dataframe must includes a "QUERY" and a "GROUND_TRUTH" columns along with all the rags answers from the rag we are evaluating.
         In every rag column, and for each query, we need a dictionary with "answer" and "context" keys to evaluate both of them relatively to each rag
         """
-        self.agent = get_Agent(config_server)
-
+        self.agent = get_Agent(config_server=config_server,
+                               models_infos=models_infos)
+        self.model = config_server["model"]
         self.dataframe = dataframe
 
         self.gt_dataframe = dataframe[dataframe["GROUND_TRUTH"].notna()]
 
-        self.arena = ArenaBattle(dataframe=self.gt_dataframe, agent=self.agent)
-        self.ground_truth_comparator = GroundTruthComparator(
-            dataframe=self.gt_dataframe, agent=self.agent
-        )
+        self.arena = ArenaBattle(dataframe=self.gt_dataframe,
+                                 agent=self.agent,
+                                 model=self.model)
+        self.ground_truth_comparator = GroundTruthComparator(dataframe=self.gt_dataframe,
+                                                             agent=self.agent,
+                                                             model=self.model)
         self.context_faithfulness_comparator = ContextFaithfulnessComparator(
-            dataframe=self.gt_dataframe, agent=self.agent
+            dataframe=self.gt_dataframe, agent=self.agent, model=self.model
         )
         self.context_relevance_comparator = ContextRelevanceComparator(
-            dataframe=self.dataframe, agent=self.agent
+            dataframe=self.dataframe, agent=self.agent, model=self.model
         )
         self.ndcg_comparator = nDCGComparator(
-            dataframe=self.dataframe, agent=self.agent
+            dataframe=self.dataframe, agent=self.agent, model=self.model
 
         )
         self.rags_available = rags_available
 
-    def get_evals(self, log_file):
-        print("Running nDCG ...")
-        context_ndcg_evaluations= (self.ndcg_comparator.run_evaluations(log_file=log_file))
-        print("nDCG done  - ✅")
-        print("Running Arena Battles ...")
-        arena_matrix = self.arena.run_battles_scores(log_file=log_file)
-        print("Arena battles done  - ✅")
-        print("Running Ground Truth comparison ...")
-        ground_truth_evaluations = self.ground_truth_comparator.run_evaluations(
-            log_file=log_file
-        )
-        print("Ground Truth comparison done  - ✅")
-        print("Running context faithfulness ...")
-        context_faithfulness_evaluations = (
-            self.context_faithfulness_comparator.run_evaluations(log_file=log_file)
-        )
-        print("Context faithfulness done  - ✅")
-        print("Running context relevance ...")
-        context_relevance_evaluations = (
-            self.context_relevance_comparator.run_evaluations(log_file=log_file)
-        )
-        print("Context relevance done  - ✅")
-       
-        return (
-            arena_matrix,
-            ground_truth_evaluations,
-            context_faithfulness_evaluations,
-            context_relevance_evaluations,
-            context_ndcg_evaluations
-        )
+    def get_evals(self, log_file, type="all"):
+        results = {}
+        if type == "all" or type == "ndcg":
+            print("Running nDCG ...")
+            context_ndcg_evaluations= (self.ndcg_comparator.run_evaluations(log_file=log_file))
+            print("nDCG done  - ✅")
+            results["ndcg_scores"] = context_ndcg_evaluations
+        if type == "all" or type == "arena":
+            print("Running Arena Battles ...")
+            arena_matrix = self.arena.run_battles_scores(log_file=log_file)
+            print("Arena battles done  - ✅")
+            results["arena_scores"] = arena_matrix
+        if type == "all" or type == "ground_truth":
+            print("Running Ground Truth comparison ...")
+            ground_truth_evaluations, ground_truth_evaluations_details = self.ground_truth_comparator.run_evaluations(log_file=log_file)
+            results["ground_truth_scores"] = ground_truth_evaluations
+            results["ground_truth_evaluations_details"] = ground_truth_evaluations_details
+            print("Ground Truth comparison done  - ✅")
+        if type == "all" or type == "context_faithfulness":
+            print("Running context faithfulness ...")
+            context_faithfulness_evaluations = (
+                self.context_faithfulness_comparator.run_evaluations(log_file=log_file)
+            )
+            results["context_faithfulness_scores"] = context_faithfulness_evaluations
+            print("Context faithfulness done  - ✅")
+        if type == "all" or type == "context_relevance":
+            print("Running context relevance ...")
+            context_relevance_evaluations = (
+                self.context_relevance_comparator.run_evaluations(log_file=log_file)
+            )
+            results["context_relevance_scores"] = context_relevance_evaluations
+            print("Context relevance done  - ✅")
+
+        return results
 
     def create_plot_report(self, plots, report_dir) -> str:
-        plots["token_graph"].write_image(
-            os.path.join(report_dir, "tokens.png"), format="png"
-        )
-        plots["ground_truth_graph"].write_image(
-            report_dir + "/ground_truth.png", format="png"
-        )
-        plots["context_graph"].write_image(
-            os.path.join(report_dir, "context.png"), format="png"
-        )
-        plots["time_graph"].write_image(
-            os.path.join(report_dir, "time_graph.png"), format="png"
-        )
-        for match, fig in plots["arena_graphs"].items():
-            fig.write_image(os.path.join(report_dir, f"{match}.png"), format="png")
-        plots["report_arena_graph"].write_image(
-            os.path.join(report_dir, "report_arena_graph.png"), format="png"
-        )
-
-        for file in os.listdir(report_dir):
-            if "_v_" in file:
-                example_arena = file
-                break
-
+        
         BASE_DIR = os.path.dirname(os.path.abspath(__file__))
         template_path = os.path.join(BASE_DIR, "plot_report_template.tex")
 
         with open(template_path, "r", encoding="utf-8") as report_template:
             content = report_template.read()
-            final_report = (
-                content.replace(
+            
+
+        if "token_graph" in plots:
+            plots["token_graph"].write_image(
+                os.path.join(report_dir, "tokens.png"), format="png"
+            )
+            content = content.replace(
                     "{token_graph_path}",
                     str(os.path.join(report_dir, "tokens.png")).replace("\\", "/"),
                 )
-                .replace(
+        if "ground_truth_graph" in plots:
+            plots["ground_truth_graph"].write_image(
+                report_dir + "/ground_truth.png", format="png"
+            )
+            content = content.replace(
                     "{gt_graph_path}",
                     str(os.path.join(report_dir, "ground_truth.png")).replace(
                         "\\", "/"
                     ),
                 )
-                .replace(
+        if "context_graph" in plots:
+            plots["context_graph"].write_image(
+                os.path.join(report_dir, "context.png"), format="png"
+            )
+            content = content.replace(
                     "{context_graph_path}",
                     str(os.path.join(report_dir, "context.png")).replace("\\", "/"),
                 )
-                .replace(
-                    "{example_arena_graph}",
-                    str(os.path.join(report_dir, example_arena)).replace("\\", "/"),
+        if "time_graph" in plots:
+            plots["time_graph"].write_image(
+                os.path.join(report_dir, "time_graph.png"), format="png"
+            )
+            content = content.replace(
+                    "{time_graph}",
+                    str(os.path.join(report_dir, "time_graph.png")).replace("\\", "/"),
                 )
-                .replace(
+        if "arena_graphs" in plots:
+            for match, fig in plots["arena_graphs"].items():
+                fig.write_image(os.path.join(report_dir, f"{match}.png"), format="png")
+            content = content.replace(
                     "{report_arena_graph}",
                     str(os.path.join(report_dir, "report_arena_graph.png")).replace(
                         "\\", "/"
                     ),
                 )
-                .replace(
-                    "{time_graph}",
-                    str(os.path.join(report_dir, "time_graph.png")).replace("\\", "/"),
-                )
+        if "report_arena_graph" in plots:
+            plots["report_arena_graph"].write_image(
+                os.path.join(report_dir, "report_arena_graph.png"), format="png"
             )
-        if plots["impact_graph"] is not None:
+            for file in os.listdir(report_dir):
+                if "_v_" in file:
+                    example_arena = file
+                    break
+            content = content.replace(
+                    "{example_arena_graph}",
+                    str(os.path.join(report_dir, example_arena)).replace("\\", "/"),
+                )        
+            
+        final_report = (
+                content 
+            )
+
+
+        if "impact_graph" in plots and plots["impact_graph"] is not None:
             plots["impact_graph"].write_image(
                 os.path.join(report_dir, "impact_graph.png"), format="png"
             )
             final_report = self.add_impact_sequence(final_report)
 
-        if plots["energy_graph"] is not None:
+        if "energy_graph" in plots and plots["energy_graph"] is not None:
             plots["energy_graph"].write_image(
                 os.path.join(report_dir, "energy_graph.png"), format="png"
             )
@@ -257,10 +276,11 @@ class DataFramePreparator:
         ground_truths = [
             ans if pd.notna(ans) and ans != "" else None for ans in df["answer"]
         ]
-
         return queries, ground_truths
 
-    def run_all_queries(self, options_generation=None, log_file: str = "") -> None:
+    def run_all_queries(self,
+                        options_generation=None,
+                        log_file: str = "") -> None:
 
         with open(log_file, "r") as f:
             data_logs = json.load(f)
@@ -280,13 +300,16 @@ class DataFramePreparator:
 
             indexation_tokens[rag_available] = rag_agent.get_infos_embeddings()
             start_time = time.time()
-            rag_results = rag_agent.generate_answers(
-                self.queries, rag_agent.nb_chunks, options_generation=options_generation
-            )
+            rag_results = rag_agent.generate_answers(self.queries,
+                                                     rag_agent.nb_chunks, 
+                                                     options_generation=options_generation)
             end_time = time.time()
             answer_time = end_time - start_time
             answers = [rag_result["answer"] for rag_result in rag_results]
             contexts = [rag_result["context"] for rag_result in rag_results]
+
+            
+
             nb_input_tokens = [
                 rag_result["nb_input_tokens"] for rag_result in rag_results
             ]
@@ -296,6 +319,8 @@ class DataFramePreparator:
             impacts = [rag_result["impacts"] for rag_result in rag_results]
 
             energies = [rag_result["energy"] for rag_result in rag_results]
+
+
             self.dataframe[rag_available] = [
                 dict(
                     ANSWER=answer,

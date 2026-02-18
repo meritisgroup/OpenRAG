@@ -3,6 +3,7 @@ from streamlit_.utils.benchmark_funcs import (
     get_report_path,
     run_indexation_benchmark,
     generate_benchmark,
+    generate_benchmark_ground_truth_only,
     generate_only_answers,
     generate_only_contexts,
 )
@@ -21,12 +22,12 @@ def task(
     report_dir,
     type_bench,
     config_server,
+    models_infos,
     queries_doc_name,
     databases,
     session_state=None,
     background=False,
 ):
-
     rag_agents, rag_names = run_indexation_benchmark(
         reset_index=reset_index,
         reset_preprocess=reset_preprocess,
@@ -40,17 +41,39 @@ def task(
     ):
         if len(rag_agents) > 1:
             if type_bench == "answers":
-                generate_only_answers(rag_names, rag_agents, report_dir=report_dir)
+                generate_only_answers(rag_names, 
+                                      rag_agents, 
+                                      report_dir=report_dir)
             elif type_bench == "contexts":
                 generate_only_contexts(
-                    rag_names=rag_names, rag_agents=rag_agents, report_dir=report_dir
+                    rag_names=rag_names,
+                    rag_agents=rag_agents,
+                    report_dir=report_dir
                 )
+            elif type_bench == "ground_truth":
+                generate_benchmark_ground_truth_only(
+                    rag_names,
+                    rag_agents,
+                    databases=databases,
+                    config_server=config_server,
+                    models_infos=models_infos,
+                    report_dir=report_dir,
+                    queries_doc_mane=queries_doc_name,
+                    session_state=session_state,
+                )
+                if not background:
+                    databases = st.session_state["benchmark_database"]
+                    markdown_text = "Benchmark runned on the following database:\n"
+                    for db in databases:
+                        markdown_text += f"- {db}\n"
+                    st.markdown(markdown_text)
             elif type_bench == "full_bench":
                 generate_benchmark(
                     rag_names,
                     rag_agents,
                     databases=databases,
                     config_server=config_server,
+                    models_infos=models_infos,
                     report_dir=report_dir,
                     queries_doc_mane=queries_doc_name,
                     session_state=session_state,
@@ -69,7 +92,8 @@ def task(
 
 
 def run_benchmark(
-    type_bench, reset_index=False, reset_preprocess=False, background=False
+    type_bench, reset_index=False,
+    reset_preprocess=False, background=False
 ):
     rag_to_run = [
         rag
@@ -80,6 +104,7 @@ def run_benchmark(
         databases = st.session_state["benchmark_database"]
         report_dir = get_report_path()
         config_server = st.session_state["config_server"]
+        models_infos = st.session_state["models_infos"]
         queries_doc_name = st.session_state["benchmark"]["queries_doc_name"]
 
         if background:
@@ -88,6 +113,8 @@ def run_benchmark(
             system = platform.system()
 
             config_server_str = json.dumps(config_server)
+            models_infos_str = json.dumps(models_infos)
+
             databases_str = json.dumps(databases)
             session_state = dict(st.session_state)
 
@@ -106,7 +133,6 @@ def run_benchmark(
             env = os.environ.copy()
             env["PYTHONUTF8"] = "1"
             env["PYTHONPATH"] = project_root + os.pathsep + env.get("PYTHONPATH", "")
-
             args = [
                 python_exe,
                 script_path,
@@ -120,6 +146,8 @@ def run_benchmark(
                 type_bench,
                 "--config_server",
                 config_server_str,
+                 "--models_infos",
+                models_infos_str,
                 "--queries_doc_name",
                 queries_doc_name,
                 "--databases",
@@ -131,8 +159,8 @@ def run_benchmark(
                 process = subprocess.Popen(
                     args,
                     env=env,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
+                    stdout=log_f,
+                    stderr=log_f,
                     stdin=subprocess.DEVNULL,
                     preexec_fn=os.setpgrp,
                     close_fds=True,
@@ -156,6 +184,7 @@ def run_benchmark(
                 report_dir=report_dir,
                 type_bench=type_bench,
                 config_server=config_server,
+                models_infos=models_infos,
                 queries_doc_name=queries_doc_name,
                 databases=databases,
             )
@@ -176,6 +205,7 @@ if __name__ == "__main__":
     parser.add_argument("--report_dir", type=str, required=True)
     parser.add_argument("--type_bench", type=str, required=True)
     parser.add_argument("--config_server", type=str, required=True)
+    parser.add_argument("--models_infos", type=str, required=True)
     parser.add_argument("--session_state_file", type=str, required=True)
     parser.add_argument("--queries_doc_name", type=str, required=True)
     parser.add_argument(
@@ -185,9 +215,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     config_server = json.loads(args.config_server)
+    models_infos = json.loads(args.models_infos)
     databases = json.loads(args.databases)
-    reset_index = args.reset_index
-    reset_preprocess = args.reset_preprocess
+    reset_index = args.reset_index.lower() == "true"
+    reset_preprocess = args.reset_preprocess.lower() == "true"
     report_dir = args.report_dir
     type_bench = args.type_bench
 
@@ -200,6 +231,7 @@ if __name__ == "__main__":
         reset_preprocess=reset_preprocess,
         type_bench=args.type_bench,
         config_server=config_server,
+        models_infos=models_infos,
         queries_doc_name=args.queries_doc_name,
         databases=databases,
         session_state=session_state,

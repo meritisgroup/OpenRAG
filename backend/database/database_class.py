@@ -10,6 +10,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Session, Query
 from ..utils.factory_vectorbase import get_vectorbase
+from .utils import get_list_path_documents
 import os
 from pathlib import Path
 from sqlalchemy.orm import DeclarativeMeta
@@ -33,15 +34,21 @@ from typing import Union
 def get_management_data(
     dbs_name, storage_path, data_folders_name, config_server: dict, agent: Agent = None
 ):
-    db = Merger_Database_Vectorbase(
-        dbs_name=dbs_name,
-        storages_path=storage_path,
-        agent=agent,
-        config_server=config_server,
-        storage_path=storage_path,
-    )
+    db = Merger_Database_Vectorbase(dbs_name=dbs_name,
+                                    storages_path=storage_path,
+                                    agent=agent,
+                                    config_server=config_server,
+                                    storage_path=storage_path)
+
     for i in range(len(dbs_name)):
-        db.add_database(db_name=dbs_name[i], data_folder_name=data_folders_name[i])
+        if type(config_server["embedding_model"])==list:
+            db.add_database(db_name=dbs_name[i],
+                            data_folder_name=data_folders_name[i],
+                            embedding_model=config_server["embedding_model"][i])
+        else:
+            db.add_database(db_name=dbs_name[i],
+                            data_folder_name=data_folders_name[i],
+                            embedding_model=config_server["embedding_model"])
 
     return db
 
@@ -69,21 +76,29 @@ class Merger_Database_Vectorbase:
             except ValueError:
                 None
 
-    def add_database(self, db_name, data_folder_name) -> None:
+    def create_engine_connection(self):
+        for db_name in self.databases.keys():
+            self.databases[db_name]["database"].create_engine_connection()
+
+    def remove_engine_connection(self):
+        for db_name in self.databases.keys():
+            self.databases[db_name]["database"].remove_engine_connection()
+
+    def add_database(self, db_name, data_folder_name, embedding_model) -> None:
         save_path = os.path.join(self.storage_path, db_name)
-        data_path = os.path.join(
-            self.config_server["storage_data_path"], data_folder_name
-        )
+        data_path = os.path.join(self.config_server["storage_data_path"],
+                                 data_folder_name)
 
         self.databases[db_name] = {}
         self.databases[db_name]["path"] = data_path
-        self.databases[db_name]["database"] = DataBase(
-            db_name=db_name, path=self.storage_path, path_data=data_path
-        )
+        self.databases[db_name]["database"] = DataBase(db_name=db_name,
+                                                       path=self.storage_path,
+                                                       path_data=data_path)
         self.databases[db_name]["database"].add_table(Document)
 
         if not self.auto_sharding:
-            self.add_vectorbase(vb_name=db_name)
+            self.add_vectorbase(vb_name=db_name,
+                                embedding_model=embedding_model)
 
     def set_database(self, db, db_name: str):
         self.databases[db_name]["database"] = db
@@ -180,11 +195,12 @@ class Merger_Database_Vectorbase:
                 results += self.databases[db_name]["database"].get_list_path_documents()
             return results
 
-    def add_vectorbase(self, vb_name) -> None:
+    def add_vectorbase(self, vb_name, embedding_model) -> None:
         self.vectorbases[vb_name] = {}
-        self.vectorbases[vb_name]["vectorbase"] = get_vectorbase(
-            vb_name=vb_name, config_server=self.config_server, agent=self.agent
-        )
+        self.vectorbases[vb_name]["vectorbase"] = get_vectorbase(vb_name=vb_name,
+                                                                 config_server=self.config_server,
+                                                                 agent=self.agent,
+                                                                 embedding_model=embedding_model)
 
     def set_vectorbase(self, vb_name, vb):
         self.vectorbases[vb_name]["vectorbase"] = vb
@@ -292,9 +308,13 @@ class Merger_Database_Vectorbase:
         vb_name: str = None,
         type_output = Chunk
     ):
+        
         if vb_name is not None:
             if collection_name is not None:
                 collection_name = vb_name + "_" + collection_name
+
+
+
             return self.vectorbases[vb_name]["vectorbase"].k_search(
                 queries=queries,
                 k=k,
@@ -303,6 +323,10 @@ class Merger_Database_Vectorbase:
                 collection_name=collection_name,
                 type_output=type_output
             )
+        
+
+
+
         else:
             n = len(self.vectorbases)
             k_per_vectorbase = k // n
@@ -320,6 +344,8 @@ class Merger_Database_Vectorbase:
                 else:
                     collection_name_search = collection_name
 
+
+               
                 result = self.vectorbases[vb_name]["vectorbase"].k_search(
                     queries=queries,
                     k=k_per_db_list[i],
@@ -327,6 +353,8 @@ class Merger_Database_Vectorbase:
                     collection_name=collection_name_search,
                     type_output=type_output
                 )
+                
+
                 if len(chunks) == 0:
                     chunks = result
                 else:
@@ -351,8 +379,15 @@ class DataBase:
         self.path_data = path_data
 
         self.name = db_name
-        self.engine = create_engine(f"sqlite:///{path + db_name}")
+        self.create_engine_connection()
+
+    def create_engine_connection(self):
+        self.engine = create_engine(f"sqlite:///{self.path + self.name}")
         self.session = Session(bind=self.engine)
+
+    def remove_engine_connection(self):
+        self.engine = None
+        self.session = None
 
     def add_table(self, table_class: Base) -> None:
         """
@@ -579,16 +614,8 @@ class DataBase:
         except Exception as e:
             self.session.rollback()
             print(f'An error "{e}" occurred when trying to clean the database')
-
     def get_list_path_documents(self):
-        all_files = os.listdir(self.path_data)
-        all_files = [
-            os.path.join(self.path_data, doc_name)
-            for doc_name in all_files
-            if doc_name != "metadatas.json" and not Path(os.path.join(self.path_data, doc_name)).is_dir()
-        ]
-        all_docs = [f for f in all_files]
-        return all_docs
+        return get_list_path_documents(path_data=self.path_data)
 
 
 class ContextDatabase:
@@ -613,7 +640,7 @@ class ContextDatabase:
             rag_name,
             self.metadata,
             Column("query", String, primary_key=True),
-            Column("context", JSON),  # Stores list[dict]
+            Column("context", JSON),
             extend_existing=True,
         )
         self.metadata.create_all(self.engine)
@@ -623,12 +650,10 @@ class ContextDatabase:
         """Insert one row (query + list of chunk dicts) into a given RAG table."""
         dict_chunks = [chunk.to_dict() for chunk in chunks]
         with self.engine.begin() as conn:
-            # Check if query already exists
             sel = rag_table.select().where(rag_table.c.query == query)
             result = conn.execute(sel).first()
 
             if result is None:
-                # Insert only if not present
                 ins = rag_table.insert().values(query=query, 
                                                 context=dict_chunks)
                 conn.execute(ins)

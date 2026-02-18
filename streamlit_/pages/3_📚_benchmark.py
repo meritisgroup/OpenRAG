@@ -16,11 +16,13 @@ from streamlit_.utils.benchmark_funcs import (
     run_indexation_benchmark,
     get_folder_saved_benchmark,
     show_already_done_benchmark,
-    get_report_path,
+    get_report_path, generate_questions
 )
-from streamlit_.utils.chat_funcs import get_chat_agent, change_default_prompt
 
+from backend.evaluation import end_to_end_evaluators
+from streamlit_.utils.chat_funcs import get_chat_agent, change_default_prompt
 from backend.utils.progress import ProgressBar
+
 
 st.markdown("# Benchmark Generation")
 st.markdown("## Choose RAG techniques to benchmark:")
@@ -28,9 +30,7 @@ col1, col2, col3 = st.columns(3)
 
 
 all_rags = list(
-    st.session_state["all_rags"][
-        st.session_state["config_server"]["params_host_llm"]["type"]
-    ].keys()
+    st.session_state["all_rags"].keys()
 )
 nb_rags = len(all_rags)
 rags_per_column = nb_rags // 3 if nb_rags % 3 == 0 else nb_rags // 3 + 1
@@ -42,9 +42,7 @@ with col1:
         else:
             disable = False
         st.session_state["benchmark"]["rags"][all_rags[i]] = st.checkbox(
-            label=st.session_state["all_rags"][
-                st.session_state["config_server"]["params_host_llm"]["type"]
-            ][all_rags[i]],
+            label=st.session_state["all_rags"][all_rags[i]],
             value=st.session_state["benchmark"]["rags"][all_rags[i]],
             disabled=disable,
         )
@@ -56,9 +54,7 @@ with col2:
         else:
             disable = False
         st.session_state["benchmark"]["rags"][all_rags[i]] = st.checkbox(
-            label=st.session_state["all_rags"][
-                st.session_state["config_server"]["params_host_llm"]["type"]
-            ][all_rags[i]],
+            label=st.session_state["all_rags"][all_rags[i]],
             value=st.session_state["benchmark"]["rags"][all_rags[i]],
             disabled=disable,
         )
@@ -70,9 +66,7 @@ with col3:
         else:
             disable = False
         st.session_state["benchmark"]["rags"][all_rags[i]] = st.checkbox(
-            label=st.session_state["all_rags"][
-                st.session_state["config_server"]["params_host_llm"]["type"]
-            ][all_rags[i]],
+            label=st.session_state["all_rags"][all_rags[i]],
             value=st.session_state["benchmark"]["rags"][all_rags[i]],
             disabled=disable,
         )
@@ -139,6 +133,53 @@ else:
             options=st.session_state["all_databases"],
             key="benchmark_database",
         )
+    
+
+
+
+
+    
+st.markdown("## Generate queries")
+left, right = st.columns([0.5, 0.15], vertical_alignment="bottom")
+st.session_state["benchmark"]["number_of_questions"] = left.number_input(
+    label="Number of queries",
+    min_value=1,
+    step=1,
+    value=5)
+
+if right.button(label="Generate queries", type="primary", use_container_width=True):
+    file_path = "./data/queries/generated_queries.xlsx"
+    config_server=st.session_state["config_server"]
+    model_infos = st.session_state["models_infos"]
+
+
+    number = st.session_state["benchmark"]["number_of_questions"]
+    list_queries, list_answers = generate_questions(
+        n_questions=number,
+        databases=st.session_state["benchmark_database"],
+        config_server=config_server,
+        model_infos=model_infos
+    )
+
+    df = pd.DataFrame({
+        "query": list_queries,
+        "answer": list_answers
+    })
+
+
+    if not os.path.exists(file_path):
+        df.to_excel(file_path, index=False)
+        st.success(f"File created and {number} queries saved to: {file_path}")
+    else:
+        existing_df = pd.read_excel(file_path)
+        updated_df = pd.concat([existing_df, df], ignore_index=True)
+        updated_df.to_excel(file_path, index=False)
+        st.success(f"Added {number} new queries ")
+
+    st.write(f"Generating {number} queries...")
+
+
+
 
 
 if "all_system_prompt" not in st.session_state:
@@ -278,8 +319,24 @@ if col2.button(
                       reset_preprocess=reset_preprocess,
                       background=False)
         
-
 if col3.button(
+    "Generate ground truth comparisons",
+    on_click=handle_click,
+    disabled=st.session_state["benchmark_clicked"],
+    use_container_width=True,
+    type="primary",
+):
+    if st.session_state["benchmark_database"] is None:
+        st.session_state["benchmark_clicked"] = False
+        st.error("Choose a database")
+    else:
+        run_benchmark(type_bench="ground_truth", 
+                      reset_index=reset_index,
+                      reset_preprocess=reset_preprocess,
+                      background=background_running)
+    put_default_local_parameters()
+
+if col4.button(
     "Generate Benchmark",
     on_click=handle_click,
     disabled=st.session_state["benchmark_clicked"],
@@ -308,6 +365,36 @@ if "report_path" in st.session_state["benchmark"]:
         "***Benchmark terminé !***",
     )
 
+    SCORES = end_to_end_evaluators.SCORES
+    report_path = st.session_state["benchmark"]["report_path"]
+    csv_path = os.path.join(report_path, "bench_df.csv")
+
+    if os.path.exists(csv_path):
+        bench_df = pd.read_csv(csv_path)
+
+        def score_to_emoji(score):
+            if score == 5:
+                return "🟢"
+            elif score == 0:
+                return "🔴"
+            return "⚪"   
+
+        for rag_name, score_list in SCORES.items():
+            bench_df[rag_name + "_correct"] = [score_to_emoji(score) for score in score_list]
+
+        with st.expander("See the RAGs' answers", expanded=False):
+            st.write("### Answers with evaluation indicators")
+
+            st.dataframe(
+                bench_df,
+                use_container_width=True,
+                height=600
+            )
+
+    else:
+        st.info("Aucun fichier bench_df.csv trouvé dans le dossier du benchmark.")
+    #ajout jusqu'ici
+
     with open(
         st.session_state["benchmark"]["report_path"] + "/plot_report.pdf", "rb"
     ) as file:
@@ -335,9 +422,11 @@ if "report_path" in st.session_state["benchmark"]:
         st.session_state["benchmark"]["report_path"] + "/config_server.json", "w"
     ) as file:
         json.dump(st.session_state["config_server"], file, indent=4)
-    match = st.selectbox(
-        label="**Choose arena match to analyse**",
-        options=st.session_state["benchmark"]["matches"],
-        format_func=match_name_cleaner,
-    )
-    st.plotly_chart(st.session_state["benchmark"]["plots"]["arena_graphs"][match])
+    if "matches" in st.session_state["benchmark"]:
+        match = st.selectbox(
+            label="**Choose arena match to analyse**",
+            options=st.session_state["benchmark"]["matches"],
+            format_func=match_name_cleaner,
+        )
+    if "arena_graphs" in st.session_state["benchmark"]["plots"] and match in st.session_state["benchmark"]["plots"]["arena_graphs"]:
+        st.plotly_chart(st.session_state["benchmark"]["plots"]["arena_graphs"][match])

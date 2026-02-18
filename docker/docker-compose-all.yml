@@ -56,29 +56,6 @@ services:
       retries: 30
     networks:
       - app-network
-
-  vllm:
-    build:
-      context: ../infrastructure/vllm
-      dockerfile: Dockerfile
-    image: openrag_vllm
-    container_name: ${VLLM_LOCAL_CONTAINER_NAME}
-    runtime: nvidia 
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-    environment:
-      - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
-    volumes:
-      - ../volumes/HF:/root/.cache/huggingface
-    networks:
-      - app-network
-
   front:
     build:
       context: ..

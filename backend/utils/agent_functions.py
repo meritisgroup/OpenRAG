@@ -8,11 +8,12 @@ import io
 from pydantic import BaseModel
 from typing import Union
 from ecologits import EcoLogits
+from io import BytesIO
+import base64
+from PIL import Image, ImageDraw, ImageFont
+import concurrent.futures
 from .progress import ProgressBar
-
-
-class RerankedChunk(BaseModel):
-    score: float
+from .threading_utils import get_executor_threads
 
 
 def np_array_to_file(image_np: np.ndarray, format: str = "jpeg"):
@@ -22,6 +23,15 @@ def np_array_to_file(image_np: np.ndarray, format: str = "jpeg"):
     image_bytes = io.BytesIO(encoded_image.tobytes())
     image_bytes.name = f"image.{format}"  # Nécessaire pour requests
     return image_bytes
+
+def encode_image(img):
+    if isinstance(img, np.ndarray):
+        img = Image.fromarray(img)
+    buffer = BytesIO()
+    img.save(buffer, format="PNG")
+    return base64.b64encode(buffer.getvalue()).decode("utf-8")
+class RerankedChunk(BaseModel):
+    score: float
 
 
 tuple_delimiter = ","
@@ -33,12 +43,57 @@ list_entities = (
     "[rôle, humain, évènement, journal, entreprise, date, lieu, objet, chiffre]"
 )
 
-
+"""
 def predict_json(
     system_prompt: str,
     prompt: str,
     model: str,
     client: Union[OpenAI, Mistral],
+    json_format: BaseModel,
+    temperature: float = None,
+    options_generation=None,
+) -> str:
+    if not getattr(EcoLogits, "_initialized", False):
+        EcoLogits.init()
+        EcoLogits._initialized = True
+
+    if (
+        options_generation is not None
+        and options_generation["type_generation"] == "no_generation"
+    ):
+        return ""
+    if True:
+        params = {
+            "model": model,
+            "input": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt},
+            ],
+            "text_format": json_format,
+        }
+        if temperature is not None:
+            params["temperature"] = temperature
+
+        if type(client) is OpenAI:
+            response = client.responses.parse(**params)
+        
+        if type(client) is Mistral:
+            response = client.chat.parse(**params)
+
+        json_response = response.output[0].content[0]
+        print("\n\njson_response:", json_response)
+        if json_response.parsed:
+
+            return json_response.parsed
+        else:
+            print("refusal ", json_response.refusal)
+"""
+
+def predict_json(
+    system_prompt: str,
+    prompt: str,
+    model: str,
+    client: OpenAI,
     json_format: BaseModel,
     temperature: float = None,
     options_generation=None,
@@ -57,14 +112,10 @@ def predict_json(
             ],
             "response_format": json_format,
         }
-        # Only add temperature if not None
         if temperature is not None:
             params["temperature"] = temperature
-        if type(client) is OpenAI:
-            response = client.beta.chat.completions.parse(**params)
 
-        if type(client) is Mistral:
-            response = client.chat.parse(**params)
+        response = client.beta.chat.completions.parse(**params)
 
         json_response = response.choices[0].message
         if json_response.parsed:
@@ -76,48 +127,84 @@ def predict_json(
     except Exception as e:
         print(f"Error: {e}")
 
-
 def predict_image(
     prompt: str,
     model: str,
-    data_url,
-    client: Union[OpenAI, Mistral],
-    json_format: BaseModel,
+    img,
+    client: OpenAI,
+    json_format: BaseModel = None,
     temperature: float = None,
 ) -> str:
 
-    try:
+        img = encode_image(img=img)
         params = {
             "model": model,
             "messages": [
                 {
                     "role": "user",
                     "content": [
-                        {"type": "image_url", "image_url": {"url": data_url}},
+                        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img}"}},
                         {"type": "text", "text": prompt},
                     ],
                 }
-            ],
-            "response_format": json_format,
+            ]
         }
-        # Only add temperature if not None
+
         if temperature is not None:
             params["temperature"] = temperature
-        if type(client) is OpenAI:
-            response = client.beta.chat.completions.parse(**params)
+        if json_format is not None:
+            params["response_format"] = json_format
 
-        if type(client) is Mistral:
-            response = client.chat.parse(**params)
-
-        json_response = response.choices[0].message
-        if json_response.parsed:
-
+        response = client.beta.chat.completions.parse(**params)
+        json_response = response.choices[0].message.content
+        
+        if json_format is not None and json_response.parsed:
             return json_response.parsed
         else:
-            print("refusal ", json_response.refusal)
+            return json_response
 
-    except Exception as e:
-        print(f"Error: {e}")
+
+def predict_images(
+    prompts: list[str],
+    model: str,
+    images: list[np.ndarray],
+    client: OpenAI,
+    json_format: BaseModel = None,
+    temperature: float = None,
+    max_workers: int = 10
+) -> str:
+    if not getattr(EcoLogits, "_initialized", False):
+        EcoLogits.init()
+        EcoLogits._initialized = True
+
+    if max_workers <= get_executor_threads():
+            max_workers = 1
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_index = {}
+        for i in range(len(images)):
+            future = executor.submit(predict_image,
+                                     prompt=prompts[i],
+                                     model=model,
+                                     img=images[i],
+                                     client=client,
+                                     json_format=json_format,
+                                     temperature=temperature)
+            future_to_index[future] = i
+
+        unordered_results = []
+        for future in concurrent.futures.as_completed(future_to_index):
+            original_index = future_to_index[future]
+            try:
+                result = future.result()
+                unordered_results.append((original_index, result)) 
+
+            except Exception as exc:
+                print(f'La tâche {original_index} a généré une exception: {exc}')
+
+        unordered_results.sort(key=lambda x: x[0])
+        answers = [result for index, result in unordered_results]
+        return answers
 
 
 def predict(
@@ -131,6 +218,10 @@ def predict(
     """
     Gives the prompt to the LLM and returns the output
     """
+    if not getattr(EcoLogits, "_initialized", False):
+        EcoLogits.init()
+        EcoLogits._initialized = True
+        
     if (
         options_generation is not None
         and options_generation["type_generation"] == "no_generation"
@@ -142,21 +233,26 @@ def predict(
             "impacts": [0, 0, ""],
             "energy": [0, 0, ""],
         }
-
-    EcoLogits.init()
-    response = client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": prompt},
-        ],
-        temperature=temperature,
-    )
     try:
-        answer = response.choices[0].message.content
+        params = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt},
+            ],
+        }
+        if temperature is not None:
+            params["temperature"] = temperature
 
-    except Exception:
-        print("Error in answer generation but still running")
+        params.pop("impacts", None)
+        if "gpt-oss" in model:
+            params["extra_body"] = {"reasoning_effort": "low"}
+
+        response = client.beta.chat.completions.parse(**params)
+        
+        answer = response.choices[0].message.content
+    except Exception as e:
+        print("Error in answer generation but still running: ", e)
         answer = ""
 
     try:
@@ -196,64 +292,6 @@ def predict(
     }
 
 
-def predict_vllm(
-    system_prompts: list[str],
-    prompts: list[str],
-    model: str,
-    url: str,
-    temperature: float = 0,
-    images: list[str] = None,
-    json_format=None,
-    options_generation=None,
-) -> tuple[list[str], int, int]:
-    """
-    Gives the prompts to the LLM and returns the outputs
-    """
-
-    if (
-        options_generation is not None
-        and options_generation["type_generation"] == "no_generation"
-    ):
-        return {
-            "texts": [""],
-            "nb_input_tokens": 0,
-            "nb_output_tokens": 0,
-            "impacts": [0, 0, ""],
-            "energy": [0, 0, ""],
-        }
-
-    if type(prompts) is type("str"):
-        prompts = [prompts]
-
-    if type(system_prompts) is type("str"):
-        system_prompts = [system_prompts]
-
-    if json_format is not None:
-        json_format = json.dumps(json_format.model_json_schema())
-
-    data = {
-        "model_name": model,
-        "systems": system_prompts,
-        "prompts": prompts,
-        "temperature": temperature,
-        "json_format": json_format,
-    }
-    if images is None or images[0] is None:
-        answers = requests.post(url, data=data).json()
-    else:
-        files = []
-        for i in range(len(images)):
-            for j in range(len(images[i])):
-                files.append(
-                    (
-                        "images",
-                        (str(i), np_array_to_file(image_np=images[i][j]), "image/jpeg"),
-                    )
-                )
-        answers = requests.post(url, data=data, files=files).json()
-    return answers
-
-
 def multiple_predict(
     system_prompts: list[str],
     prompts: list[str],
@@ -261,55 +299,74 @@ def multiple_predict(
     client: OpenAI,
     temperature: float = 0,
     options_generation=None,
-) -> tuple[list[str], int, int]:
+    max_workers: int = 10,
+) -> dict:
     """
-    Gives the prompts to the LLM and returns the outputs
+    Gives the prompts to the LLM in parallel and returns the outputs.
     """
-
     if (
         options_generation is not None
         and options_generation["type_generation"] == "no_generation"
     ):
         return {
-            "texts": ["" for k in range(len(prompts))],
+            "texts": ["" for _ in range(len(prompts))],
             "nb_input_tokens": 0,
             "nb_output_tokens": 0,
             "impacts": [0, 0, ""],
             "energy": [0, 0, ""],
         }
 
-    answers, input_tokens, output_tokens, impacts, energy = (
-        [],
-        0,
-        0,
-        [0, 0, ""],
-        [0, 0, ""],
-    )
-
-    if type(prompts) is type("str"):
+    if isinstance(prompts, str):
         prompts = [prompts]
-
-    if type(system_prompts) is type("str"):
+    if isinstance(system_prompts, str):
         system_prompts = [system_prompts]
 
-    progress_bar = ProgressBar(prompts)
-    for k, (prompt, system_prompt) in enumerate(zip(prompts, system_prompts)):
-        progress_bar.update(
-            index=k, text=f"Processing prompt {k+1}/{progress_bar.total}"
-        )
-        answer = predict(system_prompt, prompt, model, client, temperature)
-        answers.append(answer["texts"])
-        input_tokens += answer["nb_input_tokens"]
-        output_tokens += answer["nb_output_tokens"]
-        impacts = answer["impacts"]
-        energy = answer["energy"]
-    progress_bar.clear()
+    if max_workers<=get_executor_threads():
+        max_workers = 1
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_index = {
+            executor.submit(
+                predict, system_prompt, prompt, model, client, temperature
+            ): i
+            for i, (prompt, system_prompt) in enumerate(zip(prompts, system_prompts))
+        }
+
+        results = [None] * len(prompts)
+        for future in concurrent.futures.as_completed(future_to_index):
+            index = future_to_index[future]
+            try:
+                result = future.result()
+                results[index] = result
+            except Exception as exc:
+                results[index] = {"texts": f"ERROR: {exc}",
+                                  "nb_input_tokens": 0,
+                                  "nb_output_tokens": 0,
+                                  "impacts": [0, 0, ""],
+                                  "energy": [0, 0, ""]
+                                  }
+    
+    all_answers = []
+    total_input_tokens = 0
+    total_output_tokens = 0
+    total_impacts = [0, 0, ""]
+    total_energy = [0, 0, ""]
+
+    for result in results:
+        if result:
+            all_answers.append(result["texts"])
+            total_input_tokens += result["nb_input_tokens"]
+            total_output_tokens += result["nb_output_tokens"]
+            total_impacts[0] += result["impacts"][0]
+            total_impacts[1] += result["impacts"][1]
+            total_energy[0] += result["energy"][0]
+            total_energy[1] += result["energy"][1]
+
     return {
-        "texts": answers,
-        "nb_input_tokens": input_tokens,
-        "nb_output_tokens": output_tokens,
-        "impacts": impacts,
-        "energy": energy,
+        "texts": all_answers,
+        "nb_input_tokens": total_input_tokens,
+        "nb_output_tokens": total_output_tokens,
+        "impacts": total_impacts,
+        "energy": total_energy,
     }
 
 
@@ -336,7 +393,11 @@ def predict_mistral(
             "energy": [0, 0, ""],
         }
 
-    EcoLogits.init()
+    if not getattr(EcoLogits, "_initialized", False):
+        EcoLogits.init()
+        EcoLogits._initialized = True
+
+
     response = client.chat.complete(
         model=model,
         messages=[
@@ -481,14 +542,11 @@ def rerank(
             ],
             "response_format": RerankedChunk,
         }
-        # Only add temperature if not None
         if temperature is not None:
             params["temperature"] = temperature
         if type(client) is OpenAI:
+            params.pop("impacts", None)
             scores = client.beta.chat.completions.parse(**params)
-
-        if type(client) is Mistral:
-            scores = client.chat.parse(**params)
 
         json_response = scores.choices[0].message
         nb_input_tokens = scores.usage.prompt_tokens

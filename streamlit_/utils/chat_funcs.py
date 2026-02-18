@@ -9,52 +9,54 @@ import json
 from backend.database.rag_classes import Document, Tokens, Chunk
 
 
-def get_chat_agent(rag_method, databases_name, session_state=None):
+def get_chat_agent(rag_method,
+                   databases_name,
+                   session_state=None):
     if session_state is None:
         session_state = st.session_state
-
     if (
         "custom_rags" in session_state.keys()
         and rag_method in session_state["custom_rags"]
     ):
-        folder = session_state["config_server"]["params_host_llm"]["type"]
-        with open(f"data/custom_rags/{folder}/{rag_method}.json", "r") as file:
+        with open(f"data/custom_rags/{rag_method}.json", "r") as file:
             custom_config = json.load(file)
 
         custom_config["params_host_llm"] = session_state["config_server"][
             "params_host_llm"
         ]
 
-        rag_agent = get_custom_rag_agent(
+        rag_agent = get_rag_agent(
             custom_config["base"],
             config_server=custom_config,
+            models_infos=session_state["models_infos"],
             databases_name=databases_name,
         )
     elif (
         "merge_rags" in session_state.keys()
         and rag_method in session_state["merge_rags"]
     ):
-        folder = session_state["config_server"]["params_host_llm"]["type"]
-        with open(f"data/merge/{folder}/{rag_method}.json", "r") as file:
+        with open(f"data/merge/{rag_method}.json", "r") as file:
             custom_config = json.load(file)
 
         custom_config["params_host_llm"] = session_state["config_server"][
             "params_host_llm"
         ]
 
-        rag_agent = get_custom_rag_agent(
+        rag_agent = get_rag_agent(
             "merger",
             config_server=custom_config,
+            models_infos=session_state["models_infos"],
             databases_name=databases_name,
         )
     else:
-        session_state["config_server"] = change_config_server(
-            rag_name=rag_method, config_server=session_state["config_server"]
+        session_state["config_server"] = change_config_server(rag_name=rag_method,
+                                                              config_server=session_state["config_server"],
+                                                              mode=session_state["mode_interface"]
         )
-        rag_agent = get_rag_agent(
-            rag_method,
-            config_server=session_state["config_server"],
-            databases_name=databases_name,
+        rag_agent = get_rag_agent(rag_method,
+                                  config_server=session_state["config_server"],
+                                  models_infos=session_state["models_infos"],
+                                  databases_name=databases_name,
         )
 
     return rag_agent

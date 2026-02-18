@@ -5,8 +5,80 @@ from tqdm.auto import tqdm
 from ...utils.progress import ProgressBar
 import os
 import numpy as np
+import concurrent.futures
 from pathlib import Path
+import time
 from ...database.rag_classes import Chunk
+from ...utils.threading_utils import get_executor_threads
+
+
+
+from tqdm import tqdm
+import os
+import json
+
+def indexation(data_manager, doc_chunks, path_docs):
+        """
+        Adds a batch of chunks from doc_chunks to the indexation vectorbase
+        Args:
+            doc_chunks (list[str]) : Chunks to be indexed
+            name_docs (list[str]) : Name of docs each chunk is from
+
+        Returns
+            None
+        """
+
+        tokens = 0
+        taille_batch = 500
+        range_chunks = range(0, len(doc_chunks), taille_batch)
+        for i in range_chunks:
+            tokens += np.sum(
+                data_manager.add_str_batch_elements(
+                    chunks=doc_chunks[i : i + taille_batch],
+                    path_docs=path_docs[i : i + taille_batch],
+                    display_message=False,
+                )
+            )
+        return tokens
+
+
+LIST_CHUNKS=[]
+
+def process_single_doc(data_manager,
+                       path_doc: str,
+                       doc_index: int,
+                       config_server: dict,
+                       agent,
+                       splitter, 
+                       chunk_size: int,
+                       chunk_overlap: bool,
+                       reset_preprocess: bool) -> dict:
+    
+    doc = DocumentText(path=path_doc,
+                       doc_index=doc_index,
+                       config_server=config_server,
+                       agent=agent,
+                       splitter=splitter,
+                       reset_preprocess=reset_preprocess)
+    
+    doc_chunks = doc.chunks(chunk_size=chunk_size,
+                            chunk_overlap=chunk_overlap)
+    
+    LIST_CHUNKS.extend(doc_chunks)
+    path_docs = [str(Path(path_doc).parent)] * len(doc_chunks)
+
+    doc_indexation_tokens = 0
+    doc_indexation_tokens = indexation(data_manager=data_manager,
+                                       doc_chunks=doc_chunks,
+                                       path_docs=path_docs)
+    
+                                       
+    return {
+        "name": str(Path(path_doc).name),
+        "path": str(path_doc),
+        "embedding_tokens": int(doc_indexation_tokens),
+        "parent_path": str(Path(path_doc).parent),
+    }
 
 
 class NaiveRagIndexation:
@@ -15,6 +87,7 @@ class NaiveRagIndexation:
         data_manager,
         agent,
         embedding_model,
+        data_preprocessing: str,
         type_text_splitter="TextSplitter",
     ) -> None:
         """
@@ -33,65 +106,23 @@ class NaiveRagIndexation:
         self.agent = agent
         self.embedding_model = embedding_model
 
-        self.splitter = get_splitter(
-            type_text_splitter=type_text_splitter,
-            agent=self.agent,
-            embedding_model=self.embedding_model,
-        )
+        if type(self.embedding_model) == list:
+            embedding_model = self.embedding_model[0]
+        else:
+            embedding_model = self.embedding_model
+            
+        self.splitter = get_splitter(type_text_splitter=type_text_splitter,
+                                     data_preprocessing=data_preprocessing,
+                                     agent=self.agent,
+                                     embedding_model=embedding_model)
 
-    def __batch_indexation__(self, doc_chunks, path_docs):
-        """
-        Adds a batch of chunks from doc_chunks to the indexation vectorbase
-        Args:
-            doc_chunks (list[str]) : Chunks to be indexed
-            name_docs (list[str]) : Name of docs each chunk is from
 
-        Returns
-            None
-        """
-        tokens = 0
-
-        taille_batch = 500
-        range_chunks = range(0, len(doc_chunks), taille_batch)
-        progress_bar_chunks = ProgressBar(total=len(range_chunks))
-        j = 0
-        for i in range_chunks:
-            tokens += np.sum(
-                self.data_manager.add_str_batch_elements(
-                    chunks=doc_chunks[i : i + taille_batch],
-                    path_docs=path_docs[i : i + taille_batch],
-                    display_message=False,
-                )
-            )
-            progress_bar_chunks.update(j)
-            j += 1
-        progress_bar_chunks.clear()
-        return tokens
-
-    def __serial_indexation__(self, doc_chunks, path_docs):
-        """
-        Adds a batch of chunks from doc_chunks to the indexation vectorbase
-        Args:
-            doc_chunks (list[Chunks]) : Chunks to be indexed
-            name_docs (list[str]) : Name of docs each chunk is from
-
-        Returns
-            None
-        """
-
-        tokens = self.data_manager.add_str_elements(
-            doc_chunks, path_docs, display_message=False
-        )
-        return tokens
-
-    def run_pipeline(
-        self,
-        config_server,
-        reset_preprocess: bool = False,
-        chunk_size: int = 500,
-        chunk_overlap: bool = True,
-        batch: bool = True        
-    ) -> None:
+    def run_pipeline(self,
+                     config_server,
+                     reset_preprocess: bool = False,
+                     chunk_size: int = 1024,
+                     chunk_overlap: bool = True,
+                     max_workers: int = 1) -> None:
         """
         Split texts from self.data_path, embed them and save them in a vector base.
 
@@ -117,46 +148,64 @@ class NaiveRagIndexation:
         docs_to_process = [
             doc for doc in to_process_norm if doc not in docs_already_norm
         ]
+        if max_workers<=get_executor_threads():
+            max_workers = 1
+
         self.data_manager.create_collection()
         progress_bar = ProgressBar(total=len(docs_to_process))
-        for i, path_doc in enumerate(docs_to_process):
-            doc_indexation_tokens = 0
-            progress_bar.set_description(f"Embbeding chunks - {path_doc}")
-            doc = DocumentText(
-                path=path_doc,
-                doc_index=i,
-                config_server=config_server,
-                splitter=self.splitter,
-                reset_preprocess=reset_preprocess
-            )
+        index = 0
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {
+                executor.submit(process_single_doc,
+                                self.data_manager,
+                                path_doc,
+                                i,
+                                config_server,
+                                self.agent,
+                                self.splitter,
+                                chunk_size,
+                                chunk_overlap,
+                                reset_preprocess
+                            ): path_doc for i, path_doc in enumerate(docs_to_process)
+                        }
 
-            doc_chunks = doc.chunks(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+            for future in concurrent.futures.as_completed(futures):
+                    path_doc = futures[future]
 
-            name_docs = [str(Path(path_doc).name) for i in range(len(doc_chunks))]
-            path_docs = [str(Path(path_doc).parent) for i in range(len(doc_chunks))]
+                    result = future.result()
 
-            if batch:
-                doc_indexation_tokens += self.__batch_indexation__(
-                    doc_chunks=doc_chunks, path_docs=path_docs
-                )
+                    new_doc = Document(name=result["name"],
+                                       path=result["path"],
+                                       embedding_tokens=result["embedding_tokens"],
+                                       input_tokens=0,
+                                       output_tokens=0)
 
-            else:
-                doc_indexation_tokens += self.__serial_indexation__(
-                    doc_chunks=doc_chunks, path_docs=path_docs
-                )
-
-            new_doc = Document(
-                name=str(Path(path_doc).name),
-                path=str(Path(path_doc)),
-                embedding_tokens=int(doc_indexation_tokens),
-                input_tokens=0,
-                output_tokens=0,
-            )
-            self.data_manager.add_instance(
-                instance=new_doc, path=str(Path(path_doc).parent)
-            )
-            progress_bar.update(i)
+                    progress_bar.update(index)
+                    index+=1
+                    self.data_manager.add_instance(instance=new_doc,
+                                           path=result["parent_path"]
+                    )
         progress_bar.clear()
+        
+
+
+        
+        jsonl_path: str = "chunks_output.jsonl"
+        doc_ids = {}
+        num_doc = 0
+
+        os.makedirs(os.path.dirname(jsonl_path) or ".", exist_ok=True)
+        with open(jsonl_path, "a", encoding="utf-8") as f:
+            for c in tqdm(LIST_CHUNKS, desc="Écriture des chunks", unit="chunk"):
+                record = {col.name: getattr(c, col.name) for col in c.__table__.columns}
+                if c.document not in doc_ids:
+                    num_doc += 1
+                    doc_ids[c.document] = num_doc
+
+                record["doc_id"] = doc_ids[c.document]
+                f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+        return None
 
 
 def contexts_to_prompts(contexts, docs_name):

@@ -1,5 +1,5 @@
 from .base_classes import Evaluator, StatementSupported, ChunkRelevanceAnswer
-from .utils import process_prompt, process_prompt_to_json
+from .utils import process_prompts, process_prompts_to_json
 import numpy as np
 import re
 from ..utils.agent import Agent
@@ -13,6 +13,7 @@ class ContextRelevanceEvaluator(Evaluator):
     def __init__(
         self,
         agent: Agent,
+        model: str,
         max_attemps: int = 5,
         batch_size: int = 10,
     ) -> None:
@@ -20,8 +21,10 @@ class ContextRelevanceEvaluator(Evaluator):
         This class enables to rate RAG agents thanks to LLM as a judge method from given question where answers are already known.
         model : LLM used to judge the RAG
         """
-        super().__init__(agent, max_attemps, batch_size)
-        self.agent = agent
+        super().__init__(agent=agent,
+                         model=model,
+                         max_attempts=max_attemps,
+                         batch_size=batch_size)
 
         self.system_prompt: str = PROMPTS[self.language]["rate_context_relevance"][
             "SYSTEM_PROMPT"
@@ -62,16 +65,13 @@ class ContextRelevanceEvaluator(Evaluator):
     ) -> list[float | None]:
         prompts, system_prompt = self._get_prompts(queries, model_contexts)
 
-        cleaned_outputs = [
-            process_prompt(
-                prompt,
-                system_prompt,
-                self.max_attempts,
-                self.agent,
-                self._clean_output,
-            )
-            for prompt in prompts
-        ]
+        cleaned_outputs = process_prompts(prompts=prompts,
+                                          system_prompts=[system_prompt],
+                                          max_retry=self.max_attempts,
+                                          agent=self.agent,
+                                          model=self.model,
+                                          clean_output=self._clean_output)
+            
         context_relevance_evaluations = []
         for clean_output, model_context in zip(cleaned_outputs, model_contexts):
             if len(clean_output) > 0:
@@ -97,6 +97,7 @@ class ContextFaithfulnessEvaluator(Evaluator):
     def __init__(
         self,
         agent: Agent,
+        model: str,
         max_attempts: int = 5,
         batch_size: int = 10,
     ) -> None:
@@ -104,8 +105,11 @@ class ContextFaithfulnessEvaluator(Evaluator):
         This class enables to rate RAG agents thanks to LLM as a judge method from given question where answers are already known.
         model : LLM used to judge the RAG
         """
-        super().__init__(agent, max_attempts, batch_size)
-        self.agent = agent
+        super().__init__(agent=agent,
+                         model=model,
+                         max_attempts=max_attempts,
+                         batch_size=batch_size)
+
         self.max_attempts = max_attempts
 
         # Templates to retrieve statements from queries and their answers
@@ -157,16 +161,13 @@ class ContextFaithfulnessEvaluator(Evaluator):
 
     def _get_statements(self, queries: list[str], answers: list[str]):
         prompts, system_prompt = self._get_prompts_statements(queries, answers)
-        statements: list[str] = [
-            process_prompt(
-                prompt,
-                system_prompt,
-                self.max_attempts,
-                self.agent,
-                self._clean_output_statements,
-            )
-            for prompt in prompts
-        ]
+        statements: list[str] = process_prompts(prompts=prompts,
+                                                system_prompts=[system_prompt],
+                                                max_retry=self.max_attempts,
+                                                agent=self.agent,
+                                                model=self.model,
+                                                clean_output=self._clean_output_statements)
+            
 
         return statements
 
@@ -199,12 +200,12 @@ class ContextFaithfulnessEvaluator(Evaluator):
         prompts, system_prompt = self._get_prompts_faithfulness(
             statements, model_context
         )
-        cleaned_outputs: list[bool] = [
-            process_prompt_to_json(
-                prompt, system_prompt, self.max_attempts, self.agent, StatementSupported
-            )
-            for prompt in prompts
-        ]
+        cleaned_outputs = process_prompts_to_json(prompts=prompts,
+                                                  system_prompts=[system_prompt],
+                                                  max_retry=self.max_attempts,
+                                                  agent=self.agent,
+                                                  model=self.model,
+                                                  json_format=StatementSupported)
 
         return cleaned_outputs
 
@@ -250,9 +251,12 @@ class ContextFaithfulnessEvaluator(Evaluator):
 
 class nDCGEvaluator(Evaluator):
 
-    def __init__(self, agent: Agent, max_attempts=5, batch_size: int = 10) -> None:
+    def __init__(self, agent: Agent, model: str, max_attempts=5, batch_size: int = 10) -> None:
 
-        super().__init__(agent=agent, max_attempts=max_attempts, batch_size=batch_size)
+        super().__init__(agent=agent,
+                          model=model,
+                          max_attempts=max_attempts,
+                          batch_size=batch_size)
         self.language = agent.language
         self.system_prompt = PROMPTS[self.language]["rate_chunk_relevance"][
             "SYSTEM_PROMPT"
@@ -287,26 +291,35 @@ class nDCGEvaluator(Evaluator):
             
 
         return all_prompts
-
-
-    def rate_context(self, queries: list[str], answers: list[str], contexts: list[list[Chunk]]) -> list[list[int | None]]:
-
-       
-        
-        scores=[]
-        all_prompts=self._get_prompts(queries, answers, contexts)
-        for per_query in all_prompts:
-            per_query_score=[]
-            for (prompt, system_prompt) in per_query:
-                score_chunk=process_prompt_to_json(
-                prompt, system_prompt, self.max_attempts, self.agent, ChunkRelevanceAnswer).score
-                per_query_score.append(score_chunk)
-            scores.append(per_query_score)
-
-
-        return scores
     
+    def rate_context(self,
+                     queries: list[str],
+                     answers: list[str],
+                     contexts: list[list[Chunk]]) -> list[list[int | None]]:
+        all_prompts = self._get_prompts(queries, answers, contexts)
 
+        prompts = []
+        system_prompts = []
+        index_map = []  
+
+        for query_idx, per_query in enumerate(all_prompts):
+            for prompt_idx, (prompt, system_prompt) in enumerate(per_query):
+                prompts.append(prompt)
+                system_prompts.append(system_prompt)
+                index_map.append(query_idx)
+
+        scores_chunk = process_prompts_to_json(prompts=prompts,
+                                               system_prompts=system_prompts,
+                                               max_retry=self.max_attempts,
+                                               agent=self.agent,
+                                               model=self.model,
+                                               json_format=ChunkRelevanceAnswer)
+
+        scores_finale = [[] for _ in all_prompts]
+        for query_idx, eval_result in zip(index_map, scores_chunk):
+            score_value = eval_result.score if eval_result is not None else None
+            scores_finale[query_idx].append(score_value)
+        return scores_finale
 
     
     def _dcg(self,vals: list[int]) -> float:

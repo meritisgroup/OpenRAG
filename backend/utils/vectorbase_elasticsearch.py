@@ -1,5 +1,6 @@
 from typing import Union
 import numpy as np
+import time 
 from elasticsearch import Elasticsearch, helpers
 from .base_classes import VectorBase
 from .utils_vlm import load_element
@@ -9,6 +10,8 @@ from ..database.rag_classes import Chunk
 from sqlalchemy.orm import DeclarativeMeta
 from sqlalchemy import Integer, String
 from typing import Type
+
+
 
 
 def get_mapping_vb_embedding(class_: Type[DeclarativeMeta], vector_dims: int) -> dict:
@@ -144,7 +147,10 @@ class VectorBase_embeddings_elasticsearch(VectorBase):
             basic_auth=self.auth,
             request_timeout=60,
             max_retries=3,
+            connections_per_node=50,
             retry_on_timeout=True,
+            verify_certs=False,
+            ssl_show_warn=False
         )
 
     def create_collection(self, name=None, add_fields=[]) -> None:
@@ -183,6 +189,7 @@ class VectorBase_embeddings_elasticsearch(VectorBase):
         else:
             return False
 
+
     def add_str_batch_elements(
         self,
         chunks: list[Chunk],
@@ -196,37 +203,63 @@ class VectorBase_embeddings_elasticsearch(VectorBase):
             self.create_collection(name=collection_name)
 
         data = []
-        if chunks != []:
-            texts = [chunk.text for chunk in chunks]
+        if chunks :
+           
+            try:
+                
+                texts = [chunk.text for chunk in chunks]
+                embeddings = self.agent.embeddings(texts=texts, 
+                                               model=self.embedding_model)
+            
+            except Exception as e:
 
-            embeddings = self.agent.embeddings(texts=texts, model=self.embedding_model)
+                print(f"ERROR DURING embedding insertion: {e}")
+
+                import tiktoken
+                encoding = tiktoken.encoding_for_model("text-embedding-3-small")
+
+                valid_chunks = [c for c in chunks if len(encoding.encode(c.text)) < 8000]
+
+                chunks=valid_chunks
+                texts = [chunk.text for chunk in chunks]
+
+                try:
+                    embeddings = self.agent.embeddings(texts=texts, model=self.embedding_model)
+                except Exception as e:
+                    print(f"Second embedding attempt failed: {e}")
+                    return 0
+
             nb_embeddings_tokens = embeddings["nb_tokens"]
+
             if type(nb_embeddings_tokens) is list:
                 nb_embeddings_tokens = np.sum(nb_embeddings_tokens)
 
-        for k, chunk in enumerate(chunks):
-            source = chunk_to_dict_vb_embedding(
+            for k, chunk in enumerate(chunks):
+                source = chunk_to_dict_vb_embedding(
                 chunk=chunk, embedding=embeddings["embeddings"][k]
-            )
+                )
 
-            temp = {
+                temp = {
                 "_index": collection_name,
                 "_source": source,
-            }
+                }
 
-            data.append(temp)
-        res = helpers.bulk(self.client, data)
-        if display_message:
-            print(
-                f"{len(data)} elements have been successfuly added in the vector base"
-            )
-        else:
+                data.append(temp)
+       
+
+            res = helpers.bulk(self.client, data)
+        
             if display_message:
                 print(
-                    f"All the elements already were in the collection {collection_name}"
+                f"{len(data)} elements have been successfully added in the vector base"
                 )
-        self.nb_tokens_embeddings += nb_embeddings_tokens
-        return nb_embeddings_tokens
+
+            self.nb_tokens_embeddings += nb_embeddings_tokens
+            return nb_embeddings_tokens
+        
+        elif not chunks :
+            return 0
+        
 
     def add_str_elements(
         self,
@@ -244,6 +277,7 @@ class VectorBase_embeddings_elasticsearch(VectorBase):
 
         if not self.check_collection_exist(collection_name=collection_name):
             self.create_collection(name=collection_name)
+
 
         data = []
         if chunks != []:
@@ -288,7 +322,9 @@ class VectorBase_embeddings_elasticsearch(VectorBase):
         data = self.agent.embeddings(texts=queries, model=self.embedding_model)
 
         res = []
-        num_candidates = max(500, k*5)
+
+        num_candidates = max(500, min(10000, k*5))
+
         for i in range(len(data["embeddings"])):
             body = {
                 "size": k,
@@ -300,8 +336,17 @@ class VectorBase_embeddings_elasticsearch(VectorBase):
                 },
             }
 
-            response = self.client.search(index=collection_name, body=body)
-            res.append(response)
+            try:
+                response = self.client.search(index=collection_name, body=body)
+                res.append(response)
+            except Exception as e:
+                print("ELASTICSEARCH ERROR")
+                print("Error type:", type(e))
+                print("Error message:", str(e))
+                raise  
+
+        
+
         results = []
         for l in range(len(res)):
             result = []
@@ -339,8 +384,11 @@ class VectorBase_BM25_elasticsearch(VectorBase):
             self.url_elasticsearch,
             basic_auth=self.auth,
             request_timeout=60,
+            connections_per_node=50,
             max_retries=3,
             retry_on_timeout=True,
+            verify_certs=False,
+            ssl_show_warn=False
         )
 
     def create_collection(self, name=None, add_fields=[]) -> None:
@@ -389,6 +437,7 @@ class VectorBase_BM25_elasticsearch(VectorBase):
 
         if not self.check_collection_exist(collection_name=collection_name):
             self.create_collection(name=collection_name)
+
 
         data = []
         if chunks != []:
@@ -516,7 +565,8 @@ class VectorBase_hybrid_elasticsearch(VectorBase_embeddings_elasticsearch):
         if collection_name is None:
             collection_name = self.vb_name
 
-        data = self.agent.embeddings(texts=queries, model=self.embedding_model)
+        data = self.agent.embeddings(texts=queries,
+                                     model=self.embedding_model)
         res = []
         num_candidates = max(500, k*5)
         for i in range(len(queries)):
@@ -555,7 +605,6 @@ class VectorBase_hybrid_elasticsearch(VectorBase_embeddings_elasticsearch):
         results = []
         for l in range(len(res)):
             result = []
-            # print("res", res[l]["hits"]["hits"], len(res[l]["hits"]["hits"]))
             for i in range(np.min([len(res[l]["hits"]["hits"]), k])):
                 source = res[l]["hits"]["hits"][i]["_source"]
                 result.append(reconstruct_chunk_after_k_search(source, type_output))

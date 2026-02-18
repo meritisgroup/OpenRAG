@@ -1,0 +1,26 @@
+{
+    "gpt-4o-mini": {
+        "url": null,
+        "api_key": "",
+        "type": "llm"
+    },
+    "text-embedding-3-large": {
+        "url": null,
+        "api_key": "",
+        "type": "embedding"
+    },
+    "text-embedding-ada-002": {
+        "url": null,
+        "api_key": "",
+        "type": "embedding"
+    },
+    "gpt-4.1-mini": {
+        "url": null,
+        "api_key": ""
+    },
+    "text-embedding-3-small": {
+        "url": null,
+        "api_key": "",
+        "type": "embedding"
+    }
+}

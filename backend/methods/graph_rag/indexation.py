@@ -18,7 +18,6 @@ import numpy as np
 from sqlalchemy.orm import Session
 import os
 
-from ...utils.factory_name_dataset_vectorbase import get_name
 from ...utils.progress import ProgressBar
 
 
@@ -29,15 +28,21 @@ class GraphRagIndexation:
         storage_path: str,
         agent: Agent,
         type_text_splitter: str,
+        data_preprocessing: str,
         embedding_model: str,
+        llm_model: str,
         language: str = "EN",
     ):  
+        
+        self.llm_model = llm_model
+        self.embedding_model = embedding_model
         self.data_manager = data_manager
         self.agent = agent
         self.language = language
 
         self.splitter = get_splitter(
             type_text_splitter=type_text_splitter,
+            data_preprocessing=data_preprocessing,
             embedding_model=embedding_model,
             agent=self.agent,
         )
@@ -65,7 +70,7 @@ class GraphRagIndexation:
                          to_process_norm, 
                          config_server,
                          reset_preprocess,
-                         chunk_size: int = 500,
+                         chunk_size: int = 1024,
                          overlap: bool = True):
         """
         Extract entities and relations from texts located in the folder self.data_path and save all the results in the data base self.db
@@ -80,6 +85,7 @@ class GraphRagIndexation:
 
             document = DocumentText(path=path_doc,
                                     doc_index=k,
+                                    agent=self.agent,
                                     config_server=config_server,
                                     splitter=self.splitter,
                                     reset_preprocess=reset_preprocess)
@@ -87,14 +93,10 @@ class GraphRagIndexation:
                                      chunk_overlap=overlap)
             name_docs = [str(Path(path_doc).name) for i in range(len(chunks))]
             path_docs = [str(Path(path_doc).parent) for i in range(len(chunks))]
-            """
-            for chunk in chunks:
-                self.data_manager.add_instance(chunk,
-                                               path=str(Path(path_doc).parent))
-            """
 
             entities, relations, input_tokens, output_tokens = (
                     extract_entities_relations(agent=self.agent,
+                                               model = self.llm_model,
                                                chunks=chunks,
                                                doc_name=name_docs[0],
                                                language=self.language)
@@ -158,6 +160,7 @@ class GraphRagIndexation:
                                     db_name=db_name)
         db = self.data_manager.get_database(db_name=db_name)
         cd = CommunityDescription(agent=self.agent,
+                                  model=self.llm_model,
                                   graph=graph,
                                   db=db)
 
@@ -186,7 +189,7 @@ class GraphRagIndexation:
 
                 if truncated_entities != []:
                     nb_tokens = 0
-                    taille_batch = 500
+                    taille_batch = 100
                     for i in range(len(truncated_entities)):
                         truncated_entities[i] = Chunk(text=truncated_entities[i], 
                                                       document="",
@@ -231,7 +234,7 @@ class GraphRagIndexation:
 
                 if truncated_communities != []:
                     nb_tokens = 0
-                    taille_batch = 500
+                    taille_batch = 100
                     for i in range(len(truncated_communities)):
                         truncated_communities[i] = Chunk(text=truncated_communities[i], 
                                                              document="",
@@ -254,7 +257,7 @@ class GraphRagIndexation:
                                        db=db)
 
 
-    def run_pipeline(self, config_server, chunk_size: int = 500,
+    def run_pipeline(self, config_server, chunk_size: int = 1024,
                      overlap: bool = True, reset_preprocess: bool = False):
         """
         Indexation phase for graph rag, from entities extraction to community description.

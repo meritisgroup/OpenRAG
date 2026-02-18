@@ -7,13 +7,27 @@ from backend.evaluation.agent_evaluator import DataFramePreparator, AgentEvaluat
 from backend.evaluation.prompts import PROMPTS
 import pandas as pd
 import os
+from pathlib import Path
+import concurrent.futures
 from datetime import datetime
-import json
+import re
 import numpy as np
 import ast
-
+import json
 from streamlit_.utils.chat_funcs import get_chat_agent
 from backend.utils.progress import ProgressBar
+
+import base64
+import random
+from pydantic import BaseModel
+from io import BytesIO
+from backend.utils.agent import get_Agent
+import fitz
+
+
+from backend.utils.open_doc import Opener
+from backend.utils.threading_utils import get_executor_threads
+from backend.database.utils import get_list_path_documents
 
 
 color_discrete_sequence = [
@@ -28,6 +42,157 @@ color_discrete_sequence = [
     "#FF97FF",
     "#FECB52",
 ]
+
+
+question_generation_prompt = """
+You are an assistant specialized in generating questions to test RAG (Retrieval-Augmented Generation) systems.  
+You are given content from a document.  
+
+Your task:  
+1. Carefully read ONLY the content.  
+2. Generate ONE clear and specific question based strictly on the content.  
+   - The question MUST include sufficient context to identify what it refers to (company name, document type, year, specific policy name, etc.)
+   - The question must be fully self-contained and answerable by a RAG system that retrieves the right content
+   - Include identifying information in the question itself (e.g., "What is Acme Corp's policy on...", "In the 2023 sustainability report of XYZ, what...")
+   - Ask about FACTS, DATA, or CONCEPTS with proper context
+   - AVOID questions about document structure or page location (no "which page", "which section")
+   - AVOID vague pronouns like "the company", "the group", "the report" - use actual names
+   - The question should test whether a RAG system can retrieve the correct document/passage and extract the right information
+   - Do NOT invent information not present in the content
+   - If the question is about an organization, make sure to include its name.
+3. Provide the correct answer based solely on the content.
+
+Examples of GOOD questions for RAG testing:
+- "What is the materiality threshold used in Company XYZ's 2023 CSRD assessment?"
+- "According to Acme Corp's anti-corruption policy, what are the three prohibited practices?"
+- "How does Organization ABC classify interest received from non-current financial assets in its 2024 cash flow statement?"
+
+Examples of BAD questions to AVOID:
+- "Which pages contain the anti-corruption policy?" (asks about location)
+- "How does the group classify interest payments?" (lacks specific context - which group?)
+- "What is the company's revenue?" (lacks context - which company, which year?)
+- "What does this report say about X?" (references "this report")
+
+Generate the question in {} language.
+Format your output as follows (and nothing else):  
+
+query: <your question here>  
+answer: <your answer here>
+"""
+
+question_generation_system_prompt = question_generation_prompt
+
+class QuestionOnPage(BaseModel):
+    query: str
+    answer : str
+
+class QuestionGenerator:
+    """Image analysis via Ollama with minimal JSON output."""
+
+
+    def __init__(self, config_server, databases_path, model_infos):
+        self.agent = get_Agent(config_server, models_infos=model_infos)
+        self.config_server=config_server 
+        self.model_infos=model_infos
+        self.databases_path = databases_path
+        self.nb_try = 3
+
+    def generate_question(self) -> QuestionOnPage:    
+        content = ""
+        num_try = 0 
+        while len(content)<100 and num_try<self.nb_try:
+            content = get_random_contexte_sentences(databases_path=self.databases_path)
+            num_try+=1
+        
+        prompt = question_generation_prompt.format(self.config_server["language"]) + "\n\n<Content>\n" + content + "\n</Content>\n"
+        response=self.agent.predict_json(prompt=prompt,
+                                         model=self.config_server["model"],
+                                         system_prompt=question_generation_system_prompt,
+                                         json_format=QuestionOnPage)
+        return response
+
+    def generate_questions(self, nb_questions) -> list[QuestionOnPage]:
+        max_workers = self.config_server["max_workers"]
+        if max_workers<=get_executor_threads():
+            max_workers = 1
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_index = {
+                executor.submit(
+                    self.generate_question
+                ): i
+                for i in range(nb_questions)
+            }
+
+            results = [None] * nb_questions
+            for future in concurrent.futures.as_completed(future_to_index):
+                index = future_to_index[future]
+                result = future.result()
+                results[index] = result
+        
+        return results
+    
+
+def get_random_contexte_sentences(databases_path, max_len=16000):
+    db_path = random.choice(databases_path)
+
+    files = get_list_path_documents(db_path)
+    file_path = os.path.join(random.choice(files))
+
+    if file_path.endswith(".pdf"):
+        old_path = Path(file_path)
+        new_path = old_path.with_name(old_path.stem + ".md").parent / "md_without_images" / (old_path.stem + ".md")
+        if os.path.exists(new_path):
+            file_path = str(new_path)
+        else:
+            file_path = str(old_path.with_name(old_path.stem + ".txt"))
+            new_path = old_path.with_name(old_path.stem + ".md").parent / "pdf_text_extraction" / (old_path.stem + ".txt")
+            if os.path.exists(new_path):
+                file_path = str(new_path)
+
+    content = Opener(save=False).open_doc(file_path)
+    sentences = re.split(r'(?<=[.!?])\s+', content)
+    index = random.randint(0, len(sentences) - 1)
+
+    context = [sentences[index]]
+    total_length = len(sentences[index])
+
+    i_prev = index - 1
+    i_next = index + 1
+
+    while total_length < max_len and (i_prev >= 0 or i_next < len(sentences)):
+        if i_prev >= 0:
+            context.insert(0, sentences[i_prev])
+            total_length += len(sentences[i_prev])
+            i_prev -= 1
+
+        if total_length >= max_len:
+            break
+
+        if i_next < len(sentences):
+            context.append(sentences[i_next])
+            total_length += len(sentences[i_next])
+            i_next += 1
+
+    content = " ".join(context)
+    return content
+
+
+def generate_questions(n_questions, databases, config_server, model_infos):
+
+    databases_path = [os.path.join("data/databases", db) for db in databases]
+    question_generator = QuestionGenerator(config_server=config_server,
+                                           databases_path=databases_path,
+                                           model_infos=model_infos)
+
+    questions = question_generator.generate_questions(nb_questions=n_questions)
+
+    list_queries, list_answers=[],[]
+    for question in questions:
+        list_queries.append(question.query)
+        list_answers.append(question.answer)
+
+    return list_queries, list_answers
 
 
 def get_folder_saved_benchmark():
@@ -153,9 +318,8 @@ def generate_only_answers(rag_names, rag_agents, report_dir):
                 },
                 f,
             )
-    dataframe_preparator.run_all_queries(
-        options_generation={"type_generation": "simple_generation"}, log_file=log_file
-    )
+    dataframe_preparator.run_all_queries(options_generation={"type_generation": "simple_generation"},
+                                         log_file=log_file)
     df = dataframe_preparator.get_dataframe()
     df.to_csv(os.path.join(get_report_path(), "bench_df.csv"), index=False)
 
@@ -199,9 +363,8 @@ def generate_only_contexts(rag_names, rag_agents, report_dir):
                 },
                 f,
             )
-    dataframe_preparator.run_all_queries(
-        options_generation={"type_generation": "no_generation"}, log_file=log_file
-    )
+    dataframe_preparator.run_all_queries(options_generation={"type_generation": "no_generation"},
+                                         log_file=log_file)
     df = dataframe_preparator.get_dataframe()
     df.to_csv(os.path.join(get_report_path(), "contexts_df.csv"), index=False)
 
@@ -219,69 +382,76 @@ def show_already_done_benchmark():
     file_eval_save = os.path.join(report_dir, "results_bench.pkl")
     with open(file_eval_save, "rb") as f:
         results = pickle.load(f)
-    plots, impact, energy = show_benchmark(results=results)
+    plots, impact, energy = show_benchmark(results=results,
+                                           type=results["type_bench"])
     st.session_state["benchmark"]["plots"] = plots
     st.session_state["benchmark"]["report_path"] = report_dir
     st.session_state["benchmark_database"] = results["databases"]
+    st.session_state["report_path"] = report_dir
 
 
-def show_benchmark(results, session_state=None):
+def show_benchmark(results, session_state=None, type="all"):
     if session_state is None:
         session_state = st.session_state
-
-    (
-        session_state["benchmark"]["arena_matrix"],
-        session_state["benchmark"]["ground_truth"],
-        session_state["benchmark"]["context_faithfulness"],
-        session_state["benchmark"]["context_relevance"],
-        session_state["benchmark"]["ndcg_score"],
-    ) = results["evals"]
-    session_state["benchmark"]["ground_truth"] = results["ground_truth_scores"]
-    session_state["benchmark"]["arena_matrix"] = results["arena_scores"]
+    if type == "all":
+        session_state["benchmark"]["arena_matrix"] = results["evals"]["arena_scores"]
+        session_state["benchmark"]["ground_truth"] = results["evals"]["ground_truth_scores"]
+        session_state["benchmark"]["context_faithfulness"] = results["evals"]["context_faithfulness_scores"]
+        session_state["benchmark"]["context_relevance"]  = results["evals"]["context_relevance_scores"]
+        session_state["benchmark"]["ndcg_score"]  = results["evals"]["ndcg_scores"]
+        
+        
+    if type == "ground_truth":
+        session_state["benchmark"]["ground_truth"] = results["evals"]["ground_truth_scores"]
+        
     session_state["benchmark"]["all_queries"] = results["df"]
     session_state["benchmark"]["indexation_tokens"] = results["indexations_tokens"]
-
-    impact = extract_impact(results["df"])
-    energy = extract_energy(results["df"])
     time = extract_time(results["df"])
-    session_state["benchmark"]["impacts"] = impact
-    session_state["benchmark"]["energy"] = energy
     session_state["time"] = time
-
-    arena_graph = arena_graphs(session_state=session_state)
-    if session_state["config_server"]["params_host_llm"]["type"] in [
-        "openai",
-        "mistral",
-        "vllm"
-    ]:
-        impacts_graph = impact_graph(session_state=session_state)
-        energies_graph = energy_graph(session_state=session_state)
-
-    else:
-        impacts_graph = None
-        energies_graph = None
-
+    
+    impact, energy = None, None
     plots = {
         "token_graph": token_graph(session_state=session_state),
-        "ground_truth_graph": ground_truth_graph(session_state=session_state),
-        "context_graph": context_graph(session_state=session_state),
-        "arena_graphs": arena_graph,
-        "report_arena_graph": report_arena_graph(
-            arena_graph, session_state=session_state
-        ),
-        "impact_graph": impacts_graph,
-        "energy_graph": energies_graph,
-        "time_graph": time_graph(session_state=session_state),
-    }
+        "time_graph": time_graph(session_state=session_state)
+        }
+    
+    if type == "all":
+        plots["context_graph"] = context_graph(session_state=session_state)
+
+    if type == "all" or type == "ground_truth":
+        session_state["benchmark"]["ground_truth"] = results["ground_truth_scores"]
+        plots["ground_truth_graph"] = ground_truth_graph(session_state=session_state)
+    if type == "all":
+        session_state["benchmark"]["arena_matrix"] = results["arena_scores"]
+    if type == "all":
+        impact = extract_impact(results["df"])
+        energy = extract_energy(results["df"])
+
+    if type == "all":
+        session_state["benchmark"]["impacts"] = impact
+        session_state["benchmark"]["energy"] = energy
+    if type == "all":
+        arena_graph = arena_graphs(session_state=session_state)
+        plots["arena_graphs"] = arena_graph 
+        plots["report_arena_graph"] = report_arena_graph(arena_graph, session_state=session_state)
+    if type == "all":
+        impacts_graph = impact_graph(session_state=session_state)
+        plots["impact_graph"] = impacts_graph
+    if type == "all":
+        energies_graph = energy_graph(session_state=session_state)
+        plots["energy_graph"] = energies_graph
+        
     return plots, impact, energy
 
 
-def generate_benchmark(
+
+def generate_benchmark_ground_truth_only(
     rag_names,
     rag_agents,
     databases,
     queries_doc_mane,
     config_server,
+    models_infos,
     report_dir,
     session_state=None,
 ):
@@ -304,23 +474,98 @@ def generate_benchmark(
                 f,
             )
 
-    dataframe_preparator = DataFramePreparator(
-        rag_agents=rag_agents,
-        rags_available=rag_names,
-        input_path=os.path.join("data", "queries", queries_doc_mane),
-    )
-    dataframe_preparator.run_all_queries(
-        options_generation={"type_generation": "simple_generation"}, log_file=log_file
-    )
+    dataframe_preparator = DataFramePreparator(rag_agents=rag_agents,
+                                               rags_available=rag_names,
+                                               input_path=os.path.join("data", "queries", queries_doc_mane))
+    dataframe_preparator.run_all_queries(options_generation={"type_generation": "simple_generation"},
+                                         log_file=log_file)
 
     df = dataframe_preparator.get_dataframe()
-    evaluation_agent = AgentEvaluator(
-        dataframe=df, rags_available=rag_names, config_server=config_server
+    evaluation_agent = AgentEvaluator(dataframe=df,
+                                      rags_available=rag_names,
+                                      config_server=config_server,
+                                      models_infos=models_infos
+    )
+
+    evals = evaluation_agent.get_evals(log_file=log_file,
+                                       type="ground_truth")
+
+    results_bench = {
+        "type_bench": "ground_truth",
+        "df": df,
+        "answers_scores": end_to_end_evaluators.SCORES,
+        "evals": evals,
+        "ground_truth_scores": evaluation_agent.ground_truth_comparator.all_scores_dict,
+        "indexations_tokens": dataframe_preparator.indexation_tokens,
+        "databases": databases,
+    }
+
+    file_eval_save = os.path.join(report_dir, "results_bench.pkl")
+    with open(file_eval_save, "wb") as f:
+        pickle.dump(results_bench, f)
+
+    plots, impact, energy = show_benchmark(results=results_bench,
+                                           session_state=session_state,
+                                           type="ground_truth")
+    session_state["benchmark"]["plots"] = plots
+    session_state["benchmark"]["report_path"] = evaluation_agent.create_plot_report(
+        plots=plots, report_dir=report_dir
+    )
+    df_to_save = dataframe_preparator.get_dataframe_to_save()
+    df_to_save.to_csv(
+        os.path.join(session_state["benchmark"]["report_path"], "bench_df.csv"),
+        index=False,
+    )
+
+
+
+
+def generate_benchmark(
+    rag_names,
+    rag_agents,
+    databases,
+    queries_doc_mane,
+    config_server,
+    models_infos,
+    report_dir,
+    session_state=None,
+):
+    if session_state is None:
+        session_state = st.session_state
+
+    log_file = os.path.join(report_dir, "logs.json")
+    if not os.path.exists(log_file):
+        with open(log_file, "w") as f:
+            json.dump(
+                {
+                    "indexation": 0.0,
+                    "answers": 0.0,
+                    "Arena Battles": 0.0,
+                    "Ground Truth comparison": 0.0,
+                    "Context faithfulness": 0.0,
+                    "context relevance": 0.0,
+                    "nDCG score": 0.0,
+                },
+                f,
+            )
+
+    dataframe_preparator = DataFramePreparator(rag_agents=rag_agents,
+                                               rags_available=rag_names,
+                                               input_path=os.path.join("data", "queries", queries_doc_mane))
+    dataframe_preparator.run_all_queries(options_generation={"type_generation": "simple_generation"},
+                                         log_file=log_file)
+
+    df = dataframe_preparator.get_dataframe()
+    evaluation_agent = AgentEvaluator(dataframe=df,
+                                      rags_available=rag_names,
+                                      config_server=config_server,
+                                      models_infos=models_infos
     )
 
     evals = evaluation_agent.get_evals(log_file=log_file)
 
     results_bench = {
+        "type_bench": "all",
         "df": df,
         "evals": evals,
         "ground_truth_scores": evaluation_agent.ground_truth_comparator.all_scores_dict,
@@ -357,13 +602,18 @@ def generate_benchmark(
 
 
 def display_plot():
-    st.plotly_chart(st.session_state["benchmark"]["plots"]["token_graph"])
-    st.plotly_chart(st.session_state["benchmark"]["plots"]["context_graph"])
-    st.plotly_chart(st.session_state["benchmark"]["plots"]["ground_truth_graph"])
-    st.plotly_chart(st.session_state["benchmark"]["plots"]["time_graph"])
-    if st.session_state["benchmark"]["plots"]["impact_graph"] is not None:
-        st.plotly_chart(st.session_state["benchmark"]["plots"]["impact_graph"])
-    if st.session_state["benchmark"]["plots"]["energy_graph"] is not None:
+    if "tokens_graph" in st.session_state["benchmark"]["plots"]:
+        st.plotly_chart(st.session_state["benchmark"]["plots"]["token_graph"])
+    if "context_graph" in st.session_state["benchmark"]["plots"]:
+        st.plotly_chart(st.session_state["benchmark"]["plots"]["context_graph"])
+    if "ground_truth_graph" in st.session_state["benchmark"]["plots"]:
+        st.plotly_chart(st.session_state["benchmark"]["plots"]["ground_truth_graph"])
+    if "time_graph" in st.session_state["benchmark"]["plots"]:
+        st.plotly_chart(st.session_state["benchmark"]["plots"]["time_graph"])
+    if "impact_graph" in st.session_state["benchmark"]["plots"]:
+        if st.session_state["benchmark"]["plots"]["impact_graph"] is not None:
+            st.plotly_chart(st.session_state["benchmark"]["plots"]["impact_graph"])
+    if "energy_graph" in st.session_state["benchmark"]["plots"]:
         st.plotly_chart(st.session_state["benchmark"]["plots"]["energy_graph"])
 
 
@@ -425,8 +675,7 @@ def token_graph(session_state=None):
                 "Nb Tokens": tokens[rag]["indexation_output_tokens"],
             }
         )
-    host = session_state["config_server"]["params_host_llm"]["type"]
-    tickstext = [session_state["all_rags"][host][tick] for tick in ticksval]
+    tickstext = [session_state["all_rags"][tick] for tick in ticksval]
     fig = px.bar(
         data,
         x="RAG Method",
@@ -480,8 +729,7 @@ def context_graph(session_state=None):
                 "Metric": "Context nDCG Score",
             }
         )
-    host = session_state["config_server"]["params_host_llm"]["type"]
-    tickstext = [session_state["all_rags"][host][tick] for tick in ticksval]
+    tickstext = [session_state["all_rags"][tick] for tick in ticksval]
     fig = px.bar(
         data,
         x="Score",
@@ -536,8 +784,7 @@ def ground_truth_graph(session_state=None):
         orientation="h",
         color_discrete_sequence=color_discrete_sequence,
     )
-    host = session_state["config_server"]["params_host_llm"]["type"]
-    tickstext = [session_state["all_rags"][host][tick] for tick in ticksval]
+    tickstext = [session_state["all_rags"][tick] for tick in ticksval]
     fig.update_layout(
         title=dict(text="Ground Truth Analysis", x=0.5, xanchor="center"),
         xaxis={"title": {"text": "Score"}},
@@ -560,19 +807,18 @@ def arena_graphs(session_state=None):
         rag1 = match[:mid]
         rag2 = match[mid + 3 :]
         data = []
-        host = session_state["config_server"]["params_host_llm"]["type"]
         for metric in arena_matrix[match].keys():
             data.append(
                 {
                     "Metric": metric,
-                    "RAG": session_state["all_rags"][host][rag1],
+                    "RAG": session_state["all_rags"][rag1],
                     "Score": arena_matrix[match][metric][0],
                 }
             )
             data.append(
                 {
                     "Metric": metric,
-                    "RAG": session_state["all_rags"][host][rag2],
+                    "RAG": session_state["all_rags"][rag2],
                     "Score": arena_matrix[match][metric][1],
                 }
             )
@@ -599,12 +845,11 @@ def report_arena_graph(arena_graphs, session_state=None):
     n_cols = max(1, int((-1 + sqrt(1 + 8 * len(arena_graphs))) / 2))
 
     rag_list = []
-    host = session_state["config_server"]["params_host_llm"]["type"]
     session_state["benchmark"]["matches"] = list(arena_graphs.keys())
     for match in list(arena_graphs.keys())[0:n_cols]:
         mid = match.find("_v_")
         rag_b = match[mid + 3 :]
-        rag_list.append(session_state["all_rags"][host][rag_b])
+        rag_list.append(session_state["all_rags"][rag_b])
 
     while len(rag_list) < n_cols**2:
         rag_list.append("")
@@ -624,7 +869,7 @@ def report_arena_graph(arena_graphs, session_state=None):
         if rag_a != prev_rag_a:
             row += 1
             col = 1
-            y_titles.append(session_state["all_rags"][host][rag_a])
+            y_titles.append(session_state["all_rags"][rag_a])
 
         for trace in figure.data:
             fig.add_trace(trace, row=row, col=col)
@@ -656,9 +901,8 @@ def match_name_cleaner(match_name):
 
     rag_a = match_name[:mid]
     rag_b = match_name[mid + 3 :]
-    host = st.session_state["config_server"]["params_host_llm"]["type"]
     try:
-        new_rag_name = f"{st.session_state['all_rags'][host][rag_a]} - {st.session_state['all_rags'][host][rag_b]}"
+        new_rag_name = f"{st.session_state['all_rags'][rag_a]} - {st.session_state['all_rags'][rag_b]}"
     except Exception:
         new_rag_name = f"{rag_a} - {rag_b}"
 
@@ -710,12 +954,11 @@ def impact_graph(session_state=None):
         session_state = st.session_state
 
     impacts = session_state["benchmark"]["impacts"]
-    host = session_state["config_server"]["params_host_llm"]["type"]
     data = []
     for rag in impacts.keys():
         data.append(
             {
-                "RAG Method": session_state["all_rags"][host][rag],
+                "RAG Method": session_state["all_rags"][rag],
                 "center": (impacts[rag][0] + impacts[rag][1]) / 2,
                 "error": (impacts[rag][0] - impacts[rag][1]) / 2,
             }
@@ -746,12 +989,11 @@ def energy_graph(session_state=None):
         session_state = st.session_state
 
     energies = session_state["benchmark"]["energy"]
-    host = session_state["config_server"]["params_host_llm"]["type"]
     data = []
     for rag in energies.keys():
         data.append(
             {
-                "RAG Method": session_state["all_rags"][host][rag],
+                "RAG Method": session_state["all_rags"][rag],
                 "center": (energies[rag][0] + energies[rag][1]) / 2,
                 "error": (energies[rag][0] - energies[rag][1]) / 2,
             }
@@ -781,10 +1023,9 @@ def time_graph(session_state=None):
 
     raw_data = session_state["time"]
     data = []
-    host = session_state["config_server"]["params_host_llm"]["type"]
     for rag in raw_data:
         rag_data = {
-            "RAG Method": session_state["all_rags"][host][rag],
+            "RAG Method": session_state["all_rags"][rag],
             "Answering Time": raw_data[rag],
         }
         data.append(rag_data)

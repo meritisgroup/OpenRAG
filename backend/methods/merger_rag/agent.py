@@ -4,19 +4,20 @@ Created on Thu Feb  6 16:37:47 2025
 
 @author: chardy
 """
-from ...base_classes import RagAgent
+from ..naive_rag.agent import NaiveRagAgent
 from ...utils.agent import get_Agent
 from .prompts import prompts
 import numpy as np
 from .get_rags_to_merge import get_rag_to_merge
 
 
-class MergerRagAgent(RagAgent):
+class MergerRagAgent(NaiveRagAgent):
     "Original RAG with no modification"
 
     def __init__(
         self,
         config_server: dict,
+        models_infos: dict,
         dbs_name: list[str],
         data_folders_name: list[str]
     ) -> None:
@@ -27,7 +28,8 @@ class MergerRagAgent(RagAgent):
         """
         self.config_server=config_server
         self.rag_list=config_server["rag_list"]
-        self.agent = get_Agent(config_server)
+        self.agent = get_Agent(config_server,
+                               models_infos=models_infos)
         self.nb_chunks = config_server["nb_chunks"]
         self.dbs_name = dbs_name
         self.data_folders_name = data_folders_name
@@ -36,6 +38,7 @@ class MergerRagAgent(RagAgent):
         for i in range(len(self.rag_list)):
             rag_agent = get_rag_to_merge(rag_name=self.rag_list[i], 
                                          config_server=self.config_server["rag_config_list"][i],
+                                         models_infos=models_infos,
                                          databases_name=data_folders_name)
             self.rag_agents[self.rag_list[i]] = rag_agent
 
@@ -105,7 +108,8 @@ class MergerRagAgent(RagAgent):
 
         return agent.predict(prompt=user_prompt,
                              system_prompt=system_prompt,
-                             options_generation=options_generation)
+                             options_generation=options_generation,
+                             model=self.llm_model)
 
     def generate_answer(
         self,
@@ -166,15 +170,5 @@ class MergerRagAgent(RagAgent):
                 "context": full_response["context"],
                 "impacts": full_response["impacts"],
                 "energy": full_response["energy"],
+                "original_query": query
             }
-    
-    def generate_answers(
-        self, queries: list[str], nb_chunks: int = 2, options_generation=None
-    ):
-        answers = []
-        for query in queries:
-            answer = self.generate_answer(
-                query=query, nb_chunks=nb_chunks, options_generation=options_generation
-            )
-            answers.append(answer)
-        return answers

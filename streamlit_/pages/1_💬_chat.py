@@ -23,9 +23,7 @@ if "success" not in st.session_state:
     st.session_state["success"] = False
 
 with st.sidebar:
-    rag_list = st.session_state["all_rags"][
-        st.session_state["config_server"]["params_host_llm"]["type"]
-    ].copy()
+    rag_list = st.session_state["all_rags"].copy()
 
     rag_list = rag_list.keys()
 
@@ -34,13 +32,9 @@ with st.sidebar:
     rag_method = st.selectbox(
         "**What RAG Method do you want to try ?**",
         options=rag_list,
-        format_func=lambda x: st.session_state["all_rags"][
-            st.session_state["config_server"]["params_host_llm"]["type"]
-        ][x],
+        format_func=lambda x: st.session_state["all_rags"][x],
         index=list(
-            st.session_state["all_rags"][
-                st.session_state["config_server"]["params_host_llm"]["type"]
-            ].keys()
+            st.session_state["all_rags"].keys()
         ).index(st.session_state["rag_name"]),
         on_change=reset_success_button,
     )
@@ -88,7 +82,7 @@ with st.sidebar:
 
     reset_index = st.checkbox(label="Reset indexing", value=False)
     reset_preprocess = st.checkbox(label="Reset preprocessing", value=False)
-
+    
     if st.button(
         "Initialize RAG Agent",
         use_container_width=True,
@@ -140,7 +134,7 @@ if prompt := st.chat_input(
 
     with st.chat_message("assistant"):
         empty = st.empty()
-        formated_answer = f"**{st.session_state['all_rags'][st.session_state['config_server']['params_host_llm']['type']][st.session_state['rag_name']]}:**  \n"
+        formated_answer = f"**{st.session_state['all_rags'][st.session_state['rag_name']]}:**  \n"
         empty.write(formated_answer)
         with st.spinner(text="*Computing answer*", show_time=True):
             start_time = time.time()

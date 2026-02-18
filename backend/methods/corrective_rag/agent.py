@@ -13,6 +13,7 @@ class CragAgent(NaiveRagAgent):
     def __init__(
         self,
         config_server: dict,
+        models_infos: dict,
         dbs_name,
         data_folders_name,
         max_web_requests=2,
@@ -20,6 +21,7 @@ class CragAgent(NaiveRagAgent):
 
         super().__init__(
             config_server=config_server,
+            models_infos=models_infos,
             dbs_name=dbs_name,
             data_folders_name=data_folders_name
         )
@@ -31,15 +33,10 @@ class CragAgent(NaiveRagAgent):
         self.prompts = prompts[self.language]
         self.websplitter = get_splitter(
             type_text_splitter=self.type_text_splitter,
+            data_preprocessing=self.config_server["data_preprocessing"],
             agent=self.agent,
             embedding_model=self.embedding_model,
         )
-        self.reformulate_query = config_server["reformulate_query"]
-        if self.reformulate_query:
-            self.reformulater = query_reformulation(
-                agent=self.agent, language=self.language
-            )
-
         self.prompts = prompts[self.language]
 
 
@@ -75,9 +72,9 @@ class CragAgent(NaiveRagAgent):
 
                     prompts.append(prompt)
                     system_prompts.append(self.system_prompt)
-                scores = self.agent.multiple_predict(
-                    prompts=prompts, system_prompts=system_prompts
-                )
+                scores = self.agent.multiple_predict(prompts=prompts,
+                                                     system_prompts=system_prompts,
+                                                     model=self.llm_model)
                 nb_input_tokens += np.sum(scores["nb_input_tokens"])
                 nb_output_tokens += np.sum(scores["nb_output_tokens"])
                 energies[0] += scores["energy"][0]
@@ -101,9 +98,9 @@ class CragAgent(NaiveRagAgent):
                         "QUERY_TEMPLATE"
                     ].format(context=chunks[j], query=query)
 
-                    score = self.agent.predict(
-                        prompt=prompt, system_prompt=self.system_prompt
-                    )
+                    score = self.agent.predict(prompt=prompt, 
+                                               system_prompt=self.system_prompt,
+                                               model=self.llm_model)
                     nb_input_tokens += np.sum(score["nb_input_tokens"])
                     nb_output_tokens += np.sum(score["nb_output_tokens"])
                     energies[0] += score["energy"][0]
@@ -175,9 +172,9 @@ class CragAgent(NaiveRagAgent):
                 system_prompt = self.prompts["document_relevance2"]["SYSTEM_PROMPT"]
                 prompts.append(prompt)
                 system_prompts.append(system_prompt)
-            scores = agent.multiple_predict(
-                prompts=prompts, system_prompts=system_prompts
-            )
+            scores = agent.multiple_predict(prompts=prompts,
+                                            system_prompts=system_prompts,
+                                            model=self.llm_model)
             if "nb_input_tokens" in scores.keys():
                 nb_input_tokens += np.sum(scores["nb_input_tokens"])
             if nb_output_tokens in scores.keys():
@@ -214,7 +211,9 @@ class CragAgent(NaiveRagAgent):
                     context=contexts[i].text, query=query
                 )
                 system_prompt = self.prompts["document_relevance2"]["SYSTEM_PROMPT"]
-                score = agent.predict(prompt=prompt, system_prompt=system_prompt)
+                score = agent.predict(prompt=prompt,
+                                      system_prompt=system_prompt,
+                                      model=self.llm_model)
                 nb_input_tokens += np.sum(scores["nb_input_tokens"])
                 nb_output_tokens += np.sum(scores["nb_output_tokens"])
 
@@ -236,7 +235,9 @@ class CragAgent(NaiveRagAgent):
             )
             system_prompt = self.prompts["rewrite_web_query"]["SYSTEM_PROMPT"]
 
-            answer = agent.predict(prompt=prompt, system_prompt=system_prompt)
+            answer = agent.predict(prompt=prompt,
+                                   system_prompt=system_prompt,
+                                   model=self.llm_model)
             query_web = answer["texts"]
             nb_input_tokens += np.sum(answer["nb_input_tokens"])
             nb_output_tokens += np.sum(answer["nb_output_tokens"])
@@ -268,7 +269,9 @@ class CragAgent(NaiveRagAgent):
             )
             system_prompt = self.prompts["rewrite_web_query"]["SYSTEM_PROMPT"]
 
-            query_web = agent.predict(prompt=prompt, system_prompt=system_prompt)
+            query_web = agent.predict(prompt=prompt,
+                                      system_prompt=system_prompt,
+                                      model=self.llm_model)
             nb_input_tokens += (
                 query_web["nb_input_tokens"]
                 if type(query_web["nb_input_tokens"]) is type(0)
@@ -316,7 +319,8 @@ class CragAgent(NaiveRagAgent):
         system_prompt = self.prompts["smooth_generation"]["SYSTEM_PROMPT"]
         answer = agent.predict(prompt=prompt, 
                                system_prompt=system_prompt,
-                               options_generation=options_generation)
+                               options_generation=options_generation,
+                               model=self.llm_model)
         nb_input_tokens += (
             answer["nb_input_tokens"]
             if type(answer["nb_input_tokens"]) is type(0)
@@ -341,6 +345,7 @@ class CragAgent(NaiveRagAgent):
             "context": contexts,
             "impacts": impacts,
             "energy": energies,
+            "original_query": query
         }
 
     def release_gpu_memory(self):

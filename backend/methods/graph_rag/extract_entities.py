@@ -34,6 +34,7 @@ def make_chunk_id() -> str:
 
 def extract_entities_relations(
     agent: Agent,
+    model: str,
     chunks: list[Chunk],
     doc_name: str,
     language: str = "EN",
@@ -57,7 +58,7 @@ def extract_entities_relations(
     )
 
     tokens = 0
-    taille_batch = 50
+    taille_batch = 100
     outputs = None
     data_range = range(0, len(prompts), taille_batch)
     progress_bar = ProgressBar(total=len(data_range))
@@ -66,6 +67,7 @@ def extract_entities_relations(
         results = agent.multiple_predict(
             prompts=prompts[i : i + taille_batch],
             system_prompts=system_prompts[i : i + taille_batch],
+            model=model
         )
         k += 1
         progress_bar.update(
@@ -335,132 +337,3 @@ def extract_images_and_tables_blocks(section: str) -> list[str]:
 
     return parts
 
-
-class DocumentText:
-    def __init__(
-        self,
-        doc_index,
-        path: str,
-        config_server: dict,
-        splitter: Splitter = TextSplitter(),
-    ):
-
-        self.data_preprocessing = config_server["data_preprocessing"]
-        self.name_with_extension = path.split("/")[-1]
-        self.config_server = config_server
-        self.doc_index = doc_index
-
-        try:
-            if self.data_preprocessing == "md_with_images":
-                self.content = MarkdownOpener(
-                    config_server=self.config_server
-                ).open_doc(path_file=path)
-            elif self.data_preprocessing == "md_without_images":
-                self.content = MarkdownOpener(
-                    config_server=self.config_server, image_description=False
-                ).open_doc(path_file=path)
-            else:
-                self.content = Opener(save=False).open_doc(path)
-
-        except Exception as e:
-            self.content = ""
-            print(f'Error "{e}" while trying to open doc {self.name_with_extension}')
-
-        self.name = ".".join(self.name_with_extension.split(".")[:-1])
-        self.extension = "." + self.name_with_extension.split(".")[-1]
-        if (
-            self.data_preprocessing == "md_with_images"
-            or self.data_preprocessing == "md_without_images"
-        ):
-            self.text_splitter = TextSplitter()
-        else:
-            self.text_splitter = splitter
-
-    def chunks(self, chunk_size: int = 500, chunk_overlap: bool = True) -> list[Chunk]:
-
-        results = []
-        chunk_position = 1
-
-        if (
-            self.data_preprocessing == "md_with_images"
-            or self.data_preprocessing == "md_without_images"
-        ):
-            # Create the markdown splitter
-            markdown_splitter = MarkdownHeaderTextSplitter(strip_headers=True)
-
-            # Split the markdown text. The output is a dict : {{'page_content: str, 'metadata': {'Header 2' : str, 'Header 3' : str}}, {'page_content: str, 'metadata': {'Header 2' : str, 'Header 3' : str}}}
-            md_sections = markdown_splitter.split_text(self.content)
-            for section in md_sections:
-                section_text = section["page_content"]  # page_content of a section
-                section_headers = section["metadata"]
-
-                # Concatenate headers of a section into a string which will be added to chunks for context
-                headers_str = " ".join(
-                    str(v) for v in section_headers.values() if v
-                ).strip()
-
-                parts = extract_images_and_tables_blocks(section_text)
-
-                texts = []
-                for part in parts:
-                    if re.match(r"^<IMAGE\s+\d+\s*-->", part):  # image description bloc
-                        texts.append(part)
-                    elif re.match(r"^\s*\|.*\|\s*$", part, re.MULTILINE):  # table bloc
-                        texts.append(part)
-
-                    else:
-                        # Apply classic text splitter to non-table part
-                        sub_text = self.text_splitter.split_text(
-                            text=part, chunk_size=chunk_size, overlap=chunk_overlap
-                        )
-
-                        texts.extend(sub_text)
-
-                for text in texts:
-                    if headers_str:
-                        final_text = headers_str + "\n" + text
-                    else:
-                        final_text = text
-                        chunk_id = make_chunk_id()
-                    results.append(
-                        Chunk(
-                            text=final_text,
-                            document=self.name_with_extension,
-                            position_in_doc=chunk_position,
-                            id=chunk_id,
-                        )
-                    )
-                    chunk_position += 1
-
-        else:
-            """
-            # Fallback for non-markdown inputs
-            """
-            texts = self.text_splitter.split_text(
-                text=self.content, chunk_size=chunk_size, overlap=chunk_overlap
-            )
-
-            for k, text in enumerate(texts):
-                results.append(
-                    Chunk(
-                        text=text,
-                        document=self.name_with_extension,
-                        position_in_doc=k + 1,
-                        id=make_chunk_id(),
-                    )
-                )
-
-        # save chunks
-        save_chunks_to_jsonl(self.doc_index, results)
-        """
-        save_chunks_to_file(results)
-        """
-        return results
-
-    def convert_in_base(self) -> Document:
-        return Document(
-            name=self.name_with_extension,
-            embedding_tokens=0,
-            input_tokens=0,
-            output_tokens=0,
-        )

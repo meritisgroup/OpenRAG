@@ -23,7 +23,7 @@ class AgenticRagAgent(AdvancedRag):
     "Iterative RAG"
 
     def __init__(
-        self, config_server: dict, dbs_name: list[str], data_folders_name: list[str]
+        self, config_server: dict, models_infos: dict, dbs_name: list[str], data_folders_name: list[str]
     ) -> None:
         """
         Args:
@@ -41,6 +41,7 @@ class AgenticRagAgent(AdvancedRag):
 
         super().__init__(
             config_server=config_server,
+            models_infos=models_infos,
             dbs_name=dbs_name,
             data_folders_name=data_folders_name,
         )
@@ -64,6 +65,7 @@ class AgenticRagAgent(AdvancedRag):
 
         result = agent.predict_json(
             system_prompt=system_prompt,
+            model=self.llm_model,
             prompt=user_prompt,
             json_format=CompareQueryAnswer,
         )
@@ -86,7 +88,9 @@ class AgenticRagAgent(AdvancedRag):
 
         system_prompt = self.prompts["reformulate"]["SYSTEM_PROMPT"]
         user_prompt = self.prompts["reformulate"]["QUERY_TEMPLATE"].replace("{query}", str(query)).replace("{answer}", str(answer))
-        new_query = agent.predict(system_prompt=system_prompt, prompt=user_prompt)
+        new_query = agent.predict(system_prompt=system_prompt,
+                                  prompt=user_prompt,
+                                  model=self.llm_model)
 
         return new_query
 
@@ -120,6 +124,7 @@ class AgenticRagAgent(AdvancedRag):
         final_answer = agent.predict(
             system_prompt=system_prompt,
             prompt=user_prompt,
+            model=self.llm_model,
             options_generation=options_generation,
         )
 
@@ -141,8 +146,9 @@ class AgenticRagAgent(AdvancedRag):
         agent = self.agent
 
         iter = 0
-        info = super().generate_answer(
-            query, nb_chunks=nb_chunks, options_generation=options_generation
+        info = super().generate_answer(query, 
+                                       nb_chunks=nb_chunks,
+                                       options_generation=options_generation
         )
         answer = info["answer"]
 
@@ -189,4 +195,5 @@ class AgenticRagAgent(AdvancedRag):
             "context": context_tot,
             "impacts": impacts,
             "energy": energies,
+            "original_query": query
         }

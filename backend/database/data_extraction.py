@@ -11,84 +11,30 @@ from ..utils.splitter import MarkdownHeaderTextSplitter
 from ..utils.splitter import get_splitter
 from .rag_classes import Chunk, Document
 
+import secrets
+import string
+
+# Alphabet base62 (URL/file-safe)
+_ALPHABET = string.ascii_letters + string.digits  # 26+26+10 = 62
+
+
+def make_chunk_id() -> str:
+    return "".join(secrets.choice(_ALPHABET) for _ in range(15))
+
 
 def save_chunks_to_jsonl(
-    doc_id, chunks: List["Chunk"], jsonl_path: str = "chunks_output.jsonl"
+    doc_id, chunks: List[Chunk], jsonl_path: str = "chunks_output.jsonl"
 ):
 
     os.makedirs(os.path.dirname(jsonl_path) or ".", exist_ok=True)
 
     with open(jsonl_path, "a", encoding="utf-8") as f:
         for c in chunks:
-            record = {
-                "name_doc": getattr(c, "document", None),
-                "doc_id": doc_id,
-                "chunk_id": getattr(c, "id", None),
-                "chunk_content": str(getattr(c, "text", "")),
-            }
+            record = {col.name: getattr(c, col.name) for col in c.__table__.columns}
+            record["doc_id"] = doc_id
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
     return None
-
-
-def extract_images_and_tables_blocks(section: str) -> list[str]:
-    """
-    Découpe une section Markdown en blocs :
-    - Blocs d'image (délimités par <IMAGE X --> ... <IMAGE X -->)
-    - Blocs de tableau (au moins deux lignes commençant et finissant par '|')
-    - Blocs de texte (tout le reste)
-    """
-    parts = []
-    last_idx = 0
-
-    # Step 1 : extract images blocs
-    image_block_pattern = re.compile(
-        r"(<IMAGE\s+\d+\s*-->\s*\n.*?\n<IMAGE\s+\d+\s*-->)", re.DOTALL
-    )
-
-    image_blocks = []
-    for match in image_block_pattern.finditer(section):
-        start, end = match.span()
-
-        if start > last_idx:
-            before = section[last_idx:start]
-            image_blocks.append(("text", before))
-
-        image_block = match.group(1)
-        image_blocks.append(("image", image_block))
-
-        last_idx = end
-
-    if last_idx < len(section):
-        image_blocks.append(("text", section[last_idx:]))
-
-    # Step 2 : for each "text" bloc, detect tables inside
-    table_pattern = re.compile(r"((?:^\|[^\n]*\|\s*\n?){2,})", re.MULTILINE)
-
-    for block_type, content in image_blocks:
-        if block_type == "image":
-            parts.append(content.strip())  # we keep the image block as it is
-        else:
-            last_idx = 0
-            for match in table_pattern.finditer(content):
-                start, end = match.span()
-
-                if start > last_idx:
-                    before = content[last_idx:start].strip()
-                    if before:
-                        parts.append(before)
-
-                table_block = match.group(1).strip()
-                parts.append(table_block)
-
-                last_idx = end
-
-            if last_idx < len(content):
-                after = content[last_idx:].strip()
-                if after:
-                    parts.append(after)
-
-    return parts
 
 
 class DocumentText:
@@ -97,6 +43,7 @@ class DocumentText:
         doc_index,
         path: str,
         config_server: dict,
+        agent,
         splitter: Splitter = TextSplitter(),
         reset_preprocess = False
     ):
@@ -104,27 +51,28 @@ class DocumentText:
         self.data_preprocessing = config_server["data_preprocessing"]
         self.name_with_extension = Path(path).name
         self.config_server = config_server
+        self.agent = agent
         self.doc_index = doc_index
         self.path = path
         self.reset_preprocess = reset_preprocess
 
         try:
             if self.data_preprocessing == "md_with_images":
-                if self.reset_preprocess or not self.load_md__():
-                    self.content = MarkdownOpener(
-                        config_server=self.config_server,
-                        image_description=True
-                    ).open_doc(path_file=path)
-                    self.save_md__()
+                if self.reset_preprocess or not self.load_content__("md"):
+                    self.content = MarkdownOpener(config_server=self.config_server,
+                                                  agent=self.agent,
+                                                  image_description=True).open_doc(path_file=path)
+                    self.save_content__(format="md")
             elif self.data_preprocessing == "md_without_images":
-                if self.reset_preprocess or not self.load_md__():
-                    self.content = MarkdownOpener(
-                        config_server=self.config_server,
-                        image_description=False
-                    ).open_doc(path_file=path)
-                    self.save_md__()
+                if self.reset_preprocess or not self.load_content__("md"):
+                    self.content = MarkdownOpener(config_server=self.config_server,
+                                                  agent=self.agent,
+                                                  image_description=False).open_doc(path_file=path)
+                    self.save_content__(format="md")
             else:
-                self.content = Opener(save=False).open_doc(path)
+                if not self.load_content__("txt"):
+                    self.content = Opener(save=True).open_doc(path)
+                    self.save_content__(format="txt")
             
         except Exception as e:
             self.content = ""
@@ -132,18 +80,14 @@ class DocumentText:
 
         self.name = ".".join(self.name_with_extension.split(".")[:-1])
         self.extension = "." + self.name_with_extension.split(".")[-1]
-        if (
-            self.data_preprocessing == "md_with_images"
-            or self.data_preprocessing == "md_without_images"
-        ):
-            self.text_splitter = TextSplitter()
-        else:
-            self.text_splitter = splitter
+        
+        self.text_splitter = splitter
+
     
-    def load_md__(self):
+    def load_content__(self, format: str):
         file = os.path.join(Path(self.path).parent,
                             self.data_preprocessing,
-                            Path(self.name_with_extension).with_suffix(".md").name)
+                            Path(self.name_with_extension).with_suffix("."+format).name)
         if os.path.exists(file):
             with open(file, "r", encoding="utf-8") as f:
                 self.content = f.read()  
@@ -151,86 +95,37 @@ class DocumentText:
         else:
             return False
 
-    def save_md__(self):
+    def save_content__(self, format: str):
         file_save = os.path.join(Path(self.path).parent, self.data_preprocessing)
         os.makedirs(file_save, exist_ok=True)
         file_save = os.path.join(file_save,
-                                Path(self.name_with_extension).with_suffix(".md").name)
+                                Path(self.name_with_extension).with_suffix("."+format).name)
         with open(file_save, "w", encoding="utf-8") as f:
             f.write(self.content)
+
 
     def get_content(self):
         return self.content
     
-    def chunks(self, chunk_size: int = 500, chunk_overlap: bool = True) -> list[Chunk]:
+    def chunks(self, chunk_size: int = 1024, chunk_overlap: bool = True) -> list[Chunk]:
 
         results = []
         chunk_id = 1
+        """
+        # Fallback for non-markdown inputs
+        """
+        chunks = self.text_splitter.split_text(text=self.content, 
+                                               chunk_size=chunk_size, 
+                                               overlap=chunk_overlap)
 
-        if (
-            self.data_preprocessing == "md_with_images"
-            or self.data_preprocessing == "md_without_images"
-        ):
-            # Create the markdown splitter
-            markdown_splitter = MarkdownHeaderTextSplitter(strip_headers=True)
-
-            # Split the markdown text. The output is a dict : {{'page_content: str, 'metadata': {'Header 2' : str, 'Header 3' : str}}, {'page_content: str, 'metadata': {'Header 2' : str, 'Header 3' : str}}}
-            md_sections = markdown_splitter.split_text(self.content)
-            for section in md_sections:
-                section_text = section["page_content"]  # page_content of a section
-                section_headers = section["metadata"]
-
-                # Concatenate headers of a section into a string which will be added to chunks for context
-                headers_str = " ".join(
-                    str(v) for v in section_headers.values() if v
-                ).strip()
-
-                parts = extract_images_and_tables_blocks(section_text)
-
-                chunks = []
-                for part in parts:
-                    if re.match(r"^<IMAGE\s+\d+\s*-->", part):  # image description bloc
-                        chunks.append(part)
-                    elif re.match(r"^\s*\|.*\|\s*$", part, re.MULTILINE):  # table bloc
-                        chunks.append(part)
-
-                    else:
-                        # Apply classic text splitter to non-table part
-                        sub_chunks = self.text_splitter.split_text(
-                            text=part, chunk_size=chunk_size, overlap=chunk_overlap
-                        )
-
-                        chunks.extend(sub_chunks)
-
-                for chunk in chunks:
-                    if headers_str:
-                        final_text = headers_str + "\n" + chunk
-                    else:
-                        final_text = chunk
-                    results.append(
-                        Chunk(
-                            text=final_text,
-                            document=self.name_with_extension,
-                            id=chunk_id,
-                        )
-                    )
-                    chunk_id += 1
-
-        else:
-            """
-            # Fallback for non-markdown inputs
-            """
-            chunks = self.text_splitter.split_text(
-                text=self.content, chunk_size=chunk_size, overlap=chunk_overlap
-            )
-
-            for k, chunk in enumerate(chunks):
+        for k, text in enumerate(chunks):
                 results.append(
-                    Chunk(text=chunk, document=self.name_with_extension, id=k + 1)
+                    Chunk(text=text, 
+                          document=self.name_with_extension, 
+                          position_in_doc=k + 1,
+                          id=make_chunk_id())
                 )
 
-        # save chunks
-        save_chunks_to_jsonl(self.doc_index, results)
         return results
 
     def convert_in_base(self) -> Document:
