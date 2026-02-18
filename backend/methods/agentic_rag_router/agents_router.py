@@ -48,7 +48,6 @@ class RouterAgent(BaseAgent):
                                       json_format=QueryPlan)
         
         try:
-            print(response)
             return AgentResponse(content=response,
                                  confidence=response.confidence_threshold,
                                  reasoning=response.requires_reasoning,

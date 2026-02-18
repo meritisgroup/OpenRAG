@@ -368,7 +368,7 @@ if "report_path" in st.session_state["benchmark"]:
     SCORES = end_to_end_evaluators.SCORES
     report_path = st.session_state["benchmark"]["report_path"]
     csv_path = os.path.join(report_path, "bench_df.csv")
-    print("scores", SCORES, report_path)
+
     if os.path.exists(csv_path):
         bench_df = pd.read_csv(csv_path)
 

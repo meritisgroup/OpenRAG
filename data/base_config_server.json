@@ -9,7 +9,7 @@
         "url": "https://localhost:9200",
         "auth": [
             "elastic",
-            "f+zLbNRrzFKZx2yGjGG3"
+            ""
         ]
     },
     "max_workers": 45,

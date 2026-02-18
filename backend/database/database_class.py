@@ -39,8 +39,7 @@ def get_management_data(
                                     agent=agent,
                                     config_server=config_server,
                                     storage_path=storage_path)
-    print("dbs_name", dbs_name)
-    print(config_server["embedding_model"])
+
     for i in range(len(dbs_name)):
         if type(config_server["embedding_model"])==list:
             db.add_database(db_name=dbs_name[i],
