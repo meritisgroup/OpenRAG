@@ -32,21 +32,29 @@ else:
     models_infos = st.session_state.get('models_infos', {})
     model_names = list(models_infos.keys())
     model_names.append('➕ Ajouter un nouveau modèle')
-    selected_model_name = st.selectbox('Sélectionner un modèle', model_names)
+    selected_model_name = st.selectbox('Sélectionner un modèle', model_names, key='selected_model_name')
+    if selected_model_name != '➕ Ajouter un nouveau modèle':
+        selected_model = models_infos.get(selected_model_name, {})
+        if st.session_state.get('selected_model_prev') != selected_model_name:
+            st.session_state['edit_model_type'] = selected_model.get('type', 'llm')
+            st.session_state['edit_model_api_key'] = selected_model.get('api_key', '')
+            st.session_state['edit_model_url'] = selected_model.get('url', '')
+            st.session_state['selected_model_prev'] = selected_model_name
     if selected_model_name == '➕ Ajouter un nouveau modèle':
         new_model_name = st.text_input('Nom du modèle', key='new_model_name')
         new_model_url = st.text_input('URL du modèle', key='new_model_url')
         new_model_api_key = st.text_input('Clé API', type='password', key='new_model_api_key')
         new_model_type = st.selectbox('Type du modèle', ['llm', 'reranker', 'embedding'])
         if st.button('Ajouter le modèle'):
-            if new_model_name:
-                if new_model_name in models_infos:
+            model_name_val = st.session_state.get('new_model_name', '')
+            if model_name_val:
+                if model_name_val in models_infos:
                     st.warning('Ce modèle existe déjà !')
                 else:
-                    models_infos[new_model_name] = {'url': new_model_url, 'api_key': new_model_api_key, 'type': new_model_type}
+                    models_infos[model_name_val] = {'url': st.session_state.get('new_model_url', ''), 'api_key': st.session_state.get('new_model_api_key', ''), 'type': new_model_type}
                     ConfigService.update_models(models_infos)
                     st.session_state['models_infos'] = models_infos
-                    st.success(f"Modèle '{new_model_name}' ajouté ✅")
+                    st.success(f"Modèle '{model_name_val}' ajouté ✅")
             else:
                 st.warning('Merci de remplir tous les champs !')
     else:
@@ -55,19 +63,20 @@ else:
             st.markdown(f'###### Modèle : {selected_model_name}')
             col1, col2 = st.columns([1, 2])
             with col1:
-                new_model_type = st.selectbox('Type du modèle', ['llm', 'reranker', 'embedding'], index=['llm', 'reranker', 'embedding'].index(selected_model.get('type', 'llm')))
+                new_model_type = st.selectbox('Type du modèle', ['llm', 'reranker', 'embedding'], index=['llm', 'reranker', 'embedding'].index(selected_model.get('type', 'llm')), key='edit_model_type')
             with col2:
                 new_api_key = st.text_input('Clé API', value=selected_model.get('api_key', ''), type='password', key='edit_model_api_key')
             new_url = st.text_input('URL', value=selected_model.get('url', ''), key='edit_model_url')
         col_empty, col1_btn, col_empty1, col2_btn, col_empty2 = st.columns([0.5, 2, 0.5, 2, 0.5])
         with col1_btn:
             if st.button('💾 Sauvegarder les modifications', use_container_width=True):
-                models_infos[selected_model_name]['url'] = new_url
-                models_infos[selected_model_name]['api_key'] = new_api_key
-                models_infos[selected_model_name]['type'] = new_model_type
+                models_infos[selected_model_name]['url'] = st.session_state.get('edit_model_url', selected_model.get('url', ''))
+                models_infos[selected_model_name]['api_key'] = st.session_state.get('edit_model_api_key', selected_model.get('api_key', ''))
+                models_infos[selected_model_name]['type'] = st.session_state.get('edit_model_type', selected_model.get('type', 'llm'))
                 ConfigService.update_models(models_infos)
                 st.session_state['models_infos'] = models_infos
                 st.success('Modifications enregistrées ✅')
+                st.rerun()
         with col2_btn:
             if st.button('🗑️ Supprimer le modèle', use_container_width=True):
                 del models_infos[selected_model_name]
@@ -117,9 +126,9 @@ else:
         new_elastic_auth = st.text_input('Auth', value=st.session_state['config_server'].get('params_vectorbase', {}).get('auth', ['', ''])[0], key='elastic_auth')
     with col2:
         new_elastic_api_key = st.text_input('Clé API', type='password', value=st.session_state['config_server'].get('params_vectorbase', {}).get('auth', ['', ''])[1], key='elastic_api_key')
-    st.session_state['config_server']['params_vectorbase']['url'] = new_elastic_url
-    st.session_state['config_server']['params_vectorbase']['auth'][0] = new_elastic_auth
-    st.session_state['config_server']['params_vectorbase']['auth'][1] = new_elastic_api_key
+    st.session_state['config_server']['params_vectorbase']['url'] = st.session_state.get('elastic_url', st.session_state['config_server'].get('params_vectorbase', {}).get('url', ''))
+    st.session_state['config_server']['params_vectorbase']['auth'][0] = st.session_state.get('elastic_auth', st.session_state['config_server'].get('params_vectorbase', {}).get('auth', ['', ''])[0])
+    st.session_state['config_server']['params_vectorbase']['auth'][1] = st.session_state.get('elastic_api_key', st.session_state['config_server'].get('params_vectorbase', {}).get('auth', ['', ''])[1])
     if st.button('💾 Sauvegarder elasticsearch params', use_container_width=True):
         ConfigService.update_config(st.session_state['config_server'])
     st.markdown('<br><br>', unsafe_allow_html=True)
@@ -178,9 +187,10 @@ if st.button('Save Configuration', type='primary', use_container_width=True):
         except APIError as e:
             st.warning(f"API error: {e}")
         
-        if 'new_url' in globals() and new_url != '':
-            host_dict[llm_provider]['url'] = new_url
-            parsed = urlparse(new_url)
+        endpoint_url = st.session_state.get('endpoint', '')
+        if endpoint_url != '':
+            host_dict[llm_provider]['url'] = endpoint_url
+            parsed = urlparse(endpoint_url)
             base_url = f'{parsed.scheme}://{parsed.hostname}'
             port = parsed.port
             if llm_provider == 'ollama':

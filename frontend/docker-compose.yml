@@ -14,6 +14,5 @@ services:
         max-size: "10m"
         max-file: "3"
         compress: "true"
-    restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"
