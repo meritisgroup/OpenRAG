@@ -52,6 +52,7 @@ Once the app is up and running, you can now:
 - Upload your own data
 ![](frontend/streamlit_/images/screen_db.png)
 - Chat with your favorite RAG method, indexed on your database to roughly asses performances
+![](frontend/streamlit_/images/screen_chat.png)
 - Customize each RAG method
 ![](frontend/streamlit_/images/screen_rag_maker.png)
 - Benchmark selected methods and retrieved a quantitative report on their performances, their answering time, their energy consumption, greenhouse gas emissions and token consumption
