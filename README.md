@@ -17,7 +17,7 @@ It can be used on the user's hardware or with a supported API key. Available LLM
 ### Prerequisites
 - Docker and Docker Compose installed
 - Elasticsearch instance (local or remote)
-- API keys for LLM providers or local GPU for Ollama/VLLM
+- API keys for LLM providers or (local or remote) GPU for Ollama/VLLM
 
 ### Start the application
 
