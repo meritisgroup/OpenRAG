@@ -1,0 +1,18 @@
+services:
+  frontend:
+    image: openrag_frontend
+    build:
+      context: ..
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "8502:8502"
+    environment:
+      - API_BASE_URL=http://host.docker.internal:8000
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

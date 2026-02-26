@@ -1,0 +1,54 @@
+# === Core ===
+sqlalchemy
+pydantic_settings
+numpy
+polars
+
+# === LLM Providers ===
+openai
+mistralai
+
+# === Vector Stores ===
+elasticsearch==8.17.2
+pymilvus
+
+# === Document Processing ===
+pymupdf
+python-pptx
+openpyxl
+python-docx
+unidecode
+Pillow
+
+# === RAG / NLP ===
+langchain_community
+scikit-learn
+rapidfuzz
+igraph
+leidenalg
+nltk
+
+# === Web ===
+crawl4ai
+ddgs
+
+# === Visualization ===
+pyvis
+plotly==6.0.1
+nbformat>=4.2.0
+kaleido==0.2.1
+opencv-python
+
+# === Audio ===
+pydub
+
+# === API ===
+fastapi>=0.104.0
+uvicorn>=0.24.0
+python-multipart>=0.0.6
+python-dotenv>=1.0.0
+httpx>=0.25.0
+requests
+
+# === Monitoring ===
+ecologits

@@ -1,0 +1,14 @@
+# === Frontend ===
+streamlit==1.44.0
+plotly>=6.0.0
+pandas
+
+# === API Client ===
+httpx>=0.25.0
+requests
+
+# === Environment ===
+python-dotenv>=1.0.0
+
+# === Monitoring ===
+ecologits
