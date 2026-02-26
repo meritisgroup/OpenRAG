@@ -73,13 +73,6 @@ class PlotGenerator:
             plots['impact_graph'] = self.impact_graph(impact)
             plots['energy_graph'] = self.energy_graph(energy)
         
-        answers_scores = scores.get('answers_scores', {})
-        if not answers_scores:
-            answers_scores = dict(end_to_end_evaluators.SCORES)
-        
-        if answers_scores:
-            plots['answers_scores_graph'] = self.answers_scores_graph(answers_scores)
-        
         return plots
     
     def token_graph(self, df: pd.DataFrame, indexation_tokens: Dict[str, Any]) -> Dict[str, Any]:
@@ -388,54 +381,3 @@ class PlotGenerator:
             except:
                 return {}
         return {}
-    
-    def answers_scores_graph(self, answers_scores: Dict[str, Any]) -> Dict[str, Any]:
-        data = []
-        ticksval = []
-        
-        for rag in answers_scores.keys():
-            ticksval.append(rag)
-            scores_list = answers_scores[rag]
-            
-            if isinstance(scores_list, list) and len(scores_list) > 0:
-                valid_scores = [s for s in scores_list if s is not None]
-                if valid_scores:
-                    mean_score = np.mean(valid_scores)
-                    data.append({
-                        'RAG Method': rag,
-                        'Score': mean_score,
-                        'Metric': 'Answer Quality'
-                    })
-            elif isinstance(scores_list, dict):
-                for metric_name, metric_data in scores_list.items():
-                    if isinstance(metric_data, dict) and 'mean' in metric_data:
-                        mean_score = metric_data['mean']
-                        if mean_score is not None:
-                            clean_metric = metric_name.split(':')[0].strip() if ':' in metric_name else metric_name
-                            data.append({
-                                'RAG Method': rag,
-                                'Score': mean_score,
-                                'Metric': clean_metric
-                            })
-        
-        if not data:
-            return {}
-        
-        tickstext = [self.all_rags.get(tick, tick) for tick in ticksval]
-        
-        fig = px.bar(
-            data, x='Score', y='RAG Method', color='Metric',
-            barmode='group', title='Answer Quality Scores',
-            labels={'Score': 'Score (0-5)', 'RAG Method': 'RAG Method'},
-            orientation='h', color_discrete_sequence=COLOR_DISCRETE_SEQUENCE
-        )
-        fig.update_layout(
-            title=dict(text='Answer Quality Scores', x=0.5, xanchor='center'),
-            xaxis={'title': {'text': 'Score (0-5)'}, 'range': [0, 5.5]},
-            yaxis={'title': {'text': ''}, 'tickvals': ticksval, 'ticktext': tickstext},
-            legend={'title': {'text': 'Metric'}},
-            legend_traceorder='reversed',
-            margin={'l': 150}
-        )
-        
-        return fig.to_dict()

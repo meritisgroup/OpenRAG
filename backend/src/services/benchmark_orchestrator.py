@@ -309,8 +309,7 @@ class BenchmarkOrchestrator:
     def _extract_scores(self, results: Dict[str, Any]) -> Dict[str, Any]:
         scores = {
             'type': results.get('type_bench', 'unknown'),
-            'ground_truth': results.get('ground_truth_scores', {}),
-            'answers_scores': dict(end_to_end_evaluators.SCORES)
+            'ground_truth': results.get('ground_truth_scores', {})
         }
         
         if 'arena_scores' in results:

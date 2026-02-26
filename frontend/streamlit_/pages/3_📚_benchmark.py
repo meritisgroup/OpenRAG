@@ -343,10 +343,6 @@ def display_plots(plots: dict):
     if not plots:
         return
     
-    if 'answers_scores_graph' in plots:
-        fig = go.Figure(plots['answers_scores_graph'])
-        st.plotly_chart(fig, use_container_width=True)
-    
     if 'ground_truth_graph' in plots:
         fig = go.Figure(plots['ground_truth_graph'])
         st.plotly_chart(fig, use_container_width=True)

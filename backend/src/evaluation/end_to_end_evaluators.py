@@ -4,7 +4,6 @@ import numpy as np
 import re
 from utils.agent import Agent
 from .prompts import PROMPTS
-SCORES = {}
 
 class GroundTruthComparison(Evaluator):
 
@@ -30,11 +29,6 @@ class GroundTruthComparison(Evaluator):
     def _get_evaluations_for_specific_metric(self, metric: str, queries: list[str], real_answers: list[str], proposed_answers: list[str], rag_name: str) -> list[GroundTruthAnswer | None]:
         (prompts, system_prompt) = self._get_prompts(metric, queries, real_answers, proposed_answers)
         cleaned_outputs = process_prompts_to_json(prompts=prompts, system_prompts=[system_prompt], max_retry=self.max_attempts, agent=self.agent, model=self.model, json_format=GroundTruthAnswer)
-        if metric.startswith('Abs'):
-            liste_scores = [answer.score for answer in cleaned_outputs]
-            print(f'vérités du rag {rag_name} : les voicis {liste_scores}')
-            SCORES[rag_name] = liste_scores
-            print(SCORES)
         return cleaned_outputs
 
     def _clean_output(self, output: str) -> str | None:

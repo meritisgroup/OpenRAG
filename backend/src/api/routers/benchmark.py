@@ -142,7 +142,7 @@ def get_benchmark_result(benchmark_id: str):
             print(f"Error generating plots: {e}")
             plots = {}
     else:
-        missing_graphs = [k for k in ['answers_scores_graph', 'context_graph', 'ground_truth_graph'] if k not in plots]
+        missing_graphs = [k for k in ['context_graph', 'ground_truth_graph'] if k not in plots]
         
         if missing_graphs:
             try:
@@ -186,8 +186,7 @@ def _extract_scores_from_results(results: dict) -> dict:
     
     scores = {
         'type': results.get('type_bench', 'unknown'),
-        'ground_truth': results.get('ground_truth_scores', {}),
-        'answers_scores': dict(end_to_end_evaluators.SCORES)
+        'ground_truth': results.get('ground_truth_scores', {})
     }
     
     if 'arena_scores' in results:

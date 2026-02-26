@@ -68,7 +68,23 @@ class ProgressTracker:
                 'error': 'Benchmark not found'
             }
         with open(self.progress_file, 'r', encoding='utf-8') as f:
-            return json.load(f)
+            status = json.load(f)
+        
+        progress = status.get('progress', 0.0)
+        current_step = status.get('current_step', '')
+        
+        if 60 <= progress < 85 and current_step == 'Running evaluations':
+            logs = self._read_logs_with_fallback()
+            if logs:
+                detailed_progress = self._calculate_detailed_progress(progress)
+                if detailed_progress is not None:
+                    status['progress'] = detailed_progress
+                    status['detailed_info'] = self._get_detailed_status()
+                    current_metric = self._find_current_metric(logs)
+                    if current_metric:
+                        status['current_step'] = f'Running {current_metric}'
+        
+        return status
     
     def _write_progress(self, data: Dict[str, Any]) -> None:
         with open(self.progress_file, 'w', encoding='utf-8') as f:
@@ -90,3 +106,66 @@ class ProgressTracker:
         logs = self.read_log()
         logs[step] = value
         self.write_log(logs)
+    
+    def _read_logs_with_fallback(self) -> Dict[str, Any]:
+        try:
+            return self.read_log()
+        except Exception:
+            return {}
+    
+    def _calculate_detailed_progress(self, base_progress: float = 60) -> Optional[float]:
+        logs = self._read_logs_with_fallback()
+        
+        if not logs:
+            return None
+        
+        metric_weights = {
+            'nDCG score': 0.20,
+            'Arena Battles': 0.30,
+            'Ground Truth comparison': 0.25,
+            'Context faithfulness': 0.15,
+            'context relevance': 0.10
+        }
+        
+        total_weighted_progress = 0.0
+        
+        for metric_name, weight in metric_weights.items():
+            metric_progress = logs.get(metric_name, 0.0)
+            if metric_progress > 0:
+                total_weighted_progress += weight * (metric_progress / 100)
+        
+        eval_progress = base_progress + 25 * total_weighted_progress
+        
+        return eval_progress
+    
+    def _find_current_metric(self, logs: Dict[str, Any], completed_count: int = 0) -> Optional[str]:
+        metric_order = ['nDCG score', 'Arena Battles', 'Ground Truth comparison', 
+                       'Context faithfulness', 'context relevance']
+        
+        for metric_name in metric_order:
+            progress = logs.get(metric_name, 0.0)
+            if progress > 0 and progress < 100:
+                return metric_name
+            if progress >= 100:
+                completed_count -= 1
+        
+        if completed_count >= 0 and completed_count < len(metric_order):
+            return metric_order[completed_count] if completed_count < len(metric_order) else None
+        
+        return None
+    
+    def _get_detailed_status(self) -> Dict[str, Any]:
+        logs = self._read_logs_with_fallback()
+        
+        return {
+            'metrics': {
+                metric_name: {
+                    'progress': logs.get(metric_name, 0.0),
+                    'status': 'completed' if logs.get(metric_name, 0.0) >= 100 
+                             else 'running' if logs.get(metric_name, 0.0) > 0 
+                             else 'pending'
+                }
+                for metric_name in ['nDCG score', 'Arena Battles', 'Ground Truth comparison',
+                                   'Context faithfulness', 'context relevance']
+            }
+        }
