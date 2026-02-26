@@ -1,0 +1,28 @@
+services:
+  backend:
+    image: openrag_backend
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../backend/data:/app/data
+      - ../storage:/app/storage
+    environment:
+      - API_BASE_URL=http://localhost:8000
+      - RAG_LOG_INTERVAL=10
+      - LOG_FILE=/app/data/logs/openrag.log
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
