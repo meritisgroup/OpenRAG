@@ -137,15 +137,3 @@ def _init_all_databases(st):
             st.session_state['all_databases'] = []
             st.session_state['chat_database_name'] = None
             st.session_state['benchmark_database'] = []
-
-
-def setup_mode_selector(st):
-    if 'mode_interface' not in st.session_state:
-        st.session_state.mode_interface = 'Avancé'
-    st.session_state.mode_interface = st.sidebar.radio(
-        "Choisissez votre mode d'utilisation :",
-        ['Avancé', 'Simple'],
-        key='mode_inteface',
-        horizontal=True
-    )
-    st.sidebar.divider()

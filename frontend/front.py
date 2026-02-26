@@ -2,7 +2,7 @@ import streamlit as st
 from ecologits import EcoLogits
 from dotenv import load_dotenv
 
-from streamlit_.core import init_session_state, setup_mode_selector
+from streamlit_.core import init_session_state
 
 load_dotenv()
 EcoLogits.init()
@@ -23,6 +23,5 @@ st.set_option('client.showSidebarNavigation', True)
 st.logo('streamlit_/images/logomeritis_horizontal.png', size='large', link='https://meritis.fr/', icon_image='streamlit_/images/logomeritis_horizontal_rvb.png')
 
 init_session_state(st)
-setup_mode_selector(st)
 
 pg.run()

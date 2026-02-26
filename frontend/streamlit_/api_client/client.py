@@ -183,11 +183,9 @@ class APIClient:
     def get_system_info(self) -> Dict[str, Any]:
         return self._request('GET', '/api/config/system')
     
-    def change_server_config(self, rag_name: Optional[str] = None, 
-                             mode: str = 'Simple') -> Dict[str, Any]:
+    def change_server_config(self, rag_name: Optional[str] = None) -> Dict[str, Any]:
         return self._request('PUT', '/api/config/change-server', json={
-            'rag_name': rag_name,
-            'mode': mode
+            'rag_name': rag_name
         })
     
     def get_models(self) -> Dict[str, Any]:

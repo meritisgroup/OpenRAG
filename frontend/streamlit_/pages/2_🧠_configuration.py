@@ -20,27 +20,19 @@ host_dict = {
     'openai': {'url': providers.get('openai', {}).get('url', ''), 'type': 'openai', 'api_key': providers.get('openai', {}).get('api_key', '')}
 }
 
-if st.session_state['mode_interface'] == 'Simple':
-    llm_provider = st.session_state['config_server'].get('default_mode_provider', 'ollama')
-    llm_provider = st.selectbox(label='**Choose LLM host:**', options=host_dict.keys(), format_func=lambda x: host_llm[x], on_change=set_false, index=list(host_dict.keys()).index(llm_provider) if llm_provider in host_dict else 0, key='llm_host')
-    if llm_provider == 'ollama':
-        new_url = st.text_input(label=f'**{llm_provider} endpoint:**', placeholder=host_dict[llm_provider]['url'], disabled=False if llm_provider in ['ollama'] else True, key='endpoint')
-    if llm_provider in ['openai']:
-        st.text_input(label='**OpenAI API Key:**', value=host_dict['openai']['api_key'], placeholder='Your API Key', disabled=False if llm_provider in ['openai'] else True, key='api_key', type='password')
-else:
-    st.subheader('📌 Configuration des API/modèles')
-    models_infos = st.session_state.get('models_infos', {})
-    model_names = list(models_infos.keys())
-    model_names.append('➕ Ajouter un nouveau modèle')
-    selected_model_name = st.selectbox('Sélectionner un modèle', model_names, key='selected_model_name')
-    if selected_model_name != '➕ Ajouter un nouveau modèle':
+st.subheader('📌 Configuration des API/modèles')
+models_infos = st.session_state.get('models_infos', {})
+model_names = list(models_infos.keys())
+model_names.append('➕ Ajouter un nouveau modèle')
+selected_model_name = st.selectbox('Sélectionner un modèle', model_names, key='selected_model_name')
+if selected_model_name != '➕ Ajouter un nouveau modèle':
         selected_model = models_infos.get(selected_model_name, {})
         if st.session_state.get('selected_model_prev') != selected_model_name:
             st.session_state['edit_model_type'] = selected_model.get('type', 'llm')
             st.session_state['edit_model_api_key'] = selected_model.get('api_key', '')
             st.session_state['edit_model_url'] = selected_model.get('url', '')
             st.session_state['selected_model_prev'] = selected_model_name
-    if selected_model_name == '➕ Ajouter un nouveau modèle':
+if selected_model_name == '➕ Ajouter un nouveau modèle':
         new_model_name = st.text_input('Nom du modèle', key='new_model_name')
         new_model_url = st.text_input('URL du modèle', key='new_model_url')
         new_model_api_key = st.text_input('Clé API', type='password', key='new_model_api_key')
@@ -57,7 +49,7 @@ else:
                     st.success(f"Modèle '{model_name_val}' ajouté ✅")
             else:
                 st.warning('Merci de remplir tous les champs !')
-    else:
+else:
         selected_model = models_infos.get(selected_model_name, {})
         with st.container():
             st.markdown(f'###### Modèle : {selected_model_name}')
@@ -83,18 +75,20 @@ else:
                 ConfigService.update_models(models_infos)
                 st.session_state['models_infos'] = models_infos
                 st.success(f"Modèle '{selected_model_name}' supprimé ✅")
-    st.markdown('<br><br>', unsafe_allow_html=True)
-    roles = {'LLM de base': 'model', 'Reranker': 'reranker_model', 'Modèle pour décrire les images': 'model_for_image', "Modèle d'embedding": 'embedding_model'}
-    task_mapping = {'model': ['llm'], 'reranker_model': ['reranker', 'llm'], 'model_for_image': ['llm'], 'embedding_model': ['embedding']}
 
-    def sort_with_priority(model_name, config_key):
+st.markdown('<br><br>', unsafe_allow_html=True)
+roles = {'LLM de base': 'model', 'Reranker': 'reranker_model', 'Modèle pour décrire les images': 'model_for_image', "Modèle d'embedding": 'embedding_model'}
+task_mapping = {'model': ['llm'], 'reranker_model': ['reranker', 'llm'], 'model_for_image': ['llm'], 'embedding_model': ['embedding']}
+
+def sort_with_priority(model_name, config_key):
         model_type = models_infos[model_name]['type']
         priorities = task_mapping.get(config_key, [])
         priority_index = priorities.index(model_type) if model_type in priorities else len(priorities)
         return (priority_index, model_name)
-    config = {}
-    st.subheader('📌 Configuration des modèles par rôle')
-    for role_label, config_key in roles.items():
+
+config = {}
+st.subheader('📌 Configuration des modèles par rôle')
+for role_label, config_key in roles.items():
         if config_key not in st.session_state['config_server'].keys():
             st.session_state[config_key] = config.get(config_key, None)
         valid_tasks = task_mapping.get(config_key, [])
@@ -112,26 +106,28 @@ else:
         st.session_state[config_key] = selected_model
         config[config_key] = selected_model
         st.session_state['config_server'][config_key] = selected_model
-        col_empty, col_save, col_empty1 = st.columns([1, 2, 1])
-    st.markdown('<br>', unsafe_allow_html=True)
-    with col_save:
+
+col_empty, col_save, col_empty1 = st.columns([1, 2, 1])
+st.markdown('<br>', unsafe_allow_html=True)
+with col_save:
         if st.button('💾 Sauvegarder les modèles par défaut', use_container_width=True):
             ConfigService.update_config(st.session_state['config_server'])
             st.success('✅ Modèles par défaut enregistrés !')
-    st.markdown('<br><br>', unsafe_allow_html=True)
-    st.subheader('📌 Configuration Vectorbase')
-    new_elastic_url = st.text_input('URL Elasticsearch', value=st.session_state['config_server'].get('params_vectorbase', {}).get('url', ''), key='elastic_url')
-    col1, col2 = st.columns([2, 2])
-    with col1:
-        new_elastic_auth = st.text_input('Auth', value=st.session_state['config_server'].get('params_vectorbase', {}).get('auth', ['', ''])[0], key='elastic_auth')
-    with col2:
-        new_elastic_api_key = st.text_input('Clé API', type='password', value=st.session_state['config_server'].get('params_vectorbase', {}).get('auth', ['', ''])[1], key='elastic_api_key')
-    st.session_state['config_server']['params_vectorbase']['url'] = st.session_state.get('elastic_url', st.session_state['config_server'].get('params_vectorbase', {}).get('url', ''))
-    st.session_state['config_server']['params_vectorbase']['auth'][0] = st.session_state.get('elastic_auth', st.session_state['config_server'].get('params_vectorbase', {}).get('auth', ['', ''])[0])
-    st.session_state['config_server']['params_vectorbase']['auth'][1] = st.session_state.get('elastic_api_key', st.session_state['config_server'].get('params_vectorbase', {}).get('auth', ['', ''])[1])
-    if st.button('💾 Sauvegarder elasticsearch params', use_container_width=True):
-        ConfigService.update_config(st.session_state['config_server'])
-    st.markdown('<br><br>', unsafe_allow_html=True)
+
+st.markdown('<br><br>', unsafe_allow_html=True)
+st.subheader('📌 Configuration Vectorbase')
+new_elastic_url = st.text_input('URL Elasticsearch', value=st.session_state['config_server'].get('params_vectorbase', {}).get('url', ''), key='elastic_url')
+col1, col2 = st.columns([2, 2])
+with col1:
+    new_elastic_auth = st.text_input('Auth', value=st.session_state['config_server'].get('params_vectorbase', {}).get('auth', ['', ''])[0], key='elastic_auth')
+with col2:
+    new_elastic_api_key = st.text_input('Clé API', type='password', value=st.session_state['config_server'].get('params_vectorbase', {}).get('auth', ['', ''])[1], key='elastic_api_key')
+st.session_state['config_server']['params_vectorbase']['url'] = st.session_state.get('elastic_url', st.session_state['config_server'].get('params_vectorbase', {}).get('url', ''))
+st.session_state['config_server']['params_vectorbase']['auth'][0] = st.session_state.get('elastic_auth', st.session_state['config_server'].get('params_vectorbase', {}).get('auth', ['', ''])[0])
+st.session_state['config_server']['params_vectorbase']['auth'][1] = st.session_state.get('elastic_api_key', st.session_state['config_server'].get('params_vectorbase', {}).get('auth', ['', ''])[1])
+if st.button('💾 Sauvegarder elasticsearch params', use_container_width=True):
+    ConfigService.update_config(st.session_state['config_server'])
+st.markdown('<br><br>', unsafe_allow_html=True)
 
 data_preparation = {'pdf_text_extraction': 'PDF text extraction', 'md_without_images': 'PDF conversion into markdown'}
 selected_data_prep = st.selectbox(label='**Choose data preparation method:**', options=list(data_preparation.keys()), format_func=lambda x: data_preparation[x], on_change=set_false, index=0, key='data_prep')
@@ -139,7 +135,6 @@ selected_data_prep = st.selectbox(label='**Choose data preparation method:**', o
 
 def reset_retrieval():
     st.session_state['ret'] = 'embeddings'
-
 
 if 'ret' not in st.session_state:
     st.session_state['ret'] = st.session_state['config_server'].get('type_retrieval', 'embeddings')
@@ -174,58 +169,17 @@ st.slider(label='**Choose number of chunks to retrieve per query:**', min_value=
 st.session_state['config_server']['nb_chunks'] = st.session_state['chunk']
 
 if st.button('Save Configuration', type='primary', use_container_width=True):
-    if st.session_state['mode_interface'] == 'Simple':
-        if llm_provider in ['openai']:
-            host_dict[llm_provider]['api_key'] = st.session_state.get('api_key', '')
-        else:
-            st.session_state['api_key'] = host_dict[llm_provider]['api_key']
-        st.session_state['config_server']['default_mode_provider'] = llm_provider
-        
-        try:
-            result = ConfigService.change_server_config(rag_name=None, mode=st.session_state['mode_interface'])
-            st.session_state['config_server'] = result.get('config', st.session_state['config_server'])
-        except APIError as e:
-            st.warning(f"API error: {e}")
-        
-        endpoint_url = st.session_state.get('endpoint', '')
-        if endpoint_url != '':
-            host_dict[llm_provider]['url'] = endpoint_url
-            parsed = urlparse(endpoint_url)
-            base_url = f'{parsed.scheme}://{parsed.hostname}'
-            port = parsed.port
-            if llm_provider == 'ollama':
-                modify_env(key='ollama_LOCAL_URL', value=base_url)
-                modify_env(key='ollama_LOCAL_PORT', value=port)
-                host_dict[llm_provider]['url'] = st.session_state['config_server'].get('ollama_url', '') + ':' + str(port) + '/v1'
-        st.session_state['config_server']['default_mode_provider'] = llm_provider
-        
-        providers_updated = {}
-        providers_updated[llm_provider] = {}
-        providers_updated[llm_provider]['url'] = host_dict[llm_provider]['url']
-        providers_updated[llm_provider]['api_key'] = host_dict[llm_provider]['api_key']
-        
-        current_providers = st.session_state.get('providers_infos', {})
-        current_providers[llm_provider] = providers_updated[llm_provider]
-        
-        ConfigService.update_providers(current_providers)
-        st.session_state['providers_infos'] = current_providers
-        
-        models_infos = st.session_state.get('models_infos', {})
-        for key in ['model', 'model_for_image', 'embedding_model', 'reranker_model']:
-            model = st.session_state['config_server'].get(key)
-            if model and model not in models_infos.keys():
-                models_infos[model] = {}
-            if model:
-                models_infos[model]['url'] = host_dict[llm_provider]['url']
-                models_infos[model]['api_key'] = host_dict[llm_provider]['api_key']
-        
-        ConfigService.update_models(models_infos)
-        st.session_state['models_infos'] = models_infos
-    
     st.session_state['config_server']['TextSplitter'] = st.session_state['split']
     st.session_state['config_server']['reformulate_query'] = st.session_state['reformulate']
     st.session_state['config_server']['type_retrieval'] = st.session_state['ret']
     st.session_state['config_server']['data_preprocessing'] = st.session_state['data_prep']
+    
+    try:
+        result = ConfigService.change_server_config(rag_name=None)
+        st.session_state['config_server'] = result.get('config', st.session_state['config_server'])
+        st.success('Configuration saved ✅')
+    except APIError as e:
+        st.warning(f"API error: {e}")
     
     ConfigService.update_config(st.session_state['config_server'])
     

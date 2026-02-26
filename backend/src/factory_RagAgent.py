@@ -5,31 +5,10 @@ from factory.rag_registry import RAG_REGISTRY
 _factory = RAGFactory()
 
 
-def change_config_server(rag_name, config_server, mode):
-    if mode == 'Simple':
-        if config_server['default_mode_provider'] == 'ollama':
-            config_server['model'] = 'gemma3:12b'
-            config_server['embedding_model'] = 'mxbai-embed-large:latest'
-            config_server['reranker_model'] = 'gemma3:12b'
-            config_server['model_for_image'] = 'gemma3:12b'
-        elif config_server['default_mode_provider'] == 'vllm':
-            config_server['model'] = 'google/gemma-3-12b-it'
-            config_server['embedding_model'] = 'BAAI/bge-m3'
-            config_server['reranker_model'] = 'BAAI/bge-reranker-v2-m3'
-            config_server['model_for_image'] = 'google/gemma-3-12b-it'
-        elif config_server['default_mode_provider'] == 'openai':
-            config_server['model'] = 'gpt-4o-mini'
-            config_server['embedding_model'] = 'text-embedding-3-small'
-            config_server['reranker_model'] = 'gpt-4.1-nano-2025-04-14'
-            config_server['model_for_image'] = 'gpt-4.1-mini'
-        elif config_server['default_mode_provider'] == 'mistral':
-            config_server['model'] = 'mistral-small-2503'
-            config_server['embedding_model'] = 'mistral-embed'
-            config_server['reranker_model'] = 'mistral-small-2503'
-            config_server['model_for_image'] = 'mistral-small-2503'
-        if rag_name not in ('copali', 'vlm'):
-            if config_server['type_retrieval'] not in ['embeddings', 'bm25', 'hybrid']:
-                config_server['type_retrieval'] = 'embeddings'
+def change_config_server(rag_name, config_server):
+    if rag_name not in ('copali', 'vlm'):
+        if config_server['type_retrieval'] not in ['embeddings', 'bm25', 'hybrid']:
+            config_server['type_retrieval'] = 'embeddings'
     return config_server
 
 

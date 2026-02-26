@@ -40,7 +40,6 @@ class SystemInfo(BaseModel):
 
 class ChangeConfigServerRequest(BaseModel):
     rag_name: Optional[str] = None
-    mode: str = 'Simple'
 
 
 class ModelsUpdateRequest(BaseModel):

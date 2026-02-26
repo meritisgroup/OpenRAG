@@ -101,8 +101,7 @@ def change_server_config(request: ChangeConfigServerRequest):
     config = _load_json(CONFIG_PATH)
     updated_config = change_config_server(
         rag_name=request.rag_name,
-        config_server=config,
-        mode=request.mode
+        config_server=config
     )
     _save_json(CONFIG_PATH, updated_config)
     return {"status": "updated", "config": updated_config}

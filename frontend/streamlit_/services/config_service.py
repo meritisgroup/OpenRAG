@@ -46,10 +46,9 @@ class ConfigService:
         return client.get_system_info()
     
     @classmethod
-    def change_server_config(cls, rag_name: Optional[str] = None, 
-                             mode: str = 'Simple') -> Dict[str, Any]:
+    def change_server_config(cls, rag_name: Optional[str] = None) -> Dict[str, Any]:
         client = cls.get_client()
-        return client.change_server_config(rag_name=rag_name, mode=mode)
+        return client.change_server_config(rag_name=rag_name)
     
     @classmethod
     def get_models(cls) -> Dict[str, Any]:

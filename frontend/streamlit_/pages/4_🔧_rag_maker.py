@@ -57,21 +57,8 @@ if config_new_rag['base'] == 'advanced_rag' or config_new_rag['base'] == 'agenti
             if checked:
                 selected_processors.append(pre_proccessor_dic[list_keys_processor[i]])
     config_new_rag['ProcessorChunks'] = selected_processors
-    nb_reranker = st.slider(label='**Choose number of chunks after reranker**', min_value=0, max_value=500, step=5, value=st.session_state['config_server']['nb_chunks_reranker'], help='The higher the number of chunks, the better the RAG agent might perform. However, a number of chunks too large can slow down responses and increase costs.', key='chunk')
+    nb_reranker = st.slider(label='**Choose number of chunks after reranker**', min_value=0, max_value=500, step=5, value=st.session_state['config_server']['nb_chunks_reranker'], help='The higher the number of chunks, better RAG agent might perform. However, a number of chunks too large can slow down responses and increase costs.', key='chunk')
     config_new_rag['nb_chunks_reranker'] = nb_reranker
-if st.session_state['mode_interface'] == 'Simple':
-    possible_embeddings = get_possible_embeddings_model(provider=st.session_state['config_server']['default_mode_provider'])
-    if possible_embeddings:
-        possible_embeddings.insert(0, 'default')
-    else:
-        possible_embeddings = ['default']
-    embeddings_dic = {m: m for m in possible_embeddings}
-    config_new_rag['embedding_model'] = st.selectbox(label='**Choose embedding model**', options=embeddings_dic.keys(), format_func=lambda x: embeddings_dic[x])
-    if config_new_rag['embedding_model'] != 'default':
-        st.warning(f"⚠️ This RAG will be only available for '{st.session_state['config_server']['default_mode_provider']}' provider.")
-    else:
-        config_new_rag['embedding_model'] = possible_embeddings[1] if len(possible_embeddings) > 1 else 'default'
-else:
     models_infos = st.session_state.get('models_infos', {})
     st.subheader('📌 Models configuration')
     llm_models = list(models_infos.keys())

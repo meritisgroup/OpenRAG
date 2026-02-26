@@ -83,8 +83,7 @@ def create_agent(request: CreateAgentRequest):
     else:
         config = change_config_server(
             rag_name=request.rag_method,
-            config_server=request.config,
-            mode='Avancé'
+            config_server=request.config
         )
         agent = get_rag_agent(
             rag_name=request.rag_method,
