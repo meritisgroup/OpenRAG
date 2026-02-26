@@ -5,10 +5,11 @@ from math import sqrt
 from typing import Dict, Any, Optional, List
 import ast
 import numpy as np
+from evaluation import end_to_end_evaluators
 
 
 COLOR_DISCRETE_SEQUENCE = [
-    '#636EFA', '#EF553B', '#00CC96', '#AB63FA', '#FFA15A', 
+    '#636EFA', '#EF553B', '#00CC96', '#AB63FA', '#FFA15A',
     '#19D3F3', '#FF6692', '#B6E880', '#FF97FF', '#FECB52'
 ]
 
@@ -42,19 +43,25 @@ class PlotGenerator:
         )
         plots['time_graph'] = self.time_graph(results['df'])
         
-        if benchmark_type == 'all':
-            plots['context_graph'] = self.context_graph(
-                results['evals'].get('context_faithfulness_scores', {}),
-                results['evals'].get('context_relevance_scores', {}),
-                results['evals'].get('ndcg_scores', {})
-            )
+        scores = results.get('scores', {})
         
-        if benchmark_type in ('all', 'ground_truth'):
-            plots['ground_truth_graph'] = self.ground_truth_graph(
-                results.get('ground_truth_scores', {})
-            )
+        context_faithfulness = scores.get('context_faithfulness', {}) or results.get('evals', {}).get('context_faithfulness_scores', {})
+        context_relevance = scores.get('context_relevance', {}) or results.get('evals', {}).get('context_relevance_scores', {})
+        ndcg = scores.get('ndcg', {}) or results.get('evals', {}).get('ndcg_scores', {})
         
-        if benchmark_type == 'all':
+        if benchmark_type in ('all', 'full_bench'):
+            if context_faithfulness or context_relevance or ndcg:
+                plots['context_graph'] = self.context_graph(
+                    context_faithfulness, context_relevance, ndcg
+                )
+        
+        ground_truth_scores = scores.get('ground_truth', {}) or results.get('ground_truth_scores', {})
+        
+        if benchmark_type in ('all', 'full_bench', 'ground_truth'):
+            if ground_truth_scores:
+                plots['ground_truth_graph'] = self.ground_truth_graph(ground_truth_scores)
+        
+        if benchmark_type in ('all', 'full_bench'):
             arena_graphs = self.arena_graphs(
                 results.get('arena_scores', {})
             )
@@ -65,6 +72,13 @@ class PlotGenerator:
             energy = self.extract_energy(results['df'])
             plots['impact_graph'] = self.impact_graph(impact)
             plots['energy_graph'] = self.energy_graph(energy)
+        
+        answers_scores = scores.get('answers_scores', {})
+        if not answers_scores:
+            answers_scores = dict(end_to_end_evaluators.SCORES)
+        
+        if answers_scores:
+            plots['answers_scores_graph'] = self.answers_scores_graph(answers_scores)
         
         return plots
     
@@ -374,3 +388,54 @@ class PlotGenerator:
             except:
                 return {}
         return {}
+    
+    def answers_scores_graph(self, answers_scores: Dict[str, Any]) -> Dict[str, Any]:
+        data = []
+        ticksval = []
+        
+        for rag in answers_scores.keys():
+            ticksval.append(rag)
+            scores_list = answers_scores[rag]
+            
+            if isinstance(scores_list, list) and len(scores_list) > 0:
+                valid_scores = [s for s in scores_list if s is not None]
+                if valid_scores:
+                    mean_score = np.mean(valid_scores)
+                    data.append({
+                        'RAG Method': rag,
+                        'Score': mean_score,
+                        'Metric': 'Answer Quality'
+                    })
+            elif isinstance(scores_list, dict):
+                for metric_name, metric_data in scores_list.items():
+                    if isinstance(metric_data, dict) and 'mean' in metric_data:
+                        mean_score = metric_data['mean']
+                        if mean_score is not None:
+                            clean_metric = metric_name.split(':')[0].strip() if ':' in metric_name else metric_name
+                            data.append({
+                                'RAG Method': rag,
+                                'Score': mean_score,
+                                'Metric': clean_metric
+                            })
+        
+        if not data:
+            return {}
+        
+        tickstext = [self.all_rags.get(tick, tick) for tick in ticksval]
+        
+        fig = px.bar(
+            data, x='Score', y='RAG Method', color='Metric',
+            barmode='group', title='Answer Quality Scores',
+            labels={'Score': 'Score (0-5)', 'RAG Method': 'RAG Method'},
+            orientation='h', color_discrete_sequence=COLOR_DISCRETE_SEQUENCE
+        )
+        fig.update_layout(
+            title=dict(text='Answer Quality Scores', x=0.5, xanchor='center'),
+            xaxis={'title': {'text': 'Score (0-5)'}, 'range': [0, 5.5]},
+            yaxis={'title': {'text': ''}, 'tickvals': ticksval, 'ticktext': tickstext},
+            legend={'title': {'text': 'Metric'}},
+            legend_traceorder='reversed',
+            margin={'l': 150}
+        )
+        
+        return fig.to_dict()

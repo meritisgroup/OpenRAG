@@ -83,7 +83,7 @@ class Graph:
             communities.append(community)
         communities_filtered = [community for community in communities if len(community) > 1]
         print(f'[DEBUG] create_communities: Total partitions: {len(communities)}, Filtered (len>1): {len(communities_filtered)}')
-        for i, comm in enumerate(communities_filtered[:5]):  # Show first 5
+        for i, comm in enumerate(communities_filtered[:5]):
             print(f'[DEBUG] create_communities: Community {i+1}: {len(comm)} entities')
         self.communities = communities_filtered
         return communities_filtered

@@ -169,7 +169,8 @@ st.markdown('## Benchmark already done')
 def get_saved_benchmarks():
     try:
         reports = BenchmarkService.list_reports()
-        folders = [r['report_id'] for r in reports if r.get('type') in ('all', 'ground_truth')]
+        folders = [r['report_id'] for r in reports 
+                   if r.get('type') in ('all', 'ground_truth', 'full_bench')]
         return ['None'] + sorted(folders, reverse=True)
     except APIError as e:
         st.error(f"Error loading benchmark reports: {e}")
@@ -342,20 +343,24 @@ def display_plots(plots: dict):
     if not plots:
         return
     
-    if 'token_graph' in plots:
-        fig = go.Figure(plots['token_graph'])
+    if 'answers_scores_graph' in plots:
+        fig = go.Figure(plots['answers_scores_graph'])
         st.plotly_chart(fig, use_container_width=True)
     
-    if 'time_graph' in plots:
-        fig = go.Figure(plots['time_graph'])
+    if 'ground_truth_graph' in plots:
+        fig = go.Figure(plots['ground_truth_graph'])
         st.plotly_chart(fig, use_container_width=True)
     
     if 'context_graph' in plots:
         fig = go.Figure(plots['context_graph'])
         st.plotly_chart(fig, use_container_width=True)
     
-    if 'ground_truth_graph' in plots:
-        fig = go.Figure(plots['ground_truth_graph'])
+    if 'token_graph' in plots:
+        fig = go.Figure(plots['token_graph'])
+        st.plotly_chart(fig, use_container_width=True)
+    
+    if 'time_graph' in plots:
+        fig = go.Figure(plots['time_graph'])
         st.plotly_chart(fig, use_container_width=True)
     
     if 'impact_graph' in plots:
@@ -431,8 +436,3 @@ if st.session_state.get('benchmark_result'):
                 )
         except APIError as e:
             st.error(f"Error downloading files: {e}")
-    
-    scores = result.get('scores', {})
-    if scores:
-        with st.expander("View scores", expanded=False):
-            st.json(scores)

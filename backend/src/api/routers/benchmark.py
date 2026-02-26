@@ -127,16 +127,31 @@ def get_benchmark_result(benchmark_id: str):
     
     scores = _convert_to_serializable(scores)
     
-    plots = results.get('plots')
+    plots = results.get('plots', {})
+    all_rags = _get_all_rags()
+    plot_gen = PlotGenerator(all_rags)
+    benchmark_type = results.get('type_bench', 'all')
+    
+    results_with_scores = results.copy()
+    results_with_scores['scores'] = scores
+    
     if not plots:
-        all_rags = _get_all_rags()
-        plot_gen = PlotGenerator(all_rags)
-        benchmark_type = results.get('type_bench', 'all')
         try:
-            plots = plot_gen.generate_all_plots(results, benchmark_type)
+            plots = plot_gen.generate_all_plots(results_with_scores, benchmark_type)
         except Exception as e:
             print(f"Error generating plots: {e}")
             plots = {}
+    else:
+        missing_graphs = [k for k in ['answers_scores_graph', 'context_graph', 'ground_truth_graph'] if k not in plots]
+        
+        if missing_graphs:
+            try:
+                new_plots = plot_gen.generate_all_plots(results_with_scores, benchmark_type)
+                for k in missing_graphs:
+                    if k in new_plots and new_plots[k]:
+                        plots[k] = new_plots[k]
+            except Exception as e:
+                print(f"Error generating missing plots: {e}")
     
     plots = _convert_to_serializable(plots)
     
@@ -164,6 +179,11 @@ def get_benchmark_result(benchmark_id: str):
 
 
 def _extract_scores_from_results(results: dict) -> dict:
+    existing_scores = results.get('scores', {})
+    
+    if existing_scores:
+        return existing_scores
+    
     scores = {
         'type': results.get('type_bench', 'unknown'),
         'ground_truth': results.get('ground_truth_scores', {}),
