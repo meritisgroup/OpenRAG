@@ -11,34 +11,51 @@ It can be used on the user's hardware or with a supported API key. Available LLM
 - **Ollama** : requires a GPU
 - **VLLM** : requires a GPU that supports cuda>=12.1
 - **OpenAI** : requires an API key
-- **Mistral** : requires an API key
 
 ## Launch commands
-In oder to launch the app, follow these instruction to ensure a smooth running of the services. 
-On Linux, check the write access; use sudo chown -R 1000:1000 OpenRAG if needed.
-- Navigate to the `docker` folder by running `cd docker`
 
-Upon launching, you can decide to launch all services or not. Here are the possible configurations: 
-- `docker-compose-all.yml`: launches all services (Elasticsearch, the frontend, Ollama, and VLLM)
-- `docker-compose-api.yml`: launches Elasticsearch and the frontend only; OpenAI and Mistral will be usable
-- `docker-compose-ollama.yml`: launches only Elasticsearch, the frontend, and Ollama
-- `docker-compose-vllm.yml`: launches Elasticsearch, the frontend, and VLLM
+### Prerequisites
+- Docker and Docker Compose installed
+- Elasticsearch instance (local or remote)
+- API keys for LLM providers or local GPU for Ollama/VLLM
 
-Once you have choosen a docker amongst the options above build it by running `sudo docker compose -f [DOCKER FILE NAME] up -d`
+### Start the application
 
-You can now access the app through the following URL: [http://localhost:8506/](http://localhost:8506/)
+1. **Start the backend**:
+   ```bash
+   cd backend
+   docker compose up -d
+   ```
+
+2. **Start the frontend**:
+   ```bash
+   cd frontend
+   docker compose up -d
+   ```
+
+3. **Access the application**: [http://localhost:8502/](http://localhost:8502/)
+
+### Configuration
+
+On first use, go to the **Configuration** page to set up:
+- **Elasticsearch**: URL and credentials
+- **LLM providers**: 
+  - **Ollama**: requires a GPU
+  - **VLLM**: requires a GPU with CUDA >=12.1
+  - **OpenAI**: requires an API key
+- **Embedding and Reranker models**
 
 ## App functionalities:
 
 Once the app is up and running, you can now:
 
 - Upload your own data
-![](streamlit_/images/screen_db.png)
+![](frontend/streamlit_/images/screen_db.png)
 - Chat with your favorite RAG method, indexed on your database to roughly asses performances
 - Customize each RAG method
-![](streamlit_/images/screen_rag_maker.png)
+![](frontend/streamlit_/images/screen_rag_maker.png)
 - Benchmark selected methods and retrieved a quantitative report on their performances, their answering time, their energy consumption, greenhouse gas emissions and token consumption
-![](streamlit_/images/screen_report.png)
+![](frontend/streamlit_/images/screen_report.png)
 
 
 ### Contacts
