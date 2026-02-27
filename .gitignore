@@ -6,6 +6,10 @@
 /data/databases/*
 /data/queries/*
 /backend/data/*
+!/backend/data/*.json
+!/backend/data/*/
+/backend/data/*/*
+!/backend/data/*/.gitkeep
 **/__pycache__/
 /infrastructure/ollama/fine_tune
 /docker/*
