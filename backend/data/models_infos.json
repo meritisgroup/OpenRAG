@@ -1,0 +1,40 @@
+{
+    "gpt-4o-mini": {
+        "url": null,
+        "api_key": "",
+        "type": "llm"
+    },
+    "gpt-4.1-nano-2025-04-14": {
+        "url": "http://host.docker.internal:30000",
+        "api_key": "vllm"
+    },
+    "text-embedding-3-large": {
+        "url": null,
+        "api_key": "",
+        "type": "embedding"
+    },
+    "text-embedding-ada-002": {
+        "url": null,
+        "api_key": "",
+        "type": "embedding"
+    },
+    "BAAI/bge-reranker-v2-m3": {
+        "url": "http://host.docker.internal:30002",
+        "api_key": "",
+        "type": "reranker"
+    },
+    "gpt-4.1-mini": {
+        "url": null,
+        "api_key": ""
+    },
+    "text-embedding-3-small": {
+        "url": null,
+        "api_key": "",
+        "type": "embedding"
+    },
+    "openai/gpt-oss-safeguard-20b": {
+        "url": "http://host.docker.internal:30008",
+        "api_key": "",
+        "type": "llm"
+    }
+}

@@ -1,0 +1,47 @@
+{
+    "model": "openai/gpt-oss-safeguard-20b",
+    "embedding_model": "BAAI/bge-m3",
+    "reranker_model": "BAAI/bge-reranker-v2-m3",
+    "model_for_image": "openai/gpt-oss-20b",
+    "default_mode_provider": "ollama",
+    "chunk_length": 500,
+    "chunk_overlap": true,
+    "nb_chunks": 10,
+    "nb_chunks_reranker": 200,
+    "language": "FR",
+    "TextSplitter": "TextSplitter",
+    "reformulate_query": false,
+    "data_preprocessing": "pdf_text_extraction",
+    "ProcessorChunks": [],
+    "type_retrieval": "embeddings",
+    "params_vectorbase": {
+        "backend": "elasticsearch",
+        "url": "https://host.docker.internal:9200",
+        "batch": true,
+        "auth": [
+            "elastic",
+            null
+        ]
+    },
+    "max_attempts": 5,
+    "params_host_llm": {
+        "url": "http://host.docker.internal:11436/v1",
+        "api_key": null,
+        "type": "ollama"
+    },
+    "storage_path": "./storage",
+    "storage_data_path": "./data/databases",
+    "max_workers": 45,
+    "device": "cpu",
+    "mode": "default",
+    "local_params": {
+        "forced_system_prompt": false,
+        "generation_system_prompt_name": "default"
+    },
+    "all_system_prompt": {
+        "default": "You are an AI assistant, answer honestly to the user using your knowledge and the provided context. You must be exhaustive and concise. You must answer in English"
+    },
+    "options_generation": {
+        "type_generation": "simple_generation"
+    }
+}
