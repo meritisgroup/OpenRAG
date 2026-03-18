@@ -6,10 +6,17 @@ from streamlit_.api_client import APIClient
 from streamlit_.api_client.exceptions import APIError
 from streamlit_.core.config import API_BASE_URL
 
+NO_QUERY_FILES_PLACEHOLDER = 'No query files available'
+
 st.markdown('# Benchmark Generation')
 st.markdown('## Choose RAG techniques to benchmark:')
 
 all_rags = list(st.session_state['all_rags'].keys())
+
+if not all_rags:
+    st.warning('⚠️ Backend non connecté ou aucune méthode RAG disponible')
+    st.stop()
+
 nb_rags = len(all_rags)
 rags_per_column = nb_rags // 3 if nb_rags % 3 == 0 else nb_rags // 3 + 1
 
@@ -50,25 +57,31 @@ _client = APIClient(API_BASE_URL)
 try:
     query_files = _client.list_query_files()
     list_queries = [q['filename'] for q in query_files]
-except APIError as e:
-    st.error(f"Error loading query files: {e}")
+except APIError:
     list_queries = []
+
+default_index = 0
+if list_queries and st.session_state['benchmark'].get('queries_doc_name') in list_queries:
+    default_index = list_queries.index(st.session_state['benchmark']['queries_doc_name'])
 
 st.session_state['benchmark']['queries_doc_name'] = left.selectbox(
     label='Select your list of queries',
-    options=list_queries,
-    index=list_queries.index(st.session_state['benchmark'].get('queries_doc_name', list_queries[0])) if st.session_state['benchmark'].get('queries_doc_name') in list_queries else 0,
-    label_visibility='collapsed'
+    options=list_queries if list_queries else [NO_QUERY_FILES_PLACEHOLDER],
+    index=default_index,
+    label_visibility='collapsed',
+    disabled=not list_queries
 )
 
-if right.button(label='Delete Query Doc', type='primary', use_container_width=True):
+if right.button(label='Delete Query Doc', type='primary', use_container_width=True,
+                 disabled=st.session_state['benchmark']['queries_doc_name'] == NO_QUERY_FILES_PLACEHOLDER or not list_queries):
     try:
         _client.delete_query_file(st.session_state['benchmark']['queries_doc_name'])
         st.rerun()
     except APIError as e:
         st.error(f"Error deleting query file: {e}")
 
-if st.session_state['benchmark']['queries_doc_name'] is not None:
+if st.session_state['benchmark']['queries_doc_name'] is not None and \
+   st.session_state['benchmark']['queries_doc_name'] != NO_QUERY_FILES_PLACEHOLDER:
     try:
         query_data = _client.get_query_file(st.session_state['benchmark']['queries_doc_name'])
         queries_list = query_data.get('queries', [])
@@ -172,8 +185,7 @@ def get_saved_benchmarks():
         folders = [r['report_id'] for r in reports 
                    if r.get('type') in ('all', 'ground_truth', 'full_bench')]
         return ['None'] + sorted(folders, reverse=True)
-    except APIError as e:
-        st.error(f"Error loading benchmark reports: {e}")
+    except APIError:
         return ['None']
 
 
@@ -203,7 +215,11 @@ selected_benchmark = st.selectbox(
 col1, col2, col3, col4, col5 = st.columns([0.2, 0.2, 0.2, 0.25, 0.15])
 
 if col1.button('Generate Contexts', on_click=handle_click, disabled=st.session_state['benchmark_clicked'], use_container_width=True, type='primary'):
-    if not st.session_state.get('benchmark_database'):
+    queries_doc_name = st.session_state['benchmark']['queries_doc_name']
+    if queries_doc_name == NO_QUERY_FILES_PLACEHOLDER:
+        st.error('Please upload or select a valid query file first')
+        st.session_state['benchmark_clicked'] = False
+    elif not st.session_state.get('benchmark_database'):
         st.session_state['benchmark_clicked'] = False
         st.error('Choose a database')
     else:
@@ -217,7 +233,7 @@ if col1.button('Generate Contexts', on_click=handle_click, disabled=st.session_s
                     result = BenchmarkService.run_benchmark_sync(
                         rag_names=rag_to_run,
                         databases=st.session_state['benchmark_database'],
-                        queries_doc_name=st.session_state['benchmark']['queries_doc_name'],
+                        queries_doc_name=queries_doc_name,
                         config=st.session_state['config_server'],
                         models_infos=st.session_state['models_infos'],
                         benchmark_type='contexts',
@@ -232,7 +248,11 @@ if col1.button('Generate Contexts', on_click=handle_click, disabled=st.session_s
                     st.session_state['benchmark_clicked'] = False
 
 if col2.button('Generate Answers', on_click=handle_click, disabled=st.session_state['benchmark_clicked'], use_container_width=True, type='primary'):
-    if not st.session_state.get('benchmark_database'):
+    queries_doc_name = st.session_state['benchmark']['queries_doc_name']
+    if queries_doc_name == NO_QUERY_FILES_PLACEHOLDER:
+        st.error('Please upload or select a valid query file first')
+        st.session_state['benchmark_clicked'] = False
+    elif not st.session_state.get('benchmark_database'):
         st.session_state['benchmark_clicked'] = False
         st.error('Choose a database')
     else:
@@ -246,7 +266,7 @@ if col2.button('Generate Answers', on_click=handle_click, disabled=st.session_st
                     result = BenchmarkService.run_benchmark_sync(
                         rag_names=rag_to_run,
                         databases=st.session_state['benchmark_database'],
-                        queries_doc_name=st.session_state['benchmark']['queries_doc_name'],
+                        queries_doc_name=queries_doc_name,
                         config=st.session_state['config_server'],
                         models_infos=st.session_state['models_infos'],
                         benchmark_type='answers',
@@ -261,7 +281,11 @@ if col2.button('Generate Answers', on_click=handle_click, disabled=st.session_st
                     st.session_state['benchmark_clicked'] = False
 
 if col3.button('Generate ground truth', on_click=handle_click, disabled=st.session_state['benchmark_clicked'], use_container_width=True, type='primary'):
-    if not st.session_state.get('benchmark_database'):
+    queries_doc_name = st.session_state['benchmark']['queries_doc_name']
+    if queries_doc_name == NO_QUERY_FILES_PLACEHOLDER:
+        st.error('Please upload or select a valid query file first')
+        st.session_state['benchmark_clicked'] = False
+    elif not st.session_state.get('benchmark_database'):
         st.session_state['benchmark_clicked'] = False
         st.error('Choose a database')
     else:
@@ -283,7 +307,7 @@ if col3.button('Generate ground truth', on_click=handle_click, disabled=st.sessi
                 result = BenchmarkService.run_benchmark_sync(
                     rag_names=rag_to_run,
                     databases=st.session_state['benchmark_database'],
-                    queries_doc_name=st.session_state['benchmark']['queries_doc_name'],
+                    queries_doc_name=queries_doc_name,
                     config=st.session_state['config_server'],
                     models_infos=st.session_state['models_infos'],
                     benchmark_type='ground_truth',
@@ -300,7 +324,11 @@ if col3.button('Generate ground truth', on_click=handle_click, disabled=st.sessi
                 st.session_state['benchmark_clicked'] = False
 
 if col4.button('Generate Full Benchmark', on_click=handle_click, disabled=st.session_state['benchmark_clicked'], use_container_width=True, type='primary'):
-    if not st.session_state.get('benchmark_database'):
+    queries_doc_name = st.session_state['benchmark']['queries_doc_name']
+    if queries_doc_name == NO_QUERY_FILES_PLACEHOLDER:
+        st.error('Please upload or select a valid query file first')
+        st.session_state['benchmark_clicked'] = False
+    elif not st.session_state.get('benchmark_database'):
         st.session_state['benchmark_clicked'] = False
         st.error('Choose a database')
     else:
@@ -322,7 +350,7 @@ if col4.button('Generate Full Benchmark', on_click=handle_click, disabled=st.ses
                 result = BenchmarkService.run_benchmark_sync(
                     rag_names=rag_to_run,
                     databases=st.session_state['benchmark_database'],
-                    queries_doc_name=st.session_state['benchmark']['queries_doc_name'],
+                    queries_doc_name=queries_doc_name,
                     config=st.session_state['config_server'],
                     models_infos=st.session_state['models_infos'],
                     benchmark_type='full_bench',

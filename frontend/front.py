@@ -7,6 +7,18 @@ from streamlit_.core import init_session_state
 load_dotenv()
 EcoLogits.init()
 
+
+@st.fragment
+def status_display():
+    backend_status = "🟢" if st.session_state.get('backend_connected', True) else "🔴"
+    es_status = "🟢" if st.session_state.get('elasticsearch_connected', True) else "🔴"
+    st.markdown(f"**Status:** Backend {backend_status} | ES {es_status}")
+    
+    if st.button("🔄 Refresh Status"):
+        st.session_state['force_backend_check'] = True
+        st.rerun()
+
+
 chat = st.Page('streamlit_/pages/1_💬_chat.py', title='Chat')
 config = st.Page('streamlit_/pages/2_🧠_configuration.py', title='Configuration')
 benchmark = st.Page('streamlit_/pages/3_📚_benchmark.py', title='Benchmark')
@@ -23,5 +35,7 @@ st.set_option('client.showSidebarNavigation', True)
 st.logo('streamlit_/images/logomeritis_horizontal.png', size='large', link='https://meritis.fr/', icon_image='streamlit_/images/logomeritis_horizontal_rvb.png')
 
 init_session_state(st)
+with st.sidebar:
+    status_display()
 
 pg.run()

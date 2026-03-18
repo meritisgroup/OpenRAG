@@ -12,9 +12,14 @@ if 'success' not in st.session_state:
 
 with st.sidebar:
     rag_list = st.session_state['all_rags'].copy()
-    rag_list = rag_list.keys()
+    rag_list = list(rag_list.keys())
+    
+    if not rag_list:
+        st.warning('⚠️ Backend non connecté ou aucune méthode RAG disponible')
+        st.stop()
+    
     if st.session_state['selected_rag_method'] not in rag_list:
-        st.session_state['selected_rag_method'] = list(rag_list)[0]
+        st.session_state['selected_rag_method'] = rag_list[0]
     rag_method = st.selectbox('**What RAG Method do you want to try ?**', options=rag_list, format_func=lambda x: st.session_state['all_rags'][x], key='selected_rag_method', on_change=reset_success_button)
     if 'chat_database_name' not in st.session_state or st.session_state['chat_database_name'] is None:
         st.session_state['chat_database_name'] = []
