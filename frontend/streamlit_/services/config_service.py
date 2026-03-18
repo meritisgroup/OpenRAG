@@ -79,3 +79,9 @@ class ConfigService:
     def update_all_rags(cls, all_rags: Dict[str, Any]) -> Dict[str, Any]:
         client = cls.get_client()
         return client.update_all_rags(all_rags)
+    
+    @classmethod
+    def test_models(cls) -> Dict[str, Any]:
+        """Teste la disponibilité des modèles configurés"""
+        client = cls.get_client()
+        return client.test_models()

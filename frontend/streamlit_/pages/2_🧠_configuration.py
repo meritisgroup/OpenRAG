@@ -120,6 +120,50 @@ with col_save:
             ConfigService.update_config(st.session_state['config_server'])
             st.success('✅ Modèles par défaut enregistrés !')
 
+st.markdown('<br>', unsafe_allow_html=True)
+st.subheader('📊 Disponibilité des modèles configurés')
+
+col_btn, _ = st.columns([1, 4])
+with col_btn:
+    if st.button('🔄 Vérifier la disponibilité', use_container_width=True):
+        st.session_state['test_models'] = True
+
+if st.session_state.get('test_models', False):
+    try:
+        with st.spinner('Test des modèles en cours...'):
+            test_results = ConfigService.test_models()
+        st.session_state['models_test_results'] = test_results
+        st.session_state['test_models'] = False
+    except Exception as e:
+        st.error(f"Erreur lors du test: {e}")
+        st.session_state['models_test_results'] = None
+
+test_results = st.session_state.get('models_test_results', {})
+
+if test_results:
+    st.markdown('<br>', unsafe_allow_html=True)
+    
+    role_labels = {
+        'model': 'LLM de base',
+        'embedding_model': "Modèle d'embedding",
+        'reranker_model': 'Reranker',
+        'model_for_image': 'Modèle pour décrire les images'
+    }
+    
+    for key, label in role_labels.items():
+        result = test_results.get(key)
+        if result:
+            status_icon = "🟢" if result.get('available', False) else "🔴"
+            model_name = result.get('name', 'Aucun')
+            
+            st.markdown(f"**{status_icon} {label}**")
+            
+            if result.get('available', False):
+                st.success(f"✅ {model_name} est disponible")
+            else:
+                error_msg = result.get('error', 'Erreur inconnue')
+                st.error(f"❌ {model_name} n'est pas disponible : {error_msg}")
+
 st.markdown('<br><br>', unsafe_allow_html=True)
 st.subheader('📌 Configuration Vectorbase')
 new_elastic_url = st.text_input('URL Elasticsearch', value=st.session_state['config_server'].get('params_vectorbase', {}).get('url', ''), key='elastic_url')

@@ -32,8 +32,13 @@
         "api_key": "",
         "type": "embedding"
     },
-    "openai/gpt-oss-safeguard-20b": {
-        "url": "http://host.docker.internal:30008",
+    "BAAI/bge-m3": {
+        "url": "http://host.docker.internal:30001",
+        "api_key": "",
+        "type": "embedding"
+    },
+    "openai/gpt-oss-20b": {
+        "url": "http://host.docker.internal:30002",
         "api_key": "",
         "type": "llm"
     }
