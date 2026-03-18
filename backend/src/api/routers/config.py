@@ -96,6 +96,122 @@ def get_system_info():
     )
 
 
+@router.post("/models/test")
+def test_configured_models():
+    """
+    Fait une requête bidon à chaque modèle configuré pour vérifier s'il est disponible
+    """
+    import requests
+    from openai import OpenAI, APIError, APIConnectionError
+    
+    config = _load_json(CONFIG_PATH)
+    models_infos = _load_json(MODELS_PATH)
+    
+    results = {
+        'model': None,
+        'embedding_model': None,
+        'reranker_model': None,
+        'model_for_image': None
+    }
+    
+    model_keys = ['model', 'embedding_model', 'reranker_model', 'model_for_image']
+    
+    for key in model_keys:
+        model_name = config.get(key)
+        if not model_name or model_name not in models_infos:
+            results[key] = {
+                'name': model_name,
+                'available': False,
+                'error': 'Non configuré ou non trouvé dans models_infos.json'
+            }
+            continue
+        
+        model_info = models_infos[model_name]
+        model_type = model_info.get('type', 'llm')
+        url = model_info.get('url')
+        api_key = model_info.get('api_key', '')
+        
+        try:
+            if url:
+                base_url = url + '/v1' if not url.endswith('/v1') else url
+            else:
+                base_url = None
+            client = OpenAI(api_key=api_key, base_url=base_url, timeout=10)
+        except Exception as e:
+            results[key] = {
+                'name': model_name,
+                'available': False,
+                'error': f'Erreur création client: {str(e)}'
+            }
+            continue
+        
+        try:
+            if model_type == 'embedding':
+                response = client.embeddings.create(
+                    input="test",
+                    model=model_name
+                )
+                results[key] = {
+                    'name': model_name,
+                    'available': True,
+                    'type': model_type
+                }
+            elif model_type == 'reranker':
+                rerank_url = url + '/v1/rerank'
+                payload = {
+                    'model': model_name,
+                    'query': 'test query',
+                    'documents': ['test document']
+                }
+                response = requests.post(rerank_url, json=payload, timeout=10)
+                response.raise_for_status()
+                results[key] = {
+                    'name': model_name,
+                    'available': True,
+                    'type': model_type
+                }
+            else:
+                response = client.chat.completions.create(
+                    model=model_name,
+                    messages=[
+                        {"role": "system", "content": "You are a helpful assistant."},
+                        {"role": "user", "content": "test"}
+                    ],
+                    max_tokens=5
+                )
+                results[key] = {
+                    'name': model_name,
+                    'available': True,
+                    'type': model_type
+                }
+        except APIConnectionError as e:
+            results[key] = {
+                'name': model_name,
+                'available': False,
+                'error': f'Erreur de connexion: {str(e)}'
+            }
+        except APIError as e:
+            results[key] = {
+                'name': model_name,
+                'available': False,
+                'error': f'Erreur API (code {e.status_code}): {str(e)}'
+            }
+        except requests.exceptions.RequestException as e:
+            results[key] = {
+                'name': model_name,
+                'available': False,
+                'error': f'Erreur HTTP: {str(e)}'
+            }
+        except Exception as e:
+            results[key] = {
+                'name': model_name,
+                'available': False,
+                'error': f'Erreur inattendue: {str(e)}'
+            }
+    
+    return results
+
+
 @router.put("/change-server")
 def change_server_config(request: ChangeConfigServerRequest):
     config = _load_json(CONFIG_PATH)

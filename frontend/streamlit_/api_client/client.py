@@ -206,6 +206,10 @@ class APIClient:
     def update_all_rags(self, all_rags: Dict[str, Any]) -> Dict[str, Any]:
         return self._request('PUT', '/api/config/all-rags', json={'config': all_rags})
     
+    def test_models(self) -> Dict[str, Any]:
+        """Teste la disponibilité des modèles configurés"""
+        return self._request('POST', '/api/config/models/test')
+    
     def list_databases(self) -> List[Dict[str, Any]]:
         response = self._request('GET', '/api/databases')
         return response.get('databases', [])
