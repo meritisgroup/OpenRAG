@@ -20,7 +20,7 @@
         "batch": true,
         "auth": [
             "elastic",
-            null
+            "openrag"
         ]
     },
     "max_attempts": 5,

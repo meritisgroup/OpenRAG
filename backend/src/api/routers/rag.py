@@ -197,18 +197,21 @@ def generate_names(request: GenerateNamesRequest):
 @router.get("/elasticsearch/indices")
 def list_elasticsearch_indices(prefix: Optional[str] = None):
     config_path = 'data/base_config_server.json'
-    with open(config_path, 'r') as f:
-        config = json.load(f)
-    
-    params = config.get('params_vectorbase', {})
-    es = Elasticsearch(
-        [params.get('url', 'http://localhost:9200')],
-        basic_auth=(params.get('auth', ['elastic', ''])[0], params.get('auth', ['', ''])[1]),
-        verify_certs=False,
-        ssl_show_warn=False
-    )
-    
     try:
+        with open(config_path, 'r') as f:
+            config = json.load(f)
+        
+        params = config.get('params_vectorbase', {})
+        auth = params.get('auth') or ['elastic', '']
+        basic_auth = (auth[0] or 'elastic', auth[1] or '')
+        
+        es = Elasticsearch(
+            [params.get('url', 'http://localhost:9200')],
+            basic_auth=basic_auth,
+            verify_certs=False,
+            ssl_show_warn=False
+        )
+        
         indices = list(es.indices.get_alias(index='*').keys())
     except Exception as e:
         return {"indices": [], "error": str(e)}
@@ -222,16 +225,22 @@ def list_elasticsearch_indices(prefix: Optional[str] = None):
 @router.delete("/elasticsearch/indices/batch")
 def delete_elasticsearch_indices_by_prefix(prefix: str):
     config_path = 'data/base_config_server.json'
-    with open(config_path, 'r') as f:
-        config = json.load(f)
-    
-    params = config.get('params_vectorbase', {})
-    es = Elasticsearch(
-        [params.get('url', 'http://localhost:9200')],
-        basic_auth=(params.get('auth', ['elastic', ''])[0], params.get('auth', ['', ''])[1]),
-        verify_certs=False,
-        ssl_show_warn=False
-    )
+    try:
+        with open(config_path, 'r') as f:
+            config = json.load(f)
+        
+        params = config.get('params_vectorbase', {})
+        auth = params.get('auth') or ['elastic', '']
+        basic_auth = (auth[0] or 'elastic', auth[1] or '')
+        
+        es = Elasticsearch(
+            [params.get('url', 'http://localhost:9200')],
+            basic_auth=basic_auth,
+            verify_certs=False,
+            ssl_show_warn=False
+        )
+    except Exception as e:
+        return {"status": "error", "error": str(e), "deleted_count": 0, "indices": []}
     
     deleted = []
     try:

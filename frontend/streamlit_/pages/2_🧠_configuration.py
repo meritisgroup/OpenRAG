@@ -8,6 +8,11 @@ from streamlit_.utils.params_func import get_custom_rags_name, modify_env
 st.markdown('# Set Configuration')
 host_llm = {'ollama': 'Ollama', 'openai': 'OpenAI', 'mistral': 'Mistral'}
 
+models_infos = st.session_state.get('models_infos', {})
+if not models_infos and not st.session_state.get('backend_connected', True):
+    st.warning('⚠️ Backend non connecté et aucun modèle disponible')
+    st.stop()
+
 
 def set_false():
     for i in st.session_state['benchmark']['rags'].keys():
@@ -98,8 +103,9 @@ for role_label, config_key in roles.items():
         with col1:
             st.markdown(f"**Modèle pour {role_label}** {('✅' if st.session_state['config_server'].get(config_key) else '❌')}")
         with col2:
-            if st.session_state['config_server'].get(config_key) in options:
-                index = options.index(st.session_state['config_server'][config_key])
+            config_value = st.session_state['config_server'].get(config_key)
+            if config_value in options:
+                index = options.index(config_value)
             else:
                 index = 0
             selected_model = st.selectbox(label=f'Sélectionner {config_key}', options=options, index=index, format_func=lambda x: 'Aucun modèle' if x is None else x, key=f'model_select_{config_key}', label_visibility='collapsed')

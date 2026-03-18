@@ -12,24 +12,34 @@ _client = APIClient(API_BASE_URL)
 try:
     all_rags_response = _client.get_all_rags()
     base_rags = dict(all_rags_response)
-except APIError as e:
-    st.error(f"Error loading RAG methods: {e}")
+except APIError:
     base_rags = {}
 
 if 'naive_chatbot' in base_rags:
     del base_rags['naive_chatbot']
 
+if not base_rags:
+    st.warning('⚠️ Backend non connecté ou aucune méthode RAG disponible')
+    st.stop()
+
 config_new_rag = st.session_state['config_server'].copy()
 st.markdown('# Customize your RAG:')
 config_new_rag['base'] = st.selectbox(label='**Choose your base RAG**', options=base_rags.keys(), format_func=lambda x: base_rags[x])
-vectorbase_dict = {'elasticsearch': {'url': st.session_state['config_server']['params_vectorbase']['url'], 'backend': 'elasticsearch', 'auth': [st.session_state['config_server']['params_vectorbase']['auth'][0], st.session_state['config_server']['params_vectorbase']['auth'][1]], 'batch': True}}
+
+params_vectorbase = st.session_state['config_server'].get('params_vectorbase', {})
+vectorbase_dict = {'elasticsearch': {
+    'url': params_vectorbase.get('url', 'http://localhost:9200'),
+    'backend': 'elasticsearch',
+    'auth': [params_vectorbase.get('auth', ['elastic', ''])[0], params_vectorbase.get('auth', ['elastic', ''])[1]],
+    'batch': True
+}}
 backend_vectorbase = {'elasticsearch': 'Elastic Search'}
 config_new_rag['params_vectorbase'] = vectorbase_dict['elasticsearch']
 retrieval_methods = {'embeddings': 'Embeddings', 'bm25': 'BM25', 'hybrid': 'Hybrid'}
-type_retrieval = st.selectbox('**Choose retrieval method**', retrieval_methods.keys(), format_func=lambda x: retrieval_methods[x], index=list(retrieval_methods.keys()).index(st.session_state['config_server']['type_retrieval']))
+type_retrieval = st.selectbox('**Choose retrieval method**', retrieval_methods.keys(), format_func=lambda x: retrieval_methods[x], index=list(retrieval_methods.keys()).index(st.session_state['config_server'].get('type_retrieval', 'embeddings')))
 config_new_rag['type_retrieval'] = type_retrieval
 data_preparation = {'pdf_text_extraction': 'PDF text extraction', 'md_without_images': 'PDF conversion into markdown'}
-selected_data_prep = st.selectbox(label='**Choose data preparation method:**', options=list(data_preparation.keys()), format_func=lambda x: data_preparation[x], index=list(data_preparation.keys()).index(st.session_state['config_server']['data_preprocessing']), key='data_prep')
+selected_data_prep = st.selectbox(label='**Choose data preparation method:**', options=list(data_preparation.keys()), format_func=lambda x: data_preparation[x], index=list(data_preparation.keys()).index(st.session_state['config_server'].get('data_preprocessing', 'pdf_text_extraction')), key='data_prep')
 config_new_rag['data_preprocessing'] = selected_data_prep
 splitter_dic = {'Semantic_TextSplitter': 'Semantic Splitting', 'Recursive_TextSplitter': 'Recursive Splitting', 'TextSplitter': 'Length Splitting'}
 config_new_rag['TextSplitter'] = st.selectbox(label='**Choose text splitter**', options=splitter_dic.keys(), format_func=lambda x: splitter_dic[x])
@@ -57,7 +67,7 @@ if config_new_rag['base'] == 'advanced_rag' or config_new_rag['base'] == 'agenti
             if checked:
                 selected_processors.append(pre_proccessor_dic[list_keys_processor[i]])
     config_new_rag['ProcessorChunks'] = selected_processors
-    nb_reranker = st.slider(label='**Choose number of chunks after reranker**', min_value=0, max_value=500, step=5, value=st.session_state['config_server']['nb_chunks_reranker'], help='The higher the number of chunks, better RAG agent might perform. However, a number of chunks too large can slow down responses and increase costs.', key='chunk')
+    nb_reranker = st.slider(label='**Choose number of chunks after reranker**', min_value=0, max_value=500, step=5, value=st.session_state['config_server'].get('nb_chunks_reranker', 100), help='The higher the number of chunks, better RAG agent might perform. However, a number of chunks too large can slow down responses and increase costs.', key='chunk')
     config_new_rag['nb_chunks_reranker'] = nb_reranker
     models_infos = st.session_state.get('models_infos', {})
     st.subheader('📌 Models configuration')
@@ -70,11 +80,11 @@ if config_new_rag['base'] == 'advanced_rag' or config_new_rag['base'] == 'agenti
     embeddings_models = list(models_infos.keys())
     config_new_rag['embedding_model'] = st.selectbox(label='**Choose embedding model**', options=embeddings_models, format_func=lambda x: x)
     st.markdown('<br><br>', unsafe_allow_html=True)
-config_new_rag['nb_chunks'] = st.slider(label='**Choose number of chunks to retrieve per query**', min_value=0, max_value=500, step=5, value=st.session_state['config_server']['nb_chunks'], help='The higher the number of value, the better the results of the RAG agent will be.\n                                                           However a number of chunk too large might slow down the answer time and increase costs')
+config_new_rag['nb_chunks'] = st.slider(label='**Choose number of chunks to retrieve per query**', min_value=0, max_value=500, step=5, value=st.session_state['config_server'].get('nb_chunks', 5), help='The higher the number of value, the better the results of the RAG agent will be.\n                                                           However a number of chunk too large might slow down the answer time and increase costs')
 if 'chunk_length' not in st.session_state:
-    st.session_state['chunk_length'] = st.session_state['config_server']['chunk_length']
+    st.session_state['chunk_length'] = st.session_state['config_server'].get('chunk_length', 512)
 if 'numeric' not in st.session_state:
-    st.session_state['numeric'] = st.session_state['config_server']['chunk_length']
+    st.session_state['numeric'] = st.session_state['config_server'].get('chunk_length', 512)
     config_new_rag['chunk_length'] = st.session_state['numeric']
 if 'indexing' not in st.session_state:
     st.session_state['indexing'] = False
@@ -163,8 +173,7 @@ except APIError:
     try:
         result = _client.generate_rag_names(rag_method, st.session_state['config_server'], '')
         names = result.get('names', [])
-    except APIError as e:
-        st.error(f"API error: {e}")
+    except APIError:
         names = []
     cleaned_names = []
     for n in names:
