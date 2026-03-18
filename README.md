@@ -26,6 +26,36 @@ You can see our tutorial on youtube to how to install and use OpenRAG to start y
 - Elasticsearch instance (local or remote)
 - API keys for LLM providers or (local or remote) GPU for Ollama/VLLM
 
+### Start Elasticsearch (if not already installed)
+
+If you don't have Elasticsearch installed, you can start a Docker instance:
+
+```bash
+docker compose -f docker-compose.elasticsearch.yml up -d
+```
+
+**Default credentials:**
+- URL: `http://localhost:9200`
+- User: `elastic`
+- Password: `openrag`
+
+> **Important:** Change the default password by modifying `ELASTIC_PASSWORD` in `docker-compose.elasticsearch.yml`.
+
+To check if Elasticsearch is running:
+```bash
+curl http://localhost:9200
+```
+
+To stop Elasticsearch:
+```bash
+docker compose -f docker-compose.elasticsearch.yml down
+```
+
+To stop and remove data:
+```bash
+docker compose -f docker-compose.elasticsearch.yml down -v
+```
+
 ### Start the application
 
 1. **Start the backend**:
