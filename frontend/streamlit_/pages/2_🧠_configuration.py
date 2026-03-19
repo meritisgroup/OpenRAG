@@ -131,6 +131,13 @@ with col_btn:
 if st.session_state.get('test_models', False):
     try:
         with st.spinner('Testing models...'):
+            # Save current model selections to server before testing
+            model_keys = ['model', 'embedding_model', 'reranker_model', 'model_for_image']
+            for key in model_keys:
+                if key in st.session_state:
+                    st.session_state['config_server'][key] = st.session_state[key]
+            ConfigService.update_config(st.session_state['config_server'])
+            # Now test the models
             test_results = ConfigService.test_models()
         st.session_state['models_test_results'] = test_results
         st.session_state['test_models'] = False
@@ -162,7 +169,38 @@ if test_results:
                 st.success(f"✅ {model_name} is available")
             else:
                 error_msg = result.get('error', 'Unknown error')
-                st.error(f"❌ {model_name} is not available: {error_msg}")
+                # Simplifier les messages d'erreur techniques
+                simplified_error = error_msg
+
+                # Erreurs de connexion
+                if 'Network is unreachable' in error_msg or 'Failed to establish' in error_msg:
+                    simplified_error = "Cannot connect to server (network unreachable)"
+                elif 'Connection refused' in error_msg:
+                    simplified_error = "Cannot connect to server (connection refused)"
+                elif 'timeout' in error_msg.lower():
+                    simplified_error = "Connection timeout"
+                elif 'Max retries exceeded' in error_msg:
+                    simplified_error = "Cannot connect to server (max retries exceeded)"
+
+                # Erreurs de modèles
+                elif 'non trouvé sur le serveur' in error_msg or 'not found on server' in error_msg.lower():
+                    simplified_error = "Model not found on this server"
+                elif 'non disponible' in error_msg or 'not available' in error_msg.lower():
+                    simplified_error = "Model not available on this server"
+
+                # Erreurs de endpoint
+                elif 'Endpoint /v1/rerank non trouvé' in error_msg or 'not a reranking server' in error_msg.lower():
+                    simplified_error = "Invalid URL (not a reranking server)"
+                elif 'Réponse invalide du serveur rerank' in error_msg or 'invalid rerank response' in error_msg.lower():
+                    simplified_error = "Invalid server response (not a reranking server)"
+
+                # Garder le message original s'il est court, sinon le simplifier
+                if len(error_msg) > 100:
+                    display_error = simplified_error
+                else:
+                    display_error = error_msg
+
+                st.error(f"❌ {model_name}: {display_error}")
 
 st.markdown('<br><br>', unsafe_allow_html=True)
 st.subheader('📌 Vectorbase Configuration')
