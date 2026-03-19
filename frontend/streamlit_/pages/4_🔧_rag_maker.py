@@ -19,7 +19,7 @@ if 'naive_chatbot' in base_rags:
     del base_rags['naive_chatbot']
 
 if not base_rags:
-    st.warning('⚠️ Backend non connecté ou aucune méthode RAG disponible')
+    st.warning('⚠️ Backend not connected or no RAG method available')
     st.stop()
 
 config_new_rag = st.session_state['config_server'].copy()

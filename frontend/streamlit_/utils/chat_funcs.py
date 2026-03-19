@@ -29,7 +29,7 @@ def get_chat_agent(rag_method, databases_name, session_state=None, validate_mode
         RAGService.set_client(client)
     
     config = session_state['config_server'].copy()
-    
+
     try:
         if 'custom_rags' in session_state.keys() and rag_method in session_state['custom_rags']:
             custom_config = client.get_custom_rag(rag_method)
@@ -42,6 +42,20 @@ def get_chat_agent(rag_method, databases_name, session_state=None, validate_mode
                 models_infos=session_state['models_infos'],
                 validate_models=validate_models
             )
+            # Stocker la config du RAG actif pour l'utiliser dans generate_answer
+            session_state['active_rag_config'] = custom_config.copy()
+        elif 'merge_rags' in session_state.keys() and rag_method in session_state['merge_rags']:
+            merge_config = client.get_merge_rag(rag_method)
+            merge_config['params_host_llm'] = config['params_host_llm']
+            session_id = RAGService.get_chat_agent(
+                rag_method='merger',
+                databases_name=databases_name,
+                config_server=merge_config,
+                models_infos=session_state['models_infos'],
+                validate_models=validate_models
+            )
+            # Stocker la config du RAG actif pour l'utiliser dans generate_answer
+            session_state['active_rag_config'] = merge_config.copy()
         elif 'merge_rags' in session_state.keys() and rag_method in session_state['merge_rags']:
             merge_config = client.get_merge_rag(rag_method)
             merge_config['params_host_llm'] = config['params_host_llm']
@@ -60,6 +74,8 @@ def get_chat_agent(rag_method, databases_name, session_state=None, validate_mode
                 models_infos=session_state['models_infos'],
                 validate_models=validate_models
             )
+            # Stocker la config du RAG actif pour l'utiliser dans generate_answer
+            session_state['active_rag_config'] = config.copy()
         
         session_state['api_session_id'] = session_id
         return session_id
