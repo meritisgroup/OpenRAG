@@ -25,6 +25,13 @@ class APIClient:
                     raise AgentNotFoundError(self._session_id or 'unknown')
             response.raise_for_status()
             return response.json()
+        except requests.exceptions.HTTPError as e:
+            # Extraire les détails de l'erreur HTTP
+            try:
+                error_data = e.response.json()
+                raise APIError(error_data)
+            except:
+                raise APIError(str(e))
         except requests.exceptions.RequestException as e:
             raise APIError(str(e))
     
@@ -61,7 +68,21 @@ class APIClient:
     
     def create_agent(self, rag_method: str, config: Dict[str, Any], 
                      models_infos: Dict[str, Any], databases: List[str],
-                     session_id: Optional[str] = None) -> Dict[str, Any]:
+                     session_id: Optional[str] = None, validate_models: bool = True) -> Dict[str, Any]:
+        """
+        Crée un agent RAG avec validation optionnelle des modèles
+        
+        Args:
+            rag_method: Type de RAG à créer
+            config: Configuration serveur
+            models_infos: Informations sur les modèles
+            databases: Liste des bases de données
+            session_id: ID de session (optionnel)
+            validate_models: Si True, valide les modèles avant création
+        
+        Returns:
+            Réponse de création ou détails d'erreur de validation
+        """
         sid = session_id or self._session_id
         if not sid:
             sid = self.create_session()
@@ -71,7 +92,8 @@ class APIClient:
             'rag_method': rag_method,
             'config': config,
             'models_infos': models_infos,
-            'databases': databases
+            'databases': databases,
+            'validate_models': validate_models
         })
         return response
     

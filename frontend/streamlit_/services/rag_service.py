@@ -23,7 +23,11 @@ class RAGService:
     
     @classmethod
     def get_chat_agent(cls, rag_method: str, databases_name: List[str],
-                        config_server: Dict[str, Any], models_infos: Dict[str, Any]) -> str:
+                        config_server: Dict[str, Any], models_infos: Dict[str, Any],
+                        validate_models: bool = True) -> str:
+        """
+        Crée un agent RAG avec validation optionnelle des modèles
+        """
         client = cls.get_client()
         if client.session_id is None:
             client.create_session()
@@ -32,7 +36,8 @@ class RAGService:
             rag_method=rag_method,
             config=config_server,
             models_infos=models_infos,
-            databases=databases_name
+            databases=databases_name,
+            validate_models=validate_models
         )
         return client.session_id
     
