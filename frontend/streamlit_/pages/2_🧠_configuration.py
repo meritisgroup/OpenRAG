@@ -10,7 +10,7 @@ host_llm = {'ollama': 'Ollama', 'openai': 'OpenAI', 'mistral': 'Mistral'}
 
 models_infos = st.session_state.get('models_infos', {})
 if not models_infos and not st.session_state.get('backend_connected', True):
-    st.warning('⚠️ Backend non connecté et aucun modèle disponible')
+    st.warning('⚠️ Backend not connected and no models available')
     st.stop()
 
 
@@ -25,64 +25,64 @@ host_dict = {
     'openai': {'url': providers.get('openai', {}).get('url', ''), 'type': 'openai', 'api_key': providers.get('openai', {}).get('api_key', '')}
 }
 
-st.subheader('📌 Configuration des API/modèles')
+st.subheader('📌 API/Models Configuration')
 models_infos = st.session_state.get('models_infos', {})
 model_names = list(models_infos.keys())
-model_names.append('➕ Ajouter un nouveau modèle')
-selected_model_name = st.selectbox('Sélectionner un modèle', model_names, key='selected_model_name')
-if selected_model_name != '➕ Ajouter un nouveau modèle':
+model_names.append('➕ Add a new model')
+selected_model_name = st.selectbox('Select a model', model_names, key='selected_model_name')
+if selected_model_name != '➕ Add a new model':
         selected_model = models_infos.get(selected_model_name, {})
         if st.session_state.get('selected_model_prev') != selected_model_name:
             st.session_state['edit_model_type'] = selected_model.get('type', 'llm')
             st.session_state['edit_model_api_key'] = selected_model.get('api_key', '')
             st.session_state['edit_model_url'] = selected_model.get('url', '')
             st.session_state['selected_model_prev'] = selected_model_name
-if selected_model_name == '➕ Ajouter un nouveau modèle':
-        new_model_name = st.text_input('Nom du modèle', key='new_model_name')
-        new_model_url = st.text_input('URL du modèle', key='new_model_url')
-        new_model_api_key = st.text_input('Clé API', type='password', key='new_model_api_key')
-        new_model_type = st.selectbox('Type du modèle', ['llm', 'reranker', 'embedding'])
-        if st.button('Ajouter le modèle'):
+if selected_model_name == '➕ Add a new model':
+        new_model_name = st.text_input('Model name', key='new_model_name')
+        new_model_url = st.text_input('Model URL', key='new_model_url')
+        new_model_api_key = st.text_input('API Key', type='password', key='new_model_api_key')
+        new_model_type = st.selectbox('Model type', ['llm', 'reranker', 'embedding'])
+        if st.button('Add model'):
             model_name_val = st.session_state.get('new_model_name', '')
             if model_name_val:
                 if model_name_val in models_infos:
-                    st.warning('Ce modèle existe déjà !')
+                    st.warning('This model already exists!')
                 else:
                     models_infos[model_name_val] = {'url': st.session_state.get('new_model_url', ''), 'api_key': st.session_state.get('new_model_api_key', ''), 'type': new_model_type}
                     ConfigService.update_models(models_infos)
                     st.session_state['models_infos'] = models_infos
-                    st.success(f"Modèle '{model_name_val}' ajouté ✅")
+                    st.success(f"Model '{model_name_val}' added ✅")
             else:
-                st.warning('Merci de remplir tous les champs !')
+                st.warning('Please fill in all fields!')
 else:
         selected_model = models_infos.get(selected_model_name, {})
         with st.container():
-            st.markdown(f'###### Modèle : {selected_model_name}')
+            st.markdown(f'###### Model: {selected_model_name}')
             col1, col2 = st.columns([1, 2])
             with col1:
-                new_model_type = st.selectbox('Type du modèle', ['llm', 'reranker', 'embedding'], index=['llm', 'reranker', 'embedding'].index(selected_model.get('type', 'llm')), key='edit_model_type')
+                new_model_type = st.selectbox('Model type', ['llm', 'reranker', 'embedding'], index=['llm', 'reranker', 'embedding'].index(selected_model.get('type', 'llm')), key='edit_model_type')
             with col2:
-                new_api_key = st.text_input('Clé API', value=selected_model.get('api_key', ''), type='password', key='edit_model_api_key')
+                new_api_key = st.text_input('API Key', value=selected_model.get('api_key', ''), type='password', key='edit_model_api_key')
             new_url = st.text_input('URL', value=selected_model.get('url', ''), key='edit_model_url')
         col_empty, col1_btn, col_empty1, col2_btn, col_empty2 = st.columns([0.5, 2, 0.5, 2, 0.5])
         with col1_btn:
-            if st.button('💾 Sauvegarder les modifications', use_container_width=True):
+            if st.button('💾 Save changes', use_container_width=True):
                 models_infos[selected_model_name]['url'] = st.session_state.get('edit_model_url', selected_model.get('url', ''))
                 models_infos[selected_model_name]['api_key'] = st.session_state.get('edit_model_api_key', selected_model.get('api_key', ''))
                 models_infos[selected_model_name]['type'] = st.session_state.get('edit_model_type', selected_model.get('type', 'llm'))
                 ConfigService.update_models(models_infos)
                 st.session_state['models_infos'] = models_infos
-                st.success('Modifications enregistrées ✅')
+                st.success('Changes saved ✅')
                 st.rerun()
         with col2_btn:
-            if st.button('🗑️ Supprimer le modèle', use_container_width=True):
+            if st.button('🗑️ Delete model', use_container_width=True):
                 del models_infos[selected_model_name]
                 ConfigService.update_models(models_infos)
                 st.session_state['models_infos'] = models_infos
-                st.success(f"Modèle '{selected_model_name}' supprimé ✅")
+                st.success(f"Model '{selected_model_name}' deleted ✅")
 
 st.markdown('<br><br>', unsafe_allow_html=True)
-roles = {'LLM de base': 'model', 'Reranker': 'reranker_model', 'Modèle pour décrire les images': 'model_for_image', "Modèle d'embedding": 'embedding_model'}
+roles = {'Base LLM': 'model', 'Reranker': 'reranker_model', 'Model for image description': 'model_for_image', 'Embedding model': 'embedding_model'}
 task_mapping = {'model': ['llm'], 'reranker_model': ['reranker', 'llm'], 'model_for_image': ['llm'], 'embedding_model': ['embedding']}
 
 def sort_with_priority(model_name, config_key):
@@ -92,7 +92,7 @@ def sort_with_priority(model_name, config_key):
         return (priority_index, model_name)
 
 config = {}
-st.subheader('📌 Configuration des modèles par rôle')
+st.subheader('📌 Model role configuration')
 for role_label, config_key in roles.items():
         if config_key not in st.session_state['config_server'].keys():
             st.session_state[config_key] = config.get(config_key, None)
@@ -101,14 +101,14 @@ for role_label, config_key in roles.items():
         options = [None] + sorted(filtered_models)
         col1, col2 = st.columns([0.5, 2])
         with col1:
-            st.markdown(f"**Modèle pour {role_label}** {('✅' if st.session_state['config_server'].get(config_key) else '❌')}")
+            st.markdown(f"**Model for {role_label}** {('✅' if st.session_state['config_server'].get(config_key) else '❌')}")
         with col2:
             config_value = st.session_state['config_server'].get(config_key)
             if config_value in options:
                 index = options.index(config_value)
             else:
                 index = 0
-            selected_model = st.selectbox(label=f'Sélectionner {config_key}', options=options, index=index, format_func=lambda x: 'Aucun modèle' if x is None else x, key=f'model_select_{config_key}', label_visibility='collapsed')
+            selected_model = st.selectbox(label=f'Select {config_key}', options=options, index=index, format_func=lambda x: 'No model' if x is None else x, key=f'model_select_{config_key}', label_visibility='collapsed')
         st.session_state[config_key] = selected_model
         config[config_key] = selected_model
         st.session_state['config_server'][config_key] = selected_model
@@ -116,26 +116,26 @@ for role_label, config_key in roles.items():
 col_empty, col_save, col_empty1 = st.columns([1, 2, 1])
 st.markdown('<br>', unsafe_allow_html=True)
 with col_save:
-        if st.button('💾 Sauvegarder les modèles par défaut', use_container_width=True):
+        if st.button('💾 Save default models', use_container_width=True):
             ConfigService.update_config(st.session_state['config_server'])
-            st.success('✅ Modèles par défaut enregistrés !')
+            st.success('✅ Default models saved!')
 
 st.markdown('<br>', unsafe_allow_html=True)
-st.subheader('📊 Disponibilité des modèles configurés')
+st.subheader('📊 Configured models availability')
 
 col_btn, _ = st.columns([1, 4])
 with col_btn:
-    if st.button('🔄 Vérifier la disponibilité', use_container_width=True):
+    if st.button('🔄 Check availability', use_container_width=True):
         st.session_state['test_models'] = True
 
 if st.session_state.get('test_models', False):
     try:
-        with st.spinner('Test des modèles en cours...'):
+        with st.spinner('Testing models...'):
             test_results = ConfigService.test_models()
         st.session_state['models_test_results'] = test_results
         st.session_state['test_models'] = False
     except Exception as e:
-        st.error(f"Erreur lors du test: {e}")
+        st.error(f"Error during testing: {e}")
         st.session_state['models_test_results'] = None
 
 test_results = st.session_state.get('models_test_results', {})
@@ -144,10 +144,10 @@ if test_results:
     st.markdown('<br>', unsafe_allow_html=True)
     
     role_labels = {
-        'model': 'LLM de base',
-        'embedding_model': "Modèle d'embedding",
+        'model': 'Base LLM',
+        'embedding_model': 'Embedding model',
         'reranker_model': 'Reranker',
-        'model_for_image': 'Modèle pour décrire les images'
+        'model_for_image': 'Model for image description'
     }
     
     for key, label in role_labels.items():
@@ -159,13 +159,13 @@ if test_results:
             st.markdown(f"**{status_icon} {label}**")
             
             if result.get('available', False):
-                st.success(f"✅ {model_name} est disponible")
+                st.success(f"✅ {model_name} is available")
             else:
-                error_msg = result.get('error', 'Erreur inconnue')
-                st.error(f"❌ {model_name} n'est pas disponible : {error_msg}")
+                error_msg = result.get('error', 'Unknown error')
+                st.error(f"❌ {model_name} is not available: {error_msg}")
 
 st.markdown('<br><br>', unsafe_allow_html=True)
-st.subheader('📌 Configuration Vectorbase')
+st.subheader('📌 Vectorbase Configuration')
 new_elastic_url = st.text_input('URL Elasticsearch', value=st.session_state['config_server'].get('params_vectorbase', {}).get('url', ''), key='elastic_url')
 col1, col2 = st.columns([2, 2])
 with col1:
@@ -175,7 +175,7 @@ with col2:
 st.session_state['config_server']['params_vectorbase']['url'] = st.session_state.get('elastic_url', st.session_state['config_server'].get('params_vectorbase', {}).get('url', ''))
 st.session_state['config_server']['params_vectorbase']['auth'][0] = st.session_state.get('elastic_auth', st.session_state['config_server'].get('params_vectorbase', {}).get('auth', ['', ''])[0])
 st.session_state['config_server']['params_vectorbase']['auth'][1] = st.session_state.get('elastic_api_key', st.session_state['config_server'].get('params_vectorbase', {}).get('auth', ['', ''])[1])
-if st.button('💾 Sauvegarder elasticsearch params', use_container_width=True):
+if st.button('💾 Save elasticsearch params', use_container_width=True):
     ConfigService.update_config(st.session_state['config_server'])
 st.markdown('<br><br>', unsafe_allow_html=True)
 
@@ -219,7 +219,7 @@ st.slider(label='**Choose number of chunks to retrieve per query:**', min_value=
 st.session_state['config_server']['nb_chunks'] = st.session_state['chunk']
 
 if st.button('Save Configuration', type='primary', use_container_width=True):
-    # Sauvegarder les paramètres modifiés localement avant l'appel au serveur
+    # Save locally modified parameters before calling server
     local_params_to_preserve = {
         'TextSplitter': st.session_state['split'],
         'reformulate_query': st.session_state['reformulate'],
@@ -227,12 +227,12 @@ if st.button('Save Configuration', type='primary', use_container_width=True):
         'data_preprocessing': st.session_state['data_prep'],
         'nb_chunks': st.session_state['chunk'],
         'language': st.session_state['lang'],
-        # Modèles par rôle
+        # Models by role
         'model': st.session_state.get('model'),
         'embedding_model': st.session_state.get('embedding_model'),
         'reranker_model': st.session_state.get('reranker_model'),
         'model_for_image': st.session_state.get('model_for_image'),
-        # Paramètres Elasticsearch
+        # Elasticsearch parameters
         'params_vectorbase': st.session_state['config_server'].get('params_vectorbase', {}),
     }
 

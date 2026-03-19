@@ -14,7 +14,7 @@ st.markdown('## Choose RAG techniques to benchmark:')
 all_rags = list(st.session_state['all_rags'].keys())
 
 if not all_rags:
-    st.warning('⚠️ Backend non connecté ou aucune méthode RAG disponible')
+    st.warning('⚠️ Backend not connected or no RAG method available')
     st.stop()
 
 nb_rags = len(all_rags)

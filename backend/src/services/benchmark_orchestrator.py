@@ -116,20 +116,50 @@ class BenchmarkOrchestrator:
         models_infos: Dict[str, Any]
     ) -> List[Any]:
         self.tracker.update(5, 'Creating agents', 'running')
-        
+
         agents = []
         for i, rag_name in enumerate(rag_names):
-            agent = self.factory.get_agent(
-                rag_name=rag_name,
-                config_server=config,
-                models_infos=models_infos,
-                databases_name=databases,
-                custom=False
-            )
+            # Vérifier si c'est un custom RAG ou un merge RAG
+            custom_rags_path = f'data/custom_rags/{rag_name}.json'
+            merge_rags_path = f'data/merge/{rag_name}.json'
+
+            if os.path.exists(custom_rags_path):
+                # Charger la config du custom RAG
+                with open(custom_rags_path, 'r') as f:
+                    custom_config = json.load(f)
+                custom_config['params_host_llm'] = config.get('params_host_llm', {})
+                agent = self.factory.get_agent(
+                    rag_name=custom_config.get('base', rag_name),
+                    config_server=custom_config,
+                    models_infos=models_infos,
+                    databases_name=databases,
+                    custom=True
+                )
+            elif os.path.exists(merge_rags_path):
+                # Charger la config du merge RAG
+                with open(merge_rags_path, 'r') as f:
+                    merge_config = json.load(f)
+                merge_config['params_host_llm'] = config.get('params_host_llm', {})
+                agent = self.factory.get_agent(
+                    rag_name='merger',
+                    config_server=merge_config,
+                    models_infos=models_infos,
+                    databases_name=databases,
+                    custom=True
+                )
+            else:
+                # RAG standard - utiliser la config globale
+                agent = self.factory.get_agent(
+                    rag_name=rag_name,
+                    config_server=config,
+                    models_infos=models_infos,
+                    databases_name=databases,
+                    custom=False
+                )
             agents.append(agent)
             progress = 5 + (i + 1) / len(rag_names) * 5
             self.tracker.update(progress, f'Creating agent {rag_name}', 'running')
-        
+
         return agents
     
     def _run_indexation(

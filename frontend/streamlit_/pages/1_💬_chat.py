@@ -15,7 +15,7 @@ with st.sidebar:
     rag_list = list(rag_list.keys())
     
     if not rag_list:
-        st.warning('⚠️ Backend non connecté ou aucune méthode RAG disponible')
+        st.warning('⚠️ Backend not connected or no RAG method available')
         st.stop()
     
     if st.session_state['selected_rag_method'] not in rag_list:
@@ -73,7 +73,7 @@ with st.sidebar:
         st.rerun()
     
     if st.session_state['success']:
-        st.success('Indexation terminée !')
+        st.success('Indexation completed!')
 
 if 'messages' not in st.session_state:
     st.session_state['messages'] = []
@@ -96,9 +96,11 @@ if (prompt := st.chat_input('Waiting for the RAG to be initialed' if not st.sess
                 if client:
                     RAGService.set_client(client)
                 session_id = st.session_state.get('api_session_id')
+                # Utiliser la config du RAG actif s'elle existe, sinon la config globale
+                rag_config = st.session_state.get('active_rag_config', st.session_state['config_server'])
                 answer = RAGService.generate_answer(
                     query=prompt,
-                    nb_chunks=st.session_state['config_server'].get('nb_chunks', 5),
+                    nb_chunks=rag_config.get('nb_chunks', 5),
                     session_id=session_id if session_id else None
                 )
             except Exception as e:
@@ -118,7 +120,7 @@ if (prompt := st.chat_input('Waiting for the RAG to be initialed' if not st.sess
         else:
             context = answer['context']
         st.markdown("\n            <style>\n            /* Style de l'expander */\n            .streamlit-expanderHeader {\n                background-color:\n                color: white !important;\n                font-weight: normal !important;\n                border-radius: 8px;\n                padding: 8px;\n                text-transform: lowercase !important;\n            }\n            .streamlit-expanderHeader:hover {\n                background-color:\n                  /* vert un peu plus foncé au hover */\n            }\n            </style>\n            ", unsafe_allow_html=True)
-        with st.expander('💡 Voir le contexte utilisé'):
+        with st.expander('💡 View context used'):
             st.text(str(context))
         formated_answer += f"{answer['answer']} \n\n**Input tokens:** {answer['nb_input_tokens']}  \n**Output tokens:** {answer['nb_output_tokens']}  \n**Computing time:** {end_time - start_time:.2f} seconds  \n**Greenhouse gas emissions:**  {impacts}  \n**Power consumption:** {energy}"
         empty.write(formated_answer)
