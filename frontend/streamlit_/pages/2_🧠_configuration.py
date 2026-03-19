@@ -177,6 +177,22 @@ st.session_state['config_server']['params_vectorbase']['auth'][0] = st.session_s
 st.session_state['config_server']['params_vectorbase']['auth'][1] = st.session_state.get('elastic_api_key', st.session_state['config_server'].get('params_vectorbase', {}).get('auth', ['', ''])[1])
 if st.button('💾 Save elasticsearch params', use_container_width=True):
     ConfigService.update_config(st.session_state['config_server'])
+    # Vérifier la connexion Elasticsearch avec la nouvelle configuration via le backend
+    try:
+        client = st.session_state.get('api_client')
+        if client:
+            result = client.check_elasticsearch_health()
+            if result.get('status') == 'connected':
+                st.success(f"✅ Elasticsearch connection successful! (version: {result.get('version', 'unknown')})")
+                st.session_state['elasticsearch_connected'] = True
+            else:
+                st.error(f"❌ Elasticsearch connection failed: {result.get('error', 'Unknown error')}")
+                st.session_state['elasticsearch_connected'] = False
+        else:
+            st.warning('⚠️ Backend not connected')
+    except Exception as e:
+        st.error(f'❌ Elasticsearch connection error: {e}')
+        st.session_state['elasticsearch_connected'] = False
 st.markdown('<br><br>', unsafe_allow_html=True)
 
 data_preparation = {'pdf_text_extraction': 'PDF text extraction', 'md_without_images': 'PDF conversion into markdown'}

@@ -140,6 +140,10 @@ class APIClient:
             'additional_name': additional_name
         })
     
+    def check_elasticsearch_health(self) -> Dict[str, Any]:
+        """Check Elasticsearch connection health"""
+        return self._request('GET', '/api/rag/elasticsearch/health')
+
     def list_elasticsearch_indices(self, prefix: Optional[str] = None) -> Dict[str, Any]:
         params = {}
         if prefix:

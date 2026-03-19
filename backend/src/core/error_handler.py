@@ -138,3 +138,8 @@ def configure_logging(level: int=logging.INFO, log_file: Optional[str]=None, for
         os.makedirs(os.path.dirname(log_file), exist_ok=True)
         handlers.append(RotatingFileHandler(log_file, maxBytes=max_bytes, backupCount=backup_count, encoding='utf-8'))
     logging.basicConfig(level=level, format=format_string, handlers=handlers)
+
+    # Reduce noise from external libraries
+    logging.getLogger('elastic_transport').setLevel(logging.WARNING)
+    logging.getLogger('elasticsearch').setLevel(logging.WARNING)
+    logging.getLogger('urllib3').setLevel(logging.WARNING)

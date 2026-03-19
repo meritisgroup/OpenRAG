@@ -10,12 +10,17 @@ EcoLogits.init()
 
 @st.fragment
 def status_display():
+    from streamlit_.core.session_init import _check_elasticsearch_connection
+
     backend_status = "🟢" if st.session_state.get('backend_connected', True) else "🔴"
     es_status = "🟢" if st.session_state.get('elasticsearch_connected', True) else "🔴"
     st.markdown(f"**Status:** Backend {backend_status} | ES {es_status}")
-    
+
     if st.button("🔄 Refresh Status"):
         st.session_state['force_backend_check'] = True
+        # Check Elasticsearch connection with current configured URL
+        es_connected = _check_elasticsearch_connection(st)
+        st.session_state['elasticsearch_connected'] = es_connected
         st.rerun()
 
 
