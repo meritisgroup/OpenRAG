@@ -216,6 +216,48 @@ def generate_names(request: GenerateNamesRequest):
     return {"names": names}
 
 
+@router.get("/elasticsearch/health")
+def check_elasticsearch_health():
+    """Check Elasticsearch connection health"""
+    config_path = 'data/base_config_server.json'
+    try:
+        with open(config_path, 'r') as f:
+            config = json.load(f)
+
+        params = config.get('params_vectorbase', {})
+        auth = params.get('auth') or ['elastic', '']
+        basic_auth = (auth[0] or 'elastic', auth[1] or '')
+
+        es = Elasticsearch(
+            [params.get('url', 'http://localhost:9200')],
+            basic_auth=basic_auth,
+            verify_certs=False,
+            ssl_show_warn=False,
+            request_timeout=5
+        )
+
+        # Try to ping Elasticsearch
+        if es.ping():
+            es_info = es.info()
+            return {
+                "status": "connected",
+                "url": params.get('url', 'http://localhost:9200'),
+                "version": es_info.get('version', {}).get('number', 'unknown')
+            }
+        else:
+            return {
+                "status": "disconnected",
+                "url": params.get('url', 'http://localhost:9200'),
+                "error": "Ping failed"
+            }
+    except Exception as e:
+        return {
+            "status": "error",
+            "url": "unknown",
+            "error": str(e)
+        }
+
+
 @router.get("/elasticsearch/indices")
 def list_elasticsearch_indices(prefix: Optional[str] = None):
     config_path = 'data/base_config_server.json'

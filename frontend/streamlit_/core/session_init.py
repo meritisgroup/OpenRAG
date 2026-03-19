@@ -306,6 +306,19 @@ def _init_all_databases(st, force=False):
                 st.session_state['benchmark_database'] = []
 
 
+def _check_elasticsearch_connection(st) -> bool:
+    """Check Elasticsearch connection using the backend API"""
+    try:
+        client = st.session_state.get('api_client')
+        if not client:
+            return False
+
+        result = client.check_elasticsearch_health()
+        return result.get('status') == 'connected'
+    except Exception as e:
+        return False
+
+
 def _init_connection_status(st):
     if 'backend_connected' not in st.session_state:
         st.session_state['backend_connected'] = True
@@ -313,3 +326,5 @@ def _init_connection_status(st):
         st.session_state['elasticsearch_connected'] = True
     if 'last_health_check' not in st.session_state:
         st.session_state['last_health_check'] = datetime.min
+    if 'last_es_check' not in st.session_state:
+        st.session_state['last_es_check'] = datetime.min
