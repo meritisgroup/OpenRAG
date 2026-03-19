@@ -32,30 +32,50 @@ def _save_json(path: str, data: dict) -> None:
 def _test_model_availability(model_name: str, model_info: dict, timeout: int = 10) -> dict:
     """
     Teste si un modèle est disponible en faisant une requête réelle
-    
+
     Args:
         model_name: Nom du modèle à tester
         model_info: Informations du modèle (url, api_key, type)
         timeout: Timeout en secondes
-    
+
     Returns:
         dict: {'available': bool, 'error': Optional[str]}
     """
     import requests
     from openai import OpenAI, APIError, APIConnectionError
-    
+
     try:
         url = model_info.get('url')
         api_key = model_info.get('api_key', '')
         model_type = model_info.get('type', 'llm')
-        
+
         if url:
             base_url = url + '/v1' if not url.endswith('/v1') else url
         else:
             base_url = None
-        
+
         client = OpenAI(api_key=api_key, base_url=base_url, timeout=timeout)
-        
+
+        # Vérifier d'abord si le modèle existe dans la liste des modèles disponibles (pour tous les types)
+        try:
+            available_models = client.models.list()
+            available_model_names = [m.id for m in available_models.data]
+
+            # Vérifier si le modèle demandé est dans la liste (recherche exacte ou partielle)
+            model_exists = (
+                model_name in available_model_names or
+                any(model_name.lower() in m.lower() or m.lower() in model_name.lower() for m in available_model_names)
+            )
+
+            if not model_exists:
+                models_list_str = ', '.join(available_model_names[:10])
+                if len(available_model_names) > 10:
+                    models_list_str += '...'
+                return {'available': False, 'error': f'Modèle "{model_name}" non trouvé sur le serveur. Modèles disponibles: {models_list_str}'}
+        except Exception:
+            # Si la liste des modèles échoue, on continue avec le test normal
+            pass
+
         if model_type == 'embedding':
             response = client.embeddings.create(input="test", model=model_name)
             return {'available': True, 'error': None}
@@ -63,8 +83,33 @@ def _test_model_availability(model_name: str, model_info: dict, timeout: int = 1
             rerank_url = url + '/v1/rerank'
             payload = {'model': model_name, 'query': 'test', 'documents': ['test']}
             response = requests.post(rerank_url, json=payload, timeout=timeout)
-            response.raise_for_status()
-            return {'available': True, 'error': None}
+
+            if response.status_code == 200:
+                try:
+                    response_data = response.json()
+                    if 'results' in response_data or ('data' in response_data and isinstance(response_data['data'], list)):
+                        return {'available': True, 'error': None}
+                    else:
+                        return {'available': False, 'error': 'Réponse invalide du serveur rerank (format incorrect)'}
+                except Exception:
+                    return {'available': False, 'error': 'Réponse invalide du serveur rerank'}
+            else:
+                error_detail = f'Code HTTP {response.status_code}'
+                try:
+                    error_json = response.json()
+                    if 'error' in error_json:
+                        error_detail = error_json['error']
+                    elif 'message' in error_json:
+                        error_detail = error_json['message']
+                except:
+                    pass
+
+                if response.status_code == 404:
+                    return {'available': False, 'error': 'Endpoint /v1/rerank non trouvé (pas un serveur de reranking)'}
+                elif 'model' in str(error_detail).lower() and ('not found' in str(error_detail).lower() or 'not support' in str(error_detail).lower()):
+                    return {'available': False, 'error': f'Modèle "{model_name}" non disponible pour le reranking'}
+                else:
+                    return {'available': False, 'error': f'Erreur du serveur rerank: {error_detail}'}
         else:
             params = {
                 'model': model_name,
@@ -77,8 +122,14 @@ def _test_model_availability(model_name: str, model_info: dict, timeout: int = 1
     except APIConnectionError as e:
         return {'available': False, 'error': f'Erreur de connexion: {str(e)}'}
     except APIError as e:
+        error_msg = str(e).lower()
+        if 'model' in error_msg and ('not found' in error_msg or 'does not exist' in error_msg or 'invalid' in error_msg):
+            return {'available': False, 'error': f'Modèle "{model_name}" non disponible sur ce serveur'}
         return {'available': False, 'error': f'Erreur API: {str(e)}'}
     except requests.exceptions.RequestException as e:
+        error_msg = str(e).lower()
+        if 'model' in error_msg and ('not found' in error_msg or 'does not exist' in error_msg):
+            return {'available': False, 'error': f'Modèle "{model_name}" non disponible sur ce serveur'}
         return {'available': False, 'error': f'Erreur HTTP: {str(e)}'}
     except Exception as e:
         return {'available': False, 'error': f'Erreur inattendue: {str(e)}'}
@@ -227,19 +278,19 @@ def test_configured_models():
     """
     import requests
     from openai import OpenAI, APIError, APIConnectionError
-    
+
     config = _load_json(CONFIG_PATH)
     models_infos = _load_json(MODELS_PATH)
-    
+
     results = {
         'model': None,
         'embedding_model': None,
         'reranker_model': None,
         'model_for_image': None
     }
-    
+
     model_keys = ['model', 'embedding_model', 'reranker_model', 'model_for_image']
-    
+
     for key in model_keys:
         model_name = config.get(key)
         if not model_name or model_name not in models_infos:
@@ -249,12 +300,12 @@ def test_configured_models():
                 'error': 'Non configuré ou non trouvé dans models_infos.json'
             }
             continue
-        
+
         model_info = models_infos[model_name]
         model_type = model_info.get('type', 'llm')
         url = model_info.get('url')
         api_key = model_info.get('api_key', '')
-        
+
         try:
             if url:
                 base_url = url + '/v1' if not url.endswith('/v1') else url
@@ -268,8 +319,32 @@ def test_configured_models():
                 'error': f'Erreur création client: {str(e)}'
             }
             continue
-        
+
         try:
+            # Vérifier d'abord si le modèle existe dans la liste des modèles disponibles
+            model_exists = False
+            available_model_names = []
+            try:
+                available_models = client.models.list()
+                available_model_names = [m.id for m in available_models.data]
+
+                # Vérifier si le modèle demandé est dans la liste (recherche exacte ou partielle)
+                model_exists = (
+                    model_name in available_model_names or
+                    any(model_name.lower() in m.lower() or m.lower() in model_name.lower() for m in available_model_names)
+                )
+
+                if not model_exists:
+                    results[key] = {
+                        'name': model_name,
+                        'available': False,
+                        'error': f'Modèle "{model_name}" non trouvé sur le serveur. Modèles disponibles: {available_model_names[:10]}...' if len(available_model_names) > 10 else f'Modèle "{model_name}" non trouvé sur le serveur. Modèles disponibles: {available_model_names}'
+                    }
+                    continue
+            except Exception as e:
+                # Si la liste des modèles échoue, on continue avec le test normal
+                pass
+
             if model_type == 'embedding':
                 response = client.embeddings.create(
                     input="test",
@@ -288,12 +363,63 @@ def test_configured_models():
                     'documents': ['test document']
                 }
                 response = requests.post(rerank_url, json=payload, timeout=10)
-                response.raise_for_status()
-                results[key] = {
-                    'name': model_name,
-                    'available': True,
-                    'type': model_type
-                }
+
+                # Vérifier que la réponse est valide et contient des résultats de reranking
+                if response.status_code == 200:
+                    try:
+                        response_data = response.json()
+                        # Vérifier que la réponse contient les champs attendus pour un reranker
+                        if 'results' in response_data or ('data' in response_data and isinstance(response_data['data'], list)):
+                            results[key] = {
+                                'name': model_name,
+                                'available': True,
+                                'type': model_type
+                            }
+                        else:
+                            # Réponse reçue mais pas le format attendu pour un reranker
+                            results[key] = {
+                                'name': model_name,
+                                'available': False,
+                                'error': f'Réponse invalide du serveur rerank (format de réponse incorrect). Vérifiez que l\'URL pointe vers un serveur de reranking'
+                            }
+                    except Exception:
+                        # Réponse reçue mais pas du JSON valide
+                        results[key] = {
+                            'name': model_name,
+                            'available': False,
+                            'error': f'Réponse invalide du serveur rerank. Vérifiez que l\'URL pointe vers un serveur de reranking'
+                        }
+                else:
+                    # Le serveur a répondu avec un code d'erreur
+                    error_detail = f'Code HTTP {response.status_code}'
+                    try:
+                        error_json = response.json()
+                        if 'error' in error_json:
+                            error_detail = error_json['error']
+                        elif 'message' in error_json:
+                            error_detail = error_json['message']
+                    except:
+                        pass
+
+                    # Vérifier si l'erreur indique que le endpoint rerank n'existe pas
+                    if response.status_code == 404:
+                        results[key] = {
+                            'name': model_name,
+                            'available': False,
+                            'error': f'Endpoint /v1/rerank non trouvé. Cette URL ne semble pas être un serveur de reranking'
+                        }
+                    elif 'model' in str(error_detail).lower() and ('not found' in str(error_detail).lower() or 'not support' in str(error_detail).lower()):
+                        results[key] = {
+                            'name': model_name,
+                            'available': False,
+                            'error': f'Modèle "{model_name}" non disponible pour le reranking sur ce serveur'
+                        }
+                    else:
+                        results[key] = {
+                            'name': model_name,
+                            'available': False,
+                            'error': f'Erreur du serveur rerank: {error_detail}'
+                        }
             else:
                 params = {
                     'model': model_name,
@@ -317,24 +443,42 @@ def test_configured_models():
                 'error': f'Erreur de connexion: {str(e)}'
             }
         except APIError as e:
-            results[key] = {
-                'name': model_name,
-                'available': False,
-                'error': f'Erreur API (code {e.status_code}): {str(e)}'
-            }
+            error_msg = str(e).lower()
+            # Vérifier si l'erreur indique que le modèle n'existe pas
+            if 'model' in error_msg and ('not found' in error_msg or 'does not exist' in error_msg or 'invalid' in error_msg):
+                results[key] = {
+                    'name': model_name,
+                    'available': False,
+                    'error': f'Modèle "{model_name}" non disponible sur ce serveur'
+                }
+            else:
+                results[key] = {
+                    'name': model_name,
+                    'available': False,
+                    'error': f'Erreur API (code {e.status_code}): {str(e)}'
+                }
         except requests.exceptions.RequestException as e:
-            results[key] = {
-                'name': model_name,
-                'available': False,
-                'error': f'Erreur HTTP: {str(e)}'
-            }
+            error_msg = str(e).lower()
+            # Vérifier si l'erreur indique que le modèle n'existe pas
+            if 'model' in error_msg and ('not found' in error_msg or 'does not exist' in error_msg):
+                results[key] = {
+                    'name': model_name,
+                    'available': False,
+                    'error': f'Modèle "{model_name}" non disponible sur ce serveur'
+                }
+            else:
+                results[key] = {
+                    'name': model_name,
+                    'available': False,
+                    'error': f'Erreur HTTP: {str(e)}'
+                }
         except Exception as e:
             results[key] = {
                 'name': model_name,
                 'available': False,
                 'error': f'Erreur inattendue: {str(e)}'
             }
-    
+
     return results
 
 
