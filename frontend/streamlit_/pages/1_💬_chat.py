@@ -98,7 +98,7 @@ if (prompt := st.chat_input('Waiting for the RAG to be initialed' if not st.sess
                 session_id = st.session_state.get('api_session_id')
                 answer = RAGService.generate_answer(
                     query=prompt,
-                    nb_chunks=5,
+                    nb_chunks=st.session_state['config_server'].get('nb_chunks', 5),
                     session_id=session_id if session_id else None
                 )
             except Exception as e:

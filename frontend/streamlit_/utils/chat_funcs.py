@@ -3,7 +3,24 @@ import re
 from streamlit_.services import RAGService
 
 
-def get_chat_agent(rag_method, databases_name, session_state=None):
+def get_chat_agent(rag_method, databases_name, session_state=None, validate_models: bool = True):
+    """
+    Crée un agent RAG avec validation optionnelle des modèles
+    
+    Args:
+        rag_method: Type de RAG à créer
+        databases_name: Liste des bases de données
+        session_state: État de session (optionnel)
+        validate_models: Si True, valide les modèles avant création (défaut: True)
+    
+    Returns:
+        session_id: ID de session pour l'agent créé
+    
+    Raises:
+        APIError: Si la validation échoue ou si erreur lors de la création
+    """
+    from streamlit_.api_client.exceptions import APIError
+    
     if session_state is None:
         session_state = st.session_state
     
@@ -13,35 +30,71 @@ def get_chat_agent(rag_method, databases_name, session_state=None):
     
     config = session_state['config_server'].copy()
     
-    if 'custom_rags' in session_state.keys() and rag_method in session_state['custom_rags']:
-        custom_config = client.get_custom_rag(rag_method)
-        custom_config['params_host_llm'] = config['params_host_llm']
-        base_rag = custom_config.get('base', rag_method)
-        session_id = RAGService.get_chat_agent(
-            rag_method=base_rag,
-            databases_name=databases_name,
-            config_server=custom_config,
-            models_infos=session_state['models_infos']
-        )
-    elif 'merge_rags' in session_state.keys() and rag_method in session_state['merge_rags']:
-        merge_config = client.get_merge_rag(rag_method)
-        merge_config['params_host_llm'] = config['params_host_llm']
-        session_id = RAGService.get_chat_agent(
-            rag_method='merger',
-            databases_name=databases_name,
-            config_server=merge_config,
-            models_infos=session_state['models_infos']
-        )
-    else:
-        session_id = RAGService.get_chat_agent(
-            rag_method=rag_method,
-            databases_name=databases_name,
-            config_server=config,
-            models_infos=session_state['models_infos']
-        )
-    
-    session_state['api_session_id'] = session_id
-    return session_id
+    try:
+        if 'custom_rags' in session_state.keys() and rag_method in session_state['custom_rags']:
+            custom_config = client.get_custom_rag(rag_method)
+            custom_config['params_host_llm'] = config['params_host_llm']
+            base_rag = custom_config.get('base', rag_method)
+            session_id = RAGService.get_chat_agent(
+                rag_method=base_rag,
+                databases_name=databases_name,
+                config_server=custom_config,
+                models_infos=session_state['models_infos'],
+                validate_models=validate_models
+            )
+        elif 'merge_rags' in session_state.keys() and rag_method in session_state['merge_rags']:
+            merge_config = client.get_merge_rag(rag_method)
+            merge_config['params_host_llm'] = config['params_host_llm']
+            session_id = RAGService.get_chat_agent(
+                rag_method='merger',
+                databases_name=databases_name,
+                config_server=merge_config,
+                models_infos=session_state['models_infos'],
+                validate_models=validate_models
+            )
+        else:
+            session_id = RAGService.get_chat_agent(
+                rag_method=rag_method,
+                databases_name=databases_name,
+                config_server=config,
+                models_infos=session_state['models_infos'],
+                validate_models=validate_models
+            )
+        
+        session_state['api_session_id'] = session_id
+        return session_id
+        
+    except APIError as e:
+        # Gérer les erreurs de validation de modèles
+        error_data = e.args[0] if e.args else {}
+        
+        if isinstance(error_data, dict):
+            # Erreur de validation des modèles
+            if 'validation' in error_data:
+                st.error("⚠️ Certains modèles nécessaires ne sont pas disponibles :")
+                validation = error_data['validation']
+                
+                for model_key, result in validation.get('models', {}).items():
+                    if not result.get('available', False):
+                        model_name = result.get('name', 'N/A')
+                        error_msg = result.get('error', 'Erreur inconnue')
+                        st.error(f"- {model_name} ({model_key}): {error_msg}")
+                
+                # Afficher un résumé
+                st.warning("💡 Veuillez vérifier la disponibilité des modèles dans la page de configuration")
+                st.stop()  # Arrêter l'exécution sans afficher de traceback
+            elif 'error' in error_data:
+                # Autre erreur avec message
+                st.error(f"❌ Erreur: {error_data['error']}")
+                st.stop()
+            else:
+                # Autre erreur sans message explicite
+                st.error(f"❌ Erreur lors de la création du RAG: {error_data}")
+                st.stop()
+        else:
+            # Erreur non structurée
+            st.error(f"❌ Erreur lors de la création du RAG: {str(e)}")
+            st.stop()
 
 
 def change_default_prompt():

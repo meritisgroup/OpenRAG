@@ -219,18 +219,43 @@ st.slider(label='**Choose number of chunks to retrieve per query:**', min_value=
 st.session_state['config_server']['nb_chunks'] = st.session_state['chunk']
 
 if st.button('Save Configuration', type='primary', use_container_width=True):
-    st.session_state['config_server']['TextSplitter'] = st.session_state['split']
-    st.session_state['config_server']['reformulate_query'] = st.session_state['reformulate']
-    st.session_state['config_server']['type_retrieval'] = st.session_state['ret']
-    st.session_state['config_server']['data_preprocessing'] = st.session_state['data_prep']
-    
+    # Sauvegarder les paramètres modifiés localement avant l'appel au serveur
+    local_params_to_preserve = {
+        'TextSplitter': st.session_state['split'],
+        'reformulate_query': st.session_state['reformulate'],
+        'type_retrieval': st.session_state['ret'],
+        'data_preprocessing': st.session_state['data_prep'],
+        'nb_chunks': st.session_state['chunk'],
+        'language': st.session_state['lang'],
+        # Modèles par rôle
+        'model': st.session_state.get('model'),
+        'embedding_model': st.session_state.get('embedding_model'),
+        'reranker_model': st.session_state.get('reranker_model'),
+        'model_for_image': st.session_state.get('model_for_image'),
+        # Paramètres Elasticsearch
+        'params_vectorbase': st.session_state['config_server'].get('params_vectorbase', {}),
+    }
+
+    # Mettre à jour la config avec les valeurs locales
+    for key, value in local_params_to_preserve.items():
+        if value is not None:  # Ne pas écraser avec None
+            st.session_state['config_server'][key] = value
+
     try:
         result = ConfigService.change_server_config(rag_name=None)
-        st.session_state['config_server'] = result.get('config', st.session_state['config_server'])
+        server_config = result.get('config', {})
+        # Restaurer les paramètres locaux après l'appel au serveur
+        for key, value in local_params_to_preserve.items():
+            if value is not None:
+                server_config[key] = value
+        # Fusionner seulement les clés qui ne sont pas dans nos paramètres locaux
+        for key, value in server_config.items():
+            if key not in local_params_to_preserve or local_params_to_preserve.get(key) is None:
+                st.session_state['config_server'][key] = value
         st.success('Configuration saved ✅')
     except APIError as e:
         st.warning(f"API error: {e}")
-    
+
     ConfigService.update_config(st.session_state['config_server'])
     
     st.session_state['custom_rags'] = get_custom_rags_name()

@@ -29,6 +29,130 @@ def _save_json(path: str, data: dict) -> None:
         json.dump(data, f, indent=4)
 
 
+def _test_model_availability(model_name: str, model_info: dict, timeout: int = 10) -> dict:
+    """
+    Teste si un modèle est disponible en faisant une requête réelle
+    
+    Args:
+        model_name: Nom du modèle à tester
+        model_info: Informations du modèle (url, api_key, type)
+        timeout: Timeout en secondes
+    
+    Returns:
+        dict: {'available': bool, 'error': Optional[str]}
+    """
+    import requests
+    from openai import OpenAI, APIError, APIConnectionError
+    
+    try:
+        url = model_info.get('url')
+        api_key = model_info.get('api_key', '')
+        model_type = model_info.get('type', 'llm')
+        
+        if url:
+            base_url = url + '/v1' if not url.endswith('/v1') else url
+        else:
+            base_url = None
+        
+        client = OpenAI(api_key=api_key, base_url=base_url, timeout=timeout)
+        
+        if model_type == 'embedding':
+            response = client.embeddings.create(input="test", model=model_name)
+            return {'available': True, 'error': None}
+        elif model_type == 'reranker':
+            rerank_url = url + '/v1/rerank'
+            payload = {'model': model_name, 'query': 'test', 'documents': ['test']}
+            response = requests.post(rerank_url, json=payload, timeout=timeout)
+            response.raise_for_status()
+            return {'available': True, 'error': None}
+        else:
+            params = {
+                'model': model_name,
+                'messages': [{"role": "user", "content": "test"}],
+                'max_tokens': 5
+            }
+            params.pop('impacts', None)
+            response = client.chat.completions.create(**params)
+            return {'available': True, 'error': None}
+    except APIConnectionError as e:
+        return {'available': False, 'error': f'Erreur de connexion: {str(e)}'}
+    except APIError as e:
+        return {'available': False, 'error': f'Erreur API: {str(e)}'}
+    except requests.exceptions.RequestException as e:
+        return {'available': False, 'error': f'Erreur HTTP: {str(e)}'}
+    except Exception as e:
+        return {'available': False, 'error': f'Erreur inattendue: {str(e)}'}
+
+
+def _validate_rag_models(rag_name: str, config: dict, models_infos: dict, timeout: int = 10) -> dict:
+    """
+    Valide les modèles nécessaires pour un type de RAG
+    
+    Args:
+        rag_name: Nom du type de RAG
+        config: Configuration serveur
+        models_infos: Informations sur les modèles disponibles
+        timeout: Timeout en secondes pour tester chaque modèle
+    
+    Returns:
+        dict: {
+            'all_available': bool,
+            'models': dict,  # Résultats par clé de modèle
+            'errors': list[str]
+        }
+    """
+    from utils.rag_model_requirements import get_required_models_for_rag
+    
+    requirements = get_required_models_for_rag(rag_name, config)
+    
+    # Combiner requis et optionnels configurés
+    models_to_check = requirements['required'] + requirements['optional']
+    
+    results = {
+        'all_available': True,
+        'models': {},
+        'errors': []
+    }
+    
+    for model_key in models_to_check:
+        model_name = config.get(model_key)
+        
+        if not model_name:
+            results['models'][model_key] = {
+                'name': None,
+                'available': False,
+                'error': f"Modèle '{model_key}' non configuré"
+            }
+            results['all_available'] = False
+            results['errors'].append(f"Modèle '{model_key}' non configuré")
+            continue
+        
+        if model_name not in models_infos:
+            results['models'][model_key] = {
+                'name': model_name,
+                'available': False,
+                'error': f"Modèle '{model_name}' non trouvé dans models_infos.json"
+            }
+            results['all_available'] = False
+            results['errors'].append(f"Modèle '{model_name}' non trouvé dans models_infos.json")
+            continue
+        
+        model_info = models_infos[model_name]
+        test_result = _test_model_availability(model_name, model_info, timeout)
+        
+        results['models'][model_key] = {
+            'name': model_name,
+            'available': test_result['available'],
+            'error': test_result['error']
+        }
+        
+        if not test_result['available']:
+            results['all_available'] = False
+            results['errors'].append(f"Modèle '{model_name}' ({model_key}): {test_result['error']}")
+    
+    return results
+
+
 @router.get("", response_model=ConfigResponse)
 def get_config():
     config = _load_json(CONFIG_PATH)
@@ -171,14 +295,16 @@ def test_configured_models():
                     'type': model_type
                 }
             else:
-                response = client.chat.completions.create(
-                    model=model_name,
-                    messages=[
+                params = {
+                    'model': model_name,
+                    'messages': [
                         {"role": "system", "content": "You are a helpful assistant."},
                         {"role": "user", "content": "test"}
                     ],
-                    max_tokens=5
-                )
+                    'max_tokens': 5
+                }
+                params.pop('impacts', None)
+                response = client.chat.completions.create(**params)
                 results[key] = {
                     'name': model_name,
                     'available': True,

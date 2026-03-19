@@ -19,7 +19,7 @@
         "type": "embedding"
     },
     "BAAI/bge-reranker-v2-m3": {
-        "url": "http://host.docker.internal:30002",
+        "url": "http://host.docker.internal:30003",
         "api_key": "",
         "type": "reranker"
     },

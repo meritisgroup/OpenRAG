@@ -9,7 +9,8 @@ from elasticsearch import Elasticsearch
 
 from api.schemas.rag import (
     CreateAgentRequest, GenerateRequest, GenerateResponse,
-    IndexRequest, RAGMethod, AgentStatus, ChunkInfo
+    IndexRequest, RAGMethod, AgentStatus, ChunkInfo,
+    ModelValidationResult, RAGValidationResponse
 )
 from api.main import set_agent, session_exists, get_agent, get_session_info
 from factory_RagAgent import get_rag_agent, get_custom_rag_agent, change_config_server
@@ -57,6 +58,27 @@ def create_agent(request: CreateAgentRequest):
     if not session_exists(request.session_id):
         raise HTTPException(status_code=404, detail="Session not found")
     
+    # Valider les modèles si demandé
+    if request.validate_models:
+        from .config import _validate_rag_models
+        
+        validation_result = _validate_rag_models(
+            rag_name=request.rag_method,
+            config=request.config,
+            models_infos=request.models_infos,
+            timeout=10
+        )
+        
+        if not validation_result['all_available']:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "Certains modèles nécessaires ne sont pas disponibles",
+                    "validation": validation_result
+                }
+            )
+    
+    # Créer l'agent (logique existante)
     custom_rags_path = f'data/custom_rags/{request.rag_method}.json'
     merge_rags_path = f'data/merge/{request.rag_method}.json'
     

@@ -27,6 +27,19 @@ class CreateAgentRequest(BaseModel):
     config: Dict[str, Any]
     models_infos: Dict[str, Any]
     databases: List[str] = ['']
+    validate_models: bool = True
+
+class ModelValidationResult(BaseModel):
+    """Résultat de validation d'un modèle"""
+    name: Optional[str]
+    available: bool
+    error: Optional[str] = None
+
+class RAGValidationResponse(BaseModel):
+    """Réponse de validation des modèles pour un RAG"""
+    all_available: bool
+    models: Dict[str, ModelValidationResult]
+    errors: List[str]
 
 
 class IndexRequest(BaseModel):
