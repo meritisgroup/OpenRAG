@@ -53,8 +53,8 @@ RAG_MODEL_REQUIREMENTS = {
         'optional': []
     },
     'merger': {
-        'required': ['model', 'embedding_model'],
-        'optional': ['reranker_model']
+        'required': ['model'],
+        'optional': []
     }
 }
 
@@ -85,8 +85,8 @@ def get_required_models_for_rag(rag_name: str, config: dict) -> dict:
     merge_rag_path = f'data/merge/{rag_name}.json'
     if os.path.exists(merge_rag_path):
         return {
-            'required': ['model', 'embedding_model'],
-            'optional': ['reranker_model']
+            'required': ['model'],
+            'optional': []
         }
     
     # RAG standard

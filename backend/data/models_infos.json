@@ -41,5 +41,15 @@
         "url": "http://host.docker.internal:30002",
         "api_key": "",
         "type": "llm"
+    },
+    "gemma3:1b": {
+        "url": "http://host.docker.internal:11434",
+        "api_key": "",
+        "type": "llm"
+    },
+    "all-minilm:33m": {
+        "url": "http://host.docker.internal:11434",
+        "api_key": "",
+        "type": "embedding"
     }
 }

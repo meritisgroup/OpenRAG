@@ -9,6 +9,36 @@ from streamlit_.utils.params_func import get_possible_embeddings_model, get_defa
 
 _client = APIClient(API_BASE_URL)
 
+
+def get_rag_model_requirements(rag_base: str, models_infos: dict) -> dict:
+    """Retourne les modèles disponibles par type pour un RAG donné"""
+    
+    rags_with_reranker = ['advanced_rag', 'agentic', 'agentic_router', 'reranker_rag']
+    rags_with_embedding = ['naive', 'advanced_rag', 'agentic', 'agentic_router', 'reranker_rag', 'query_reformulation', 'semantic_chunking', 'graph', 'corrective_rag', 'contextual_retrieval', 'query_based']
+    
+    requirements = {
+        'model': [],
+        'embedding_model': [],
+        'reranker_model': None
+    }
+    
+    for name, info in models_infos.items():
+        model_type = info.get('type', 'llm')
+        
+        if model_type in ['llm']:
+            requirements['model'].append(name)
+        
+        elif model_type == 'embedding' and rag_base in rags_with_embedding:
+            requirements['embedding_model'].append(name)
+        
+        elif model_type in ['reranker', 'llm']:
+            if rag_base in rags_with_reranker:
+                if requirements['reranker_model'] is None:
+                    requirements['reranker_model'] = []
+                requirements['reranker_model'].append(name)
+    
+    return requirements
+
 try:
     all_rags_response = _client.get_all_rags()
     base_rags = dict(all_rags_response)
@@ -43,6 +73,8 @@ selected_data_prep = st.selectbox(label='**Choose data preparation method:**', o
 config_new_rag['data_preprocessing'] = selected_data_prep
 splitter_dic = {'Semantic_TextSplitter': 'Semantic Splitting', 'Recursive_TextSplitter': 'Recursive Splitting', 'TextSplitter': 'Length Splitting'}
 config_new_rag['TextSplitter'] = st.selectbox(label='**Choose text splitter**', options=splitter_dic.keys(), format_func=lambda x: splitter_dic[x])
+models_infos = st.session_state.get('models_infos', {})
+
 if config_new_rag['base'] == 'advanced_rag' or config_new_rag['base'] == 'agentic':
     pre_proccessor_dic = {'Contextual integration': 'Contextual', 'Global Sum up document integration': 'Global_sum_up', 'Extract metadata': 'Extractor_metadata'}
     selected_processors = []
@@ -69,17 +101,47 @@ if config_new_rag['base'] == 'advanced_rag' or config_new_rag['base'] == 'agenti
     config_new_rag['ProcessorChunks'] = selected_processors
     nb_reranker = st.slider(label='**Choose number of chunks after reranker**', min_value=0, max_value=500, step=5, value=st.session_state['config_server'].get('nb_chunks_reranker', 100), help='The higher the number of chunks, better RAG agent might perform. However, a number of chunks too large can slow down responses and increase costs.', key='chunk')
     config_new_rag['nb_chunks_reranker'] = nb_reranker
-    models_infos = st.session_state.get('models_infos', {})
-    st.subheader('📌 Models configuration')
-    llm_models = list(models_infos.keys())
-    config_new_rag['model'] = st.selectbox(label='**Choose LLm model**', options=llm_models, format_func=lambda x: x)
-    reranker_models = list(models_infos.keys())
-    config_new_rag['reranker_model'] = st.selectbox(label='**Choose Reranker model**', options=reranker_models, format_func=lambda x: x)
-    image_models = list(models_infos.keys())
-    config_new_rag['model_for_image'] = st.selectbox(label='**Choose model for image description**', options=image_models, format_func=lambda x: x)
-    embeddings_models = list(models_infos.keys())
-    config_new_rag['embedding_model'] = st.selectbox(label='**Choose embedding model**', options=embeddings_models, format_func=lambda x: x)
-    st.markdown('<br><br>', unsafe_allow_html=True)
+
+rags_with_reranker = ['advanced_rag', 'agentic', 'agentic_router', 'reranker_rag']
+use_reranker = config_new_rag['base'] in rags_with_reranker
+
+model_requirements = get_rag_model_requirements(config_new_rag['base'], models_infos)
+
+st.subheader('📌 Models configuration')
+
+if config_new_rag['base'] != 'naive_chatbot' and model_requirements['model']:
+    config_new_rag['model'] = st.selectbox(
+        label='**Choose LLM model**',
+        options=model_requirements['model'],
+        format_func=lambda x: x,
+        index=model_requirements['model'].index(st.session_state['config_server'].get('model', model_requirements['model'][0])) if st.session_state['config_server'].get('model') in model_requirements['model'] else 0
+    )
+
+if config_new_rag['base'] != 'naive_chatbot' and model_requirements['embedding_model']:
+    config_new_rag['embedding_model'] = st.selectbox(
+        label='**Choose embedding model**',
+        options=model_requirements['embedding_model'],
+        format_func=lambda x: x,
+        index=model_requirements['embedding_model'].index(st.session_state['config_server'].get('embedding_model', model_requirements['embedding_model'][0])) if st.session_state['config_server'].get('embedding_model') in model_requirements['embedding_model'] else 0
+    )
+
+if use_reranker and model_requirements['reranker_model']:
+    config_new_rag['reranker_model'] = st.selectbox(
+        label='**Choose reranker model**',
+        options=model_requirements['reranker_model'],
+        format_func=lambda x: x,
+        index=model_requirements['reranker_model'].index(st.session_state['config_server'].get('reranker_model', model_requirements['reranker_model'][0])) if st.session_state['config_server'].get('reranker_model') in model_requirements['reranker_model'] else 0
+    )
+
+if config_new_rag['base'] in ['advanced_rag', 'agentic']:
+    image_models = [name for name, info in models_infos.items() if info.get('type') in ['llm']]
+    config_new_rag['model_for_image'] = st.selectbox(
+        label='**Choose model for image description**',
+        options=image_models,
+        format_func=lambda x: x
+    )
+
+st.markdown('<br><br>', unsafe_allow_html=True)
 config_new_rag['nb_chunks'] = st.slider(label='**Choose number of chunks to retrieve per query**', min_value=0, max_value=500, step=5, value=st.session_state['config_server'].get('nb_chunks', 5), help='The higher the number of value, the better the results of the RAG agent will be.\n                                                           However a number of chunk too large might slow down the answer time and increase costs')
 if 'chunk_length' not in st.session_state:
     st.session_state['chunk_length'] = st.session_state['config_server'].get('chunk_length', 512)
@@ -146,7 +208,20 @@ if rag_to_del in st.session_state['custom_rags']:
     try:
         config = _client.get_custom_rag(rag_to_del)
         retrieval_methods = {'embeddings': 'Embeddings', 'bm25': 'BM25', 'hybrid': 'Hybrid'}
-        display_config = {'Base RAG': [st.session_state['all_rags'][config['base']]], 'Vectorbase Type': [backend_vectorbase[config['params_vectorbase']['backend']]], 'Retrieval Method': [retrieval_methods[config['type_retrieval']]], 'Splitter': [splitter_dic[config['TextSplitter']]], 'Embedding model': [config['embedding_model']], 'Nb chunks': [str(config['nb_chunks'])], 'Chunk length': [str(config['chunk_length'])]}
+        display_config = {
+            'Base RAG': [st.session_state['all_rags'][config['base']]],
+            'Vectorbase Type': [backend_vectorbase[config['params_vectorbase']['backend']]],
+            'Retrieval Method': [retrieval_methods[config['type_retrieval']]],
+            'Splitter': [splitter_dic[config['TextSplitter']]]
+        }
+        if 'model' in config:
+            display_config['LLM model'] = [config['model']]
+        if 'embedding_model' in config:
+            display_config['Embedding model'] = [config['embedding_model']]
+        if 'reranker_model' in config:
+            display_config['Reranker model'] = [config['reranker_model']]
+        display_config['Nb chunks'] = [str(config['nb_chunks'])]
+        display_config['Chunk length'] = [str(config['chunk_length'])]
         st.write(pd.DataFrame(display_config))
     except APIError as e:
         st.error(f"Error loading custom RAG config: {e}")
