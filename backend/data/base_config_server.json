@@ -6,7 +6,7 @@
     "default_mode_provider": "ollama",
     "chunk_length": 500,
     "chunk_overlap": true,
-    "nb_chunks": 5,
+    "nb_chunks": 40,
     "nb_chunks_reranker": 200,
     "language": "FR",
     "TextSplitter": "Semantic_TextSplitter",
