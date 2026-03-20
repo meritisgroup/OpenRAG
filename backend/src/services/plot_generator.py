@@ -43,6 +43,9 @@ class PlotGenerator:
         )
         plots['time_graph'] = self.time_graph(results['df'])
         
+        if benchmark_type in ('contexts', 'answers'):
+            return plots
+        
         scores = results.get('scores', {})
         
         context_faithfulness = scores.get('context_faithfulness', {}) or results.get('evals', {}).get('context_faithfulness_scores', {})
@@ -62,11 +65,11 @@ class PlotGenerator:
                 plots['ground_truth_graph'] = self.ground_truth_graph(ground_truth_scores)
         
         if benchmark_type in ('all', 'full_bench'):
-            arena_graphs = self.arena_graphs(
-                results.get('arena_scores', {})
-            )
-            plots['arena_graphs'] = arena_graphs
-            plots['report_arena_graph'] = self.report_arena_graph(arena_graphs)
+            arena_scores = results.get('arena_scores', {})
+            if arena_scores:
+                arena_graphs = self.arena_graphs(arena_scores)
+                plots['arena_graphs'] = arena_graphs
+                plots['report_arena_graph'] = self.report_arena_graph(arena_graphs)
             
             impact = self.extract_impact(results['df'])
             energy = self.extract_energy(results['df'])

@@ -210,13 +210,15 @@ class BenchmarkOrchestrator:
             options = {'type_generation': 'simple_generation'}
         
         n = len(rag_names)
-        for i in range(n):
-            progress = 30 + (i + 1) / n * 30
-            self.tracker.update(progress, f'Generating answers ({i+1}/{n})', 'running')
+        
+        def progress_callback(current: int, total: int, rag_name: str):
+            progress = 30 + current / total * 30
+            self.tracker.update(progress, f'Generating answers ({current}/{total}) - {rag_name}', 'running')
         
         dataframe_preparator.run_all_queries(
             options_generation=options,
-            log_file=log_file
+            log_file=log_file,
+            progress_callback=progress_callback
         )
         
         df = dataframe_preparator.get_dataframe()
@@ -288,8 +290,7 @@ class BenchmarkOrchestrator:
         self.tracker.update(92, 'Generating PDF report', 'running')
         
         try:
-            temp_evaluator = AgentEvaluator.__new__(AgentEvaluator)
-            temp_evaluator.create_plot_report(plots, self.report_dir)
+            self._create_plot_report(plots, self.report_dir)
             pdf_path = os.path.join(self.report_dir, 'plot_report.pdf')
             if os.path.exists(pdf_path):
                 print(f"PDF report generated successfully: {pdf_path}")
@@ -299,6 +300,105 @@ class BenchmarkOrchestrator:
             import traceback
             print(f"Error generating PDF report: {e}")
             print(traceback.format_exc())
+    
+    def _create_plot_report(self, plots: Dict[str, Any], report_dir: str) -> None:
+        import plotly.graph_objects as go
+        import subprocess
+        
+        BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+        template_path = os.path.join(BASE_DIR, '..', 'evaluation', 'plot_report_template.tex')
+        
+        if not os.path.exists(template_path):
+            print(f"Warning: LaTeX template not found at {template_path}")
+            return
+        
+        with open(template_path, 'r', encoding='utf-8') as report_template:
+            content = report_template.read()
+        
+        if 'token_graph' in plots:
+            go.Figure(plots['token_graph']).write_image(os.path.join(report_dir, 'tokens.png'), format='png')
+            content = content.replace('{token_graph_path}', 'tokens.png')
+        if 'ground_truth_graph' in plots:
+            go.Figure(plots['ground_truth_graph']).write_image(os.path.join(report_dir, 'ground_truth.png'), format='png')
+            content = content.replace('{gt_graph_path}', 'ground_truth.png')
+        if 'context_graph' in plots:
+            go.Figure(plots['context_graph']).write_image(os.path.join(report_dir, 'context.png'), format='png')
+            content = content.replace('{context_graph_path}', 'context.png')
+        if 'time_graph' in plots:
+            go.Figure(plots['time_graph']).write_image(os.path.join(report_dir, 'time_graph.png'), format='png')
+            content = content.replace('{time_graph}', 'time_graph.png')
+        if 'arena_graphs' in plots:
+            for (match, fig) in plots['arena_graphs'].items():
+                go.Figure(fig).write_image(os.path.join(report_dir, f'{match}.png'), format='png')
+            content = content.replace('{report_arena_graph}', 'report_arena_graph.png')
+        if 'report_arena_graph' in plots:
+            go.Figure(plots['report_arena_graph']).write_image(os.path.join(report_dir, 'report_arena_graph.png'), format='png')
+            example_arena = None
+            for file in os.listdir(report_dir):
+                if '_v_' in file:
+                    example_arena = file
+                    break
+            if example_arena:
+                content = content.replace('{example_arena_graph}', example_arena)
+        final_report = content
+        if 'impact_graph' in plots and plots['impact_graph'] is not None:
+            go.Figure(plots['impact_graph']).write_image(os.path.join(report_dir, 'impact_graph.png'), format='png')
+            final_report = self._add_impact_sequence(final_report)
+        if 'energy_graph' in plots and plots['energy_graph'] is not None:
+            go.Figure(plots['energy_graph']).write_image(os.path.join(report_dir, 'energy_graph.png'), format='png')
+            final_report = self._add_energy_sequence(final_report)
+        tex_filename = 'plot_report.tex'
+        tex_path = os.path.join(report_dir, tex_filename)
+        with open(tex_path, 'w+', encoding='utf-8') as f:
+            f.write(final_report)
+        self._tex_to_pdf(tex_path)
+    
+    def _tex_to_pdf(self, tex_file_path: str) -> None:
+        import subprocess
+        if not os.path.exists(tex_file_path):
+            print(f'File not found: {tex_file_path}')
+            return
+        tex_dir = os.path.dirname(os.path.abspath(tex_file_path))
+        tex_filename = os.path.basename(tex_file_path)
+        try:
+            result = subprocess.run(['pdflatex', '-interaction=nonstopmode', tex_filename], cwd=tex_dir, check=True, capture_output=True, text=True)
+            pdf_path = tex_file_path.replace('.tex', '.pdf')
+            if os.path.exists(pdf_path):
+                print(f'PDF created successfully: {pdf_path}')
+            else:
+                print(f'PDF file not created. pdflatex output: {result.stdout[-500:] if len(result.stdout) > 500 else result.stdout}')
+        except FileNotFoundError:
+            print('Error: pdflatex not found. Please install a LaTeX distribution.')
+        except subprocess.CalledProcessError as e:
+            print(f'Error during PDF generation: {e}')
+    
+    def _add_impact_sequence(self, template: str) -> str:
+        end = template.find('\\end{document}')
+        new_template = template[:end]
+        new_template += '''
+                        \\section{Greenhouse gas emissions}
+                        Here is an estimation of how much greenhouse gas each RAG has emitted while performing the benchmark.
+                        \\begin{figure}[H]
+                        \\centering
+                        \\includegraphics[width=14cm]{impact_graph.png}
+                        \\end{figure}
+                        '''
+        new_template += template[end:]
+        return new_template
+    
+    def _add_energy_sequence(self, template: str) -> str:
+        end = template.find('\\end{document}')
+        new_template = template[:end]
+        new_template += '''
+                        \\section{Power consumption}
+                        Here is an estimation of how much power each RAG has used while performing the benchmark.
+                        \\begin{figure}[H]
+                        \\centering
+                        \\includegraphics[width=14cm]{energy_graph.png}
+                        \\end{figure}
+                        '''
+        new_template += template[end:]
+        return new_template
     
     def _save_results(
         self,
@@ -313,8 +413,12 @@ class BenchmarkOrchestrator:
         
         df = results.get('df')
         if df is not None:
+            raw_csv_path = os.path.join(self.report_dir, 'bench_raw.csv')
+            df.to_csv(raw_csv_path, index=False)
+            
+            df_structured = self._flatten_dataframe(df)
             csv_path = os.path.join(self.report_dir, 'bench_df.csv')
-            df.to_csv(csv_path, index=False)
+            df_structured.to_csv(csv_path, index=False, sep=';', encoding='utf-8-sig')
             
             df_to_save = df.copy()
             for rag in df.columns[2:]:
@@ -335,6 +439,58 @@ class BenchmarkOrchestrator:
             'config': config_path,
             'pdf': os.path.join(self.report_dir, 'plot_report.pdf')
         }
+    
+    def _flatten_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
+        result = pd.DataFrame()
+        result['QUERIES'] = df['QUERIES'].copy()
+        result['GROUND_TRUTH'] = df['GROUND_TRUTH'].copy()
+        
+        for rag in df.columns[2:]:
+            rag_data = df[rag].apply(
+                lambda d: d if isinstance(d, dict) else {}
+            )
+            
+            result[f'{rag}_ANSWER'] = rag_data.apply(
+                lambda d: d.get('ANSWER', '')
+            )
+            result[f'{rag}_CONTEXT'] = rag_data.apply(
+                lambda d: self._format_list(d.get('CONTEXT', []), sep=' | ')
+            )
+            result[f'{rag}_INPUT_TOKENS'] = rag_data.apply(
+                lambda d: d.get('INPUT_TOKENS', 0)
+            )
+            result[f'{rag}_OUTPUT_TOKENS'] = rag_data.apply(
+                lambda d: d.get('OUTPUT_TOKENS', 0)
+            )
+            result[f'{rag}_TIME'] = rag_data.apply(
+                lambda d: d.get('TIME', 0.0)
+            )
+            result[f'{rag}_IMPACT'] = rag_data.apply(
+                lambda d: self._format_impact_energy(d.get('IMPACTS', []))
+            )
+            result[f'{rag}_ENERGY'] = rag_data.apply(
+                lambda d: self._format_impact_energy(d.get('ENERGY', []))
+            )
+        
+        return result
+    
+    def _format_list(self, lst: list, sep: str = '|') -> str:
+        if not lst:
+            return ''
+        if isinstance(lst, list):
+            return sep.join([str(item) for item in lst])
+        return str(lst)
+    
+    def _format_impact_energy(self, data: list) -> str:
+        if not data or len(data) < 2:
+            return ''
+        try:
+            min_val = float(data[0]) * 1000
+            max_val = float(data[1]) * 1000
+            unit = data[2] if len(data) > 2 else 'gCO2eq'
+            return f'{min_val:.2f}-{max_val:.2f} {unit}'
+        except (IndexError, ValueError, TypeError):
+            return ''
     
     def _extract_scores(self, results: Dict[str, Any]) -> Dict[str, Any]:
         scores = {

@@ -170,9 +170,14 @@ class DataFramePreparator:
         ground_truths = [ans if pd.notna(ans) and ans != '' else None for ans in df['answer']]
         return (queries, ground_truths)
 
-    def run_all_queries(self, options_generation=None, log_file: str='') -> None:
-        with open(log_file, 'r') as f:
-            data_logs = json.load(f)
+    def run_all_queries(self, options_generation=None, log_file: str='', progress_callback=None) -> None:
+        if log_file and not os.path.exists(log_file):
+            with open(log_file, 'w') as f:
+                json.dump({'answers': 0.0}, f)
+        data_logs = {}
+        if log_file:
+            with open(log_file, 'r') as f:
+                data_logs = json.load(f)
         progress_bar = ProgressBar(zip(self.rags_available, self.rag_agents), total=len(self.rags_available), desc='Generating RAG answers')
         indexation_tokens = self.indexation_tokens
         n = len(self.rags_available)
@@ -191,7 +196,10 @@ class DataFramePreparator:
             energies = [rag_result['energy'] for rag_result in rag_results]
             self.dataframe[rag_available] = [dict(ANSWER=answer, CONTEXT=context, INPUT_TOKENS=nb_input_token, OUTPUT_TOKENS=nb_output_token, IMPACTS=impact, ENERGY=energy, TIME=answer_time) for (answer, context, nb_input_token, nb_output_token, impact, energy) in zip(answers, contexts, nb_input_tokens, nb_output_tokens, impacts, energies)]
             data_logs['answers'] = int((i + 1) / n * 100)
-            with open(log_file, 'w') as f:
-                json.dump(data_logs, f)
+            if log_file:
+                with open(log_file, 'w') as f:
+                    json.dump(data_logs, f)
             self.context_database.complete_context_database(rag_name=rag_available, queries=self.queries, answers=rag_results)
+            if progress_callback:
+                progress_callback(i + 1, n, rag_available)
         progress_bar.success('Answers ready for evaluation')
