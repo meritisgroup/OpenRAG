@@ -55,8 +55,8 @@ async def start_benchmark(
     request: BenchmarkStartRequest,
     background_tasks: BackgroundTasks
 ):
-    if len(request.rag_names) < 1:
-        raise HTTPException(status_code=400, detail="At least 1 RAG method required")
+    if len(request.rag_names) < 2:
+        raise HTTPException(status_code=400, detail="At least 2 RAG methods required")
     
     benchmark_id = ProgressTracker.create_benchmark_id()
     tracker = ProgressTracker(benchmark_id)
