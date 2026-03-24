@@ -81,3 +81,12 @@ class AgentStatus(BaseModel):
     total_tokens: int
     nb_input_tokens: int
     nb_output_tokens: int
+
+
+class IndexationStatusResponse(BaseModel):
+    status: str
+    progress: float
+    message: str
+    sub_progress: float = 0.0
+    sub_message: str = ""
+    error: Optional[str] = None

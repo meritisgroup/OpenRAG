@@ -40,14 +40,14 @@ class AgenticRouterRAG(AdvancedRag):
         self.synthesizer_agent = SynthesizerAgent(config_server=self.config_server, agent=self.agent, language=self.language)
         self.evaluator_agent = EvaluatorAgent(config_server=self.config_server, agent=self.agent, language=self.language)
 
-    def indexation_phase(self, reset_index: bool=False, reset_preprocess: bool=False, overlap: bool=True) -> None:
+    def indexation_phase(self, reset_index: bool=False, reset_preprocess: bool=False, overlap: bool=True, progress_callback=None, **kwargs) -> None:
         if reset_preprocess:
             reset_index = True
         if reset_index:
             self.data_manager.delete_collection()
             self.data_manager.clean_database()
         index = AdvancedIndexation(data_manager=self.data_manager, type_text_splitter=self.type_text_splitter, data_preprocessing=self.config_server['data_preprocessing'], agent=self.agent, embedding_model=self.embedding_model, llm_model=self.llm_model, type_processor_chunks=self.type_processor_chunks, language=self.language)
-        index.run_pipeline(chunk_size=self.config_server.get('chunk_size', 512), chunk_overlap=overlap, batch=self.config_server.get('batch', 32), config_server=self.config_server, reset_preprocess=reset_preprocess)
+        index.run_pipeline(chunk_size=self.config_server.get('chunk_size', 512), chunk_overlap=overlap, batch=self.config_server.get('batch', 32), config_server=self.config_server, reset_preprocess=reset_preprocess, progress_callback=progress_callback)
 
     def generate_answer(self, query: str, nb_chunks: int=7, options_generation: Optional[Dict]=None, return_execution_trace: bool=False) -> Dict:
         execution_trace = []

@@ -22,7 +22,7 @@ class HydeRagAgent(BaseRAGAgent):
             language=self.language
         )
 
-    def indexation_phase(self, reset_index: bool=False, reset_preprocess: bool=False, overlap: bool=True) -> None:
+    def indexation_phase(self, reset_index: bool=False, reset_preprocess: bool=False, overlap: bool=True, progress_callback=None, **kwargs) -> None:
         if reset_preprocess:
             reset_index = True
         if reset_index:
@@ -40,7 +40,8 @@ class HydeRagAgent(BaseRAGAgent):
             chunk_overlap=overlap,
             config_server=self.config_server,
             reset_preprocess=reset_preprocess,
-            max_workers=self.config_server['max_workers']
+            max_workers=self.config_server['max_workers'],
+            progress_callback=progress_callback
         )
         return None
 

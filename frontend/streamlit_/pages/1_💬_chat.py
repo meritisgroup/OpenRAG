@@ -55,20 +55,66 @@ with st.sidebar:
     if st.button('Initialize RAG Agent', use_container_width=True, on_click=handle_click, disabled=st.session_state['button_clicked'], type='primary'):
         with st.spinner('Setting up RAG agent', show_time=True):
             session_id = get_chat_agent(rag_method=rag_method, databases_name=st.session_state['chat_database_name'])
-        with st.spinner('Indexation running', show_time=True):
-            try:
-                client = st.session_state.get('api_client')
-                if client:
-                    RAGService.set_client(client)
-                RAGService.run_indexation(
-                    session_id=session_id,
-                    reset_index=reset_index,
-                    reset_preprocess=reset_preprocess
-                )
-            except Exception as e:
-                st.error(f"Indexation error: {e}")
+
+        try:
+            client = st.session_state.get('api_client')
+            if client:
+                RAGService.set_client(client)
+
+            RAGService.run_indexation(
+                session_id=session_id,
+                reset_index=reset_index,
+                reset_preprocess=reset_preprocess
+            )
+
+            progress_bar = st.progress(0, text="Starting indexation...")
+            sub_progress_bar = None
+            status_placeholder = st.empty()
+
+            while True:
+                status = RAGService.get_indexation_status(session_id=session_id)
+
+                if status['status'] == 'completed':
+                    progress_bar.progress(100, text="Indexation completed!")
+                    if sub_progress_bar is not None:
+                        sub_progress_bar.progress(100, text="Sub-task completed!")
+                    status_placeholder.empty()
+                    break
+                elif status['status'] == 'error':
+                    progress_bar.empty()
+                    if sub_progress_bar is not None:
+                        sub_progress_bar.empty()
+                    status_placeholder.error(f"Indexation failed: {status.get('error', 'Unknown error')}")
+                    st.session_state['button_clicked'] = False
+                    st.rerun()
+                    break
+                elif status['status'] == 'running':
+                    # Progress bar globale
+                    progress = status.get('progress', 0)
+                    message = status.get('message', 'Processing...')
+                    progress_bar.progress(progress / 100, text=message)
+
+                    # Progress bar sous-étape (si présente)
+                    sub_progress = status.get('sub_progress', 0)
+                    sub_message = status.get('sub_message', '')
+
+                    if sub_progress > 0 and sub_message:
+                        if sub_progress_bar is None:
+                            sub_progress_bar = st.progress(0, text="")
+                        sub_progress_bar.progress(sub_progress / 100, text=sub_message)
+                    elif sub_progress_bar is not None:
+                        sub_progress_bar.empty()
+                        sub_progress_bar = None
+
+                    status_placeholder.info(message)
+                    time.sleep(5)
+                else:
+                    time.sleep(5)
+
             st.session_state['success'] = True
             st.session_state['rag_name'] = rag_method
+        except Exception as e:
+            st.error(f"Indexation error: {e}")
         st.session_state['button_clicked'] = False
         st.rerun()
     

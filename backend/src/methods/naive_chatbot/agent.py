@@ -27,7 +27,7 @@ class NaiveChatbot(NaiveRagAgent):
         infos['output_tokens'] = 0
         return infos
 
-    def indexation_phase(self, reset_index: bool=False, overlap: bool=True, reset_preprocess=False) -> None:
+    def indexation_phase(self, reset_index: bool=False, overlap: bool=True, reset_preprocess=False, progress_callback=None, **kwargs) -> None:
         return None
 
     def get_rag_context(self, query: str, nb_chunks: int=0) -> list[str]:

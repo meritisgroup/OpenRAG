@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from datetime import datetime
 import uuid
 import os
@@ -80,7 +80,7 @@ def session_exists(session_id: str) -> bool:
     return session_id in agent_cache
 
 
-def get_session_info(session_id: str) -> Dict[str, Any]:
+def get_session_info(session_id: str) -> Optional[Dict[str, Any]]:
     if session_id not in agent_cache:
         return None
     return {
@@ -90,6 +90,54 @@ def get_session_info(session_id: str) -> Dict[str, Any]:
         'rag_method': agent_cache[session_id].get('rag_method'),
         'databases': agent_cache[session_id].get('databases')
     }
+
+
+def set_indexation_status(session_id: str, status: str, progress: float, message: str = "", sub_progress: float = 0.0, sub_message: str = "", error: Optional[str] = None) -> None:
+    if session_id not in agent_cache:
+        agent_cache[session_id] = {
+            'agent': None,
+            'created_at': datetime.now(),
+            'rag_method': None,
+            'databases': None
+        }
+    agent_cache[session_id]['indexation_status'] = {
+        'status': status,
+        'progress': progress,
+        'message': message,
+        'sub_progress': sub_progress,
+        'sub_message': sub_message,
+        'error': error
+    }
+
+
+def get_indexation_status(session_id: str) -> Dict[str, Any]:
+    if session_id not in agent_cache:
+        return {
+            'status': 'idle',
+            'progress': 0.0,
+            'message': 'Session not found',
+            'sub_progress': 0.0,
+            'sub_message': '',
+            'error': None
+        }
+    return agent_cache[session_id].get('indexation_status', {
+        'status': 'idle',
+        'progress': 0.0,
+        'message': 'No indexation started',
+        'sub_progress': 0.0,
+        'sub_message': '',
+        'error': None
+    })
+
+
+def reset_indexation_status(session_id: str) -> None:
+    if session_id in agent_cache:
+        agent_cache[session_id]['indexation_status'] = {
+            'status': 'idle',
+            'progress': 0.0,
+            'message': '',
+            'error': None
+        }
 
 
 from .routers import (

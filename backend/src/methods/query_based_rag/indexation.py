@@ -105,7 +105,7 @@ class QbRagIndexation:
         self.prompts = prompts[language]
         self.splitter = get_splitter(type_text_splitter=type_text_splitter, data_preprocessing=data_preprocessing, agent=self.agent, embedding_model=self.embedding_model)
 
-    def run_pipeline(self, config_server, chunk_size, chunk_overlap: bool=True, reset_preprocess: bool=False, max_workers: int=10):
+    def run_pipeline(self, config_server, chunk_size, chunk_overlap: bool=True, reset_preprocess: bool=False, max_workers: int=10, progress_callback=None):
         add_fields = [{'field_name': 'chunk_text', 'data': {'field_name': 'chunk_text', 'datatype': 'str', 'max_length': 5001}}]
         self.data_manager.create_collection(add_fields=add_fields)
         docs_already_processed = [res[0] for res in self.data_manager.query(Document.path)]
@@ -115,7 +115,7 @@ class QbRagIndexation:
         if max_workers <= get_executor_threads():
             max_workers = 1
         self.data_manager.create_collection()
-        progress_bar = ProgressBar(docs_to_process)
+        progress_bar = ProgressBar(docs_to_process, callback=progress_callback)
         index = 0
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {executor.submit(process_single_doc, data_manager=self.data_manager, path_doc=path_doc, doc_index=i, config_server=config_server, agent=self.agent, model=self.llm_model, splitter=self.splitter, chunk_size=chunk_size, chunk_overlap=chunk_overlap, prompts_template=self.prompts, reset_preprocess=reset_preprocess): path_doc for (i, path_doc) in enumerate(docs_to_process)}
