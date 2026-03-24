@@ -6,7 +6,7 @@ from streamlit_.utils.chat_funcs import get_chat_agent
 from streamlit_.utils.params_func import get_custom_rags_name, modify_env
 
 st.markdown('# Set Configuration')
-host_llm = {'ollama': 'Ollama', 'openai': 'OpenAI', 'mistral': 'Mistral'}
+host_llm = {'openai': 'OpenAI', 'mistral': 'Mistral'}
 
 models_infos = st.session_state.get('models_infos', {})
 if not models_infos and not st.session_state.get('backend_connected', True):
@@ -42,44 +42,59 @@ if selected_model_name == '➕ Add a new model':
         new_model_url = st.text_input('Model URL', key='new_model_url')
         new_model_api_key = st.text_input('API Key', type='password', key='new_model_api_key')
         new_model_type = st.selectbox('Model type', ['llm', 'reranker', 'embedding'])
+        new_model_provider = st.selectbox('Provider', ['openai', 'anthropic', 'mistral', 'cohere', 'custom (openaiSDK-compatible)'], key='new_model_provider')
         if st.button('Add model'):
             model_name_val = st.session_state.get('new_model_name', '')
             if model_name_val:
                 if model_name_val in models_infos:
                     st.warning('This model already exists!')
                 else:
-                    models_infos[model_name_val] = {'url': st.session_state.get('new_model_url', ''), 'api_key': st.session_state.get('new_model_api_key', ''), 'type': new_model_type}
+                    models_infos[model_name_val] = {
+                        'url': st.session_state.get('new_model_url', ''),
+                        'api_key': st.session_state.get('new_model_api_key', ''),
+                        'type': new_model_type,
+                        'provider': st.session_state.get('new_model_provider', 'openai')
+                    }
                     ConfigService.update_models(models_infos)
                     st.session_state['models_infos'] = models_infos
                     st.success(f"Model '{model_name_val}' added ✅")
             else:
                 st.warning('Please fill in all fields!')
 else:
-        selected_model = models_infos.get(selected_model_name, {})
-        with st.container():
-            st.markdown(f'###### Model: {selected_model_name}')
-            col1, col2 = st.columns([1, 2])
-            with col1:
-                new_model_type = st.selectbox('Model type', ['llm', 'reranker', 'embedding'], index=['llm', 'reranker', 'embedding'].index(selected_model.get('type', 'llm')), key='edit_model_type')
-            with col2:
-                new_api_key = st.text_input('API Key', value=selected_model.get('api_key', ''), type='password', key='edit_model_api_key')
+            selected_model = models_infos.get(selected_model_name, {})
+            with st.container():
+                st.markdown(f'###### Model: {selected_model_name}')
+                col1, col2, col3 = st.columns([1, 1, 1])
+                with col1:
+                    new_model_type = st.selectbox('Model type', ['llm', 'reranker', 'embedding'], index=['llm', 'reranker', 'embedding'].index(selected_model.get('type', 'llm')), key='edit_model_type')
+                with col2:
+                    new_api_key = st.text_input('API Key', value=selected_model.get('api_key', ''), type='password', key='edit_model_api_key')
+                with col3:
+                    provider_options = ['openai', 'anthropic', 'mistral', 'custom (openaiSDK-compatible)']
+                    current_provider = selected_model.get('provider', 'openai')
+                    if current_provider in ['custom']:
+                        current_provider = 'custom (openaiSDK-compatible)'
+                    if current_provider not in provider_options:
+                        current_provider = provider_options[0]
+                    new_provider = st.selectbox('Provider', provider_options, index=provider_options.index(current_provider) if current_provider in provider_options else 0, key='edit_model_provider')
             new_url = st.text_input('URL', value=selected_model.get('url', ''), key='edit_model_url')
-        col_empty, col1_btn, col_empty1, col2_btn, col_empty2 = st.columns([0.5, 2, 0.5, 2, 0.5])
-        with col1_btn:
-            if st.button('💾 Save changes', use_container_width=True):
-                models_infos[selected_model_name]['url'] = st.session_state.get('edit_model_url', selected_model.get('url', ''))
-                models_infos[selected_model_name]['api_key'] = st.session_state.get('edit_model_api_key', selected_model.get('api_key', ''))
-                models_infos[selected_model_name]['type'] = st.session_state.get('edit_model_type', selected_model.get('type', 'llm'))
-                ConfigService.update_models(models_infos)
-                st.session_state['models_infos'] = models_infos
-                st.success('Changes saved ✅')
-                st.rerun()
-        with col2_btn:
-            if st.button('🗑️ Delete model', use_container_width=True):
-                del models_infos[selected_model_name]
-                ConfigService.update_models(models_infos)
-                st.session_state['models_infos'] = models_infos
-                st.success(f"Model '{selected_model_name}' deleted ✅")
+            col_empty, col1_btn, col_empty1, col2_btn, col_empty2 = st.columns([0.5, 2, 0.5, 2, 0.5])
+            with col1_btn:
+                if st.button('💾 Save changes', use_container_width=True):
+                    models_infos[selected_model_name]['url'] = st.session_state.get('edit_model_url', selected_model.get('url', ''))
+                    models_infos[selected_model_name]['api_key'] = st.session_state.get('edit_model_api_key', selected_model.get('api_key', ''))
+                    models_infos[selected_model_name]['type'] = st.session_state.get('edit_model_type', selected_model.get('type', 'llm'))
+                    models_infos[selected_model_name]['provider'] = st.session_state.get('edit_model_provider', selected_model.get('provider', 'openai'))
+                    ConfigService.update_models(models_infos)
+                    st.session_state['models_infos'] = models_infos
+                    st.success('Changes saved ✅')
+                    st.rerun()
+            with col2_btn:
+                if st.button('🗑️ Delete model', use_container_width=True):
+                    del models_infos[selected_model_name]
+                    ConfigService.update_models(models_infos)
+                    st.session_state['models_infos'] = models_infos
+                    st.success(f"Model '{selected_model_name}' deleted ✅")
 
 st.markdown('<br><br>', unsafe_allow_html=True)
 roles = {'Base LLM': 'model', 'Reranker': 'reranker_model', 'Model for image description': 'model_for_image', 'Embedding model': 'embedding_model'}

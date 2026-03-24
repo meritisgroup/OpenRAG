@@ -7,9 +7,10 @@ import re
 
 class LocalSearch:
 
-    def __init__(self, agent: Agent, model: str, data_manager, start_node: int=5, language: str='EN') -> None:
-        self.data_manager
+    def __init__(self, agent: Agent, model: str, data_manager, start_node: int=5, max_chunks: int=10, language: str='EN') -> None:
+        self.data_manager = data_manager
         self.start_node = start_node
+        self.max_chunks = max_chunks
         self.language = language
         self.agent = agent
         self.model = model
@@ -40,7 +41,7 @@ class LocalSearch:
         self.tokens_counter['nb_output_tokens'] = 0
         entities_in_query = self.retrieve_from_a_query(query)
         if entities_in_query == [] or entities_in_query is None:
-            return 'No available context found for this query.\nPlease juste use your knowledge to answer.'
+            return ('No available context found for this query.\nPlease juste use your knowledge to answer.', [], self.tokens_counter)
         (entities, entities_names) = ([], [])
         db_names = self.data_manager.get_dbs_name()
         collection_name = 'graph_rag_local'
@@ -75,16 +76,22 @@ class LocalSearch:
         adding_entity = PROMPTS[self.language]['unique_entity']
         adding_relation = PROMPTS[self.language]['unique_relation']
         chunks = []
+        i = 0
+        entities = entities[:self.max_chunks]
         for entity in entities:
             adding_entities += adding_entity.replace('{entity}', entity.name).replace('{entity_description}', entity.description.replace('\n', '')) + '\n\n'
             new_chunk = Chunk(text=adding_entity.replace('{entity}', entity.name).replace('{entity_description}', entity.description.replace('\n', '')), id=i)
             chunks.append(new_chunk)
             i += 1
+        remaining_slots = self.max_chunks - len(entities)
+        both_relations = both_relations[:remaining_slots]
         for relation in both_relations:
             adding_relations += adding_relation.replace('{source}', relation.source).replace('{target}', relation.target).replace('{relation_description}', relation.description) + '\n\n'
             new_chunk = Chunk(text=adding_relation.replace('{source}', relation.source).replace('{target}', relation.target).replace('{relation_description}', relation.description), id=i)
             chunks.append(new_chunk)
             i += 1
+        remaining_slots = self.max_chunks - len(entities) - len(both_relations)
+        single_relations = single_relations[:max(0, remaining_slots)]
         for relation in single_relations:
             adding_relations += adding_relation.replace('{entity_source}', relation.source).replace('{entity_target}', relation.target).replace('{relation_description}', relation.description) + '\n\n'
             new_chunk = Chunk(text=adding_relation.replace('{entity_source}', relation.source).replace('{entity_target}', relation.target).replace('{relation_description}', relation.description), id=i)

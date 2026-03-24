@@ -19,9 +19,10 @@
         "type": "embedding"
     },
     "BAAI/bge-reranker-v2-m3": {
-        "url": "http://host.docker.internal:30005",
+        "url": "http://host.docker.internal:30003",
         "api_key": "",
-        "type": "reranker"
+        "type": "reranker",
+        "provider": "openai"
     },
     "gpt-4.1-mini": {
         "url": null,

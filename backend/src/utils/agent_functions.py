@@ -162,11 +162,12 @@ def multiple_predict(system_prompts: list[str], prompts: list[str], model: str, 
             total_energy[1] += result['energy'][1]
     return {'texts': all_answers, 'nb_input_tokens': total_input_tokens, 'nb_output_tokens': total_output_tokens, 'impacts': total_impacts, 'energy': total_energy}
 
-def predict_mistral(system_prompt: str, prompt: str, model: str, client: Mistral, temperature: float=0, options_generation: Optional[Dict[str, Any]]=None) -> Dict[str, Any]:
+def predict_mistral(system_prompt: str, prompt: str, model: str, api_key: str, temperature: float=0, options_generation: Optional[Dict[str, Any]]=None) -> Dict[str, Any]:
     init_ecologits()
     if options_generation is not None and options_generation['type_generation'] == 'no_generation':
         return {'texts': '', 'nb_input_tokens': 0, 'nb_output_tokens': 0, 'impacts': [0, 0, ''], 'energy': [0, 0, '']}
-    response = client.chat.complete(model=model, messages=[{'role': 'system', 'content': system_prompt}, {'role': 'user', 'content': prompt}], temperature=temperature)
+    with Mistral(api_key=api_key) as mistral:
+        response = mistral.chat.complete(model=model, messages=[{'role': 'system', 'content': system_prompt}, {'role': 'user', 'content': prompt}], temperature=temperature)
     try:
         answer = response.choices[0].message.content
     except Exception:
@@ -187,7 +188,7 @@ def predict_mistral(system_prompt: str, prompt: str, model: str, client: Mistral
         energy = [0, 0, '']
     return {'texts': answer, 'nb_input_tokens': input_tokens, 'nb_output_tokens': output_tokens, 'impacts': impacts, 'energy': energy}
 
-def multiple_predict_mistral(system_prompts: list[str], prompts: list[str], model: str, client: OpenAI, temperature: float=0, options_generation=None) -> tuple[list[str], int, int]:
+def multiple_predict_mistral(system_prompts: list[str], prompts: list[str], model: str, api_key: str, temperature: float=0, options_generation=None) -> tuple[list[str], int, int]:
     if options_generation is not None and options_generation['type_generation'] == 'no_generation':
         return {'texts': ['' for k in range(len(prompts))], 'nb_input_tokens': 0, 'nb_output_tokens': 0, 'impacts': [0, 0, ''], 'energy': [0, 0, '']}
     (answers, input_tokens, output_tokens, impacts, energy) = ([], 0, 0, [0, 0, ''], [0, 0, ''])
@@ -197,7 +198,7 @@ def multiple_predict_mistral(system_prompts: list[str], prompts: list[str], mode
         system_prompts = [system_prompts]
     progress_bar = ProgressBar(prompts)
     for (k, (prompt, system_prompt)) in enumerate(zip(prompts, system_prompts)):
-        answer = predict_mistral(system_prompt, prompt, model, client, temperature)
+        answer = predict_mistral(system_prompt, prompt, model, api_key, temperature)
         progress_bar.update(index=k, text=f'Processing prompt {k + 1}/{progress_bar.total}')
         answers.append(answer['texts'])
         input_tokens += answer['nb_input_tokens']

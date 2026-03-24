@@ -4,11 +4,16 @@ from core.error_handler import ConfigurationError, LLMError
 from .base_provider import BaseLLMProvider
 from .openai_provider import OpenAIProvider
 from .mistral_provider import MistralProvider
-from .ollama_provider import OllamaProvider
-from .vllm_provider import VLLMProvider
+from .anthropic_provider import AnthropicProvider
 
 class LLMProviderFactory:
-    _provider_classes = {'openai': OpenAIProvider, 'mistral': MistralProvider, 'ollama': OllamaProvider, 'vllm': VLLMProvider, 'default': BaseLLMProvider}
+    _provider_classes = {
+        'openai': OpenAIProvider,
+        'mistral': MistralProvider,
+        'anthropic': AnthropicProvider,
+        'custom': OpenAIProvider,
+        'default': BaseLLMProvider
+    }
 
     @classmethod
     def create_provider(cls, provider_type: str, models_infos: Dict[str, Any], **kwargs) -> ILLMProvider:

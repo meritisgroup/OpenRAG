@@ -1,6 +1,6 @@
 from typing import Dict, List, Any, Optional, Union
 import concurrent.futures
-from mistralai import Mistral
+import anthropic
 from pydantic import BaseModel
 import numpy as np
 from core.interfaces.illm_provider import ILLMProvider
@@ -9,8 +9,8 @@ from utils.threading_utils import get_executor_threads
 from utils.ecologits_init import init_ecologits
 
 
-class MistralProvider(ILLMProvider):
-
+class AnthropicProvider(ILLMProvider):
+    
     def __init__(
         self,
         models_infos: Dict[str, Any],
@@ -26,20 +26,20 @@ class MistralProvider(ILLMProvider):
         init_ecologits()
         self.clients = self._create_clients()
 
-    def _create_clients(self) -> Dict[str, str]:
+    def _create_clients(self) -> Dict[str, anthropic.Anthropic]:
         clients = {}
         for key in self.models_infos.keys():
             model_config = self.models_infos[key]
             provider = model_config.get('provider', '').lower()
-            if provider == 'mistral':
+            if provider == 'anthropic':
                 api_key = model_config.get('api_key', '')
                 if api_key:
-                    clients[key] = api_key
+                    clients[key] = anthropic.Anthropic(api_key=api_key)
         return clients
 
     @property
     def provider_name(self) -> str:
-        return 'mistral'
+        return 'anthropic'
 
     @property
     def is_available(self) -> bool:
@@ -62,33 +62,32 @@ class MistralProvider(ILLMProvider):
                     'impacts': [0, 0, ''],
                     'energy': [0, 0, '']
                 }
-
+            
             if model not in self.clients:
                 raise LLMError(
-                    f'Model {model} not configured for Mistral',
-                    provider='mistral',
+                    f'Model {model} not configured for Anthropic',
+                    provider='anthropic',
                     model=model
                 )
-
-            api_key = self.clients[model]
-
-            with Mistral(api_key=api_key) as mistral:
-                response = mistral.chat.complete(
-                    model=model,
-                    messages=[
-                        {'role': 'system', 'content': system_prompt},
-                        {'role': 'user', 'content': prompt}
-                    ],
-                    temperature=temperature or self.temperature
-                )
-
-            answer = response.choices[0].message.content
-            input_tokens = response.usage.prompt_tokens
-            output_tokens = response.usage.completion_tokens
-
+            
+            client = self.clients[model]
+            
+            response = client.messages.create(
+                model=model,
+                max_tokens=4096,
+                system=system_prompt,
+                messages=[{'role': 'user', 'content': prompt}],
+                temperature=temperature or self.temperature
+            )
+            
+            answer = response.content[0].text
+            
+            input_tokens = response.usage.input_tokens
+            output_tokens = response.usage.output_tokens
+            
             impacts = [0, 0, '']
             energy = [0, 0, '']
-
+            
             try:
                 if hasattr(response, 'impacts') and response.impacts:
                     impacts = [
@@ -103,7 +102,7 @@ class MistralProvider(ILLMProvider):
                     ]
             except Exception:
                 pass
-
+            
             return {
                 'texts': answer,
                 'nb_input_tokens': input_tokens,
@@ -111,10 +110,17 @@ class MistralProvider(ILLMProvider):
                 'impacts': impacts,
                 'energy': energy
             }
+        except anthropic.APIError as e:
+            raise LLMError(
+                f'Anthropic API error: {str(e)}',
+                provider='anthropic',
+                model=model,
+                original_error=e
+            )
         except Exception as e:
             raise LLMError(
                 f'Prediction failed for model {model}',
-                provider='mistral',
+                provider='anthropic',
                 model=model,
                 original_error=e
             )
@@ -130,20 +136,20 @@ class MistralProvider(ILLMProvider):
         try:
             if max_workers <= get_executor_threads():
                 max_workers = 1
-
+            
             all_answers = []
             total_input_tokens = 0
             total_output_tokens = 0
             total_impacts = [0, 0, '']
             total_energy = [0, 0, '']
-
+            
             with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
                 future_to_index = {
                     executor.submit(self.predict, prompt, system_prompt, model, temperature): i
                     for i, prompt in enumerate(prompts)
                 }
                 results = [None] * len(prompts)
-
+                
                 for future in concurrent.futures.as_completed(future_to_index):
                     index = future_to_index[future]
                     try:
@@ -157,7 +163,7 @@ class MistralProvider(ILLMProvider):
                             'impacts': [0, 0, ''],
                             'energy': [0, 0, '']
                         }
-
+            
             for result in results:
                 if result:
                     all_answers.append(result['texts'])
@@ -167,7 +173,7 @@ class MistralProvider(ILLMProvider):
                     total_impacts[1] += result['impacts'][1]
                     total_energy[0] += result['energy'][0]
                     total_energy[1] += result['energy'][1]
-
+            
             return {
                 'texts': all_answers,
                 'nb_input_tokens': total_input_tokens,
@@ -178,7 +184,7 @@ class MistralProvider(ILLMProvider):
         except Exception as e:
             raise LLMError(
                 f'Multiple predictions failed for model {model}',
-                provider='mistral',
+                provider='anthropic',
                 model=model,
                 original_error=e
             )
@@ -194,73 +200,46 @@ class MistralProvider(ILLMProvider):
         try:
             if model not in self.clients:
                 raise LLMError(
-                    f'Model {model} not configured for Mistral',
-                    provider='mistral',
+                    f'Model {model} not configured for Anthropic',
+                    provider='anthropic',
                     model=model
                 )
-
-            api_key = self.clients[model]
-
-            with Mistral(api_key=api_key) as mistral:
-                response = mistral.chat.complete(
-                    model=model,
-                    messages=[
-                        {'role': 'system', 'content': system_prompt},
-                        {'role': 'user', 'content': prompt}
-                    ],
-                    response_format={"type": "json_object"},
-                    temperature=temperature or self.temperature
-                )
-
-            import json
-            answer = response.choices[0].message.content
-            parsed = json.loads(answer)
-            return json_format.model_validate(parsed)
+            
+            client = self.clients[model]
+            
+            tool_schema = {
+                'name': json_format.__name__,
+                'input_schema': json_format.model_json_schema()
+            }
+            
+            response = client.messages.create(
+                model=model,
+                max_tokens=4096,
+                system=system_prompt,
+                messages=[{'role': 'user', 'content': prompt}],
+                tools=[tool_schema],
+                tool_choice={'type': 'tool', 'name': json_format.__name__}
+            )
+            
+            for block in response.content:
+                if block.type == 'tool_use':
+                    return json_format.model_validate(block.input)
+            
+            return None
         except Exception as e:
             raise LLMError(
                 f'JSON prediction failed for model {model}',
-                provider='mistral',
+                provider='anthropic',
                 model=model,
                 original_error=e
             )
 
     def embeddings(self, texts: Union[str, List[str]], model: str) -> Dict[str, Any]:
-        try:
-            if model not in self.clients:
-                raise LLMError(
-                    f'Model {model} not configured for Mistral',
-                    provider='mistral',
-                    model=model
-                )
-
-            api_key = self.clients[model]
-
-            if isinstance(texts, str):
-                texts = [texts]
-
-            with Mistral(api_key=api_key) as mistral:
-                response = mistral.embeddings.create(
-                    model=model,
-                    inputs=texts
-                )
-
-            embeddings = [item.embedding for item in response.data]
-
-            return {
-                'embeddings': embeddings,
-                'model': model,
-                'usage': {
-                    'prompt_tokens': response.usage.prompt_tokens,
-                    'total_tokens': response.usage.total_tokens
-                }
-            }
-        except Exception as e:
-            raise LLMError(
-                f'Embeddings failed for model {model}',
-                provider='mistral',
-                model=model,
-                original_error=e
-            )
+        raise LLMError(
+            'Anthropic does not provide native embeddings. Please configure an external embedding model (e.g., OpenAI text-embedding-3-small).',
+            provider='anthropic',
+            model=model
+        )
 
     def predict_image(
         self,
@@ -270,11 +249,77 @@ class MistralProvider(ILLMProvider):
         json_format: Optional[type[BaseModel]] = None,
         temperature: float = 0
     ) -> Dict[str, Any]:
-        raise LLMError(
-            'Mistral does not provide native image analysis. Please configure a vision model (e.g., Anthropic).',
-            provider='mistral',
-            model=model
-        )
+        try:
+            import base64
+            from io import BytesIO
+            from PIL import Image
+            
+            if model not in self.clients:
+                raise LLMError(
+                    f'Model {model} not configured for Anthropic',
+                    provider='anthropic',
+                    model=model
+                )
+            
+            client = self.clients[model]
+            
+            if isinstance(image, np.ndarray):
+                img = Image.fromarray(image)
+            else:
+                img = image
+            
+            buffer = BytesIO()
+            img.save(buffer, format='PNG')
+            image_data = base64.standard_b64encode(buffer.getvalue()).decode('utf-8')
+            
+            response = client.messages.create(
+                model=model,
+                max_tokens=4096,
+                messages=[{
+                    'role': 'user',
+                    'content': [
+                        {
+                            'type': 'image',
+                            'source': {
+                                'type': 'base64',
+                                'media_type': 'image/png',
+                                'data': image_data
+                            }
+                        },
+                        {
+                            'type': 'text',
+                            'text': prompt
+                        }
+                    ]
+                }]
+            )
+            
+            answer = response.content[0].text
+            input_tokens = response.usage.input_tokens
+            output_tokens = response.usage.output_tokens
+            
+            if json_format:
+                import json
+                try:
+                    parsed = json.loads(answer)
+                    return json_format.model_validate(parsed)
+                except Exception:
+                    return None
+            
+            return {
+                'texts': answer,
+                'nb_input_tokens': input_tokens,
+                'nb_output_tokens': output_tokens,
+                'impacts': [1, 0, ''],
+                'energy': [0, 0, '']
+            }
+        except Exception as e:
+            raise LLMError(
+                f'Image prediction failed for model {model}',
+                provider='anthropic',
+                model=model,
+                original_error=e
+            )
 
     def predict_images(
         self,
@@ -285,11 +330,44 @@ class MistralProvider(ILLMProvider):
         temperature: float = 0,
         max_workers: int = 10
     ) -> List[Dict[str, Any]]:
-        raise LLMError(
-            'Mistral does not provide native image analysis. Please configure a vision model (e.g., Anthropic).',
-            provider='mistral',
-            model=model
-        )
+        try:
+            if max_workers <= get_executor_threads():
+                max_workers = 1
+            
+            results = []
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+                future_to_index = {
+                    executor.submit(
+                        self.predict_image,
+                        prompts[i],
+                        model,
+                        images[i],
+                        json_format,
+                        temperature
+                    ): i
+                    for i in range(len(images))
+                }
+                
+                unordered_results = []
+                for future in concurrent.futures.as_completed(future_to_index):
+                    index = future_to_index[future]
+                    try:
+                        result = future.result()
+                        unordered_results.append((index, result))
+                    except Exception as exc:
+                        unordered_results.append((index, None))
+                
+                unordered_results.sort(key=lambda x: x[0])
+                results = [r[1] for r in unordered_results]
+            
+            return results
+        except Exception as e:
+            raise LLMError(
+                f'Multiple image predictions failed for model {model}',
+                provider='anthropic',
+                model=model,
+                original_error=e
+            )
 
     def reranking(
         self,
@@ -299,8 +377,8 @@ class MistralProvider(ILLMProvider):
         max_workers: int = 10
     ) -> Dict[str, Any]:
         raise LLMError(
-            'Mistral does not provide native reranking. Please configure an external reranker model.',
-            provider='mistral',
+            'Anthropic does not provide native reranking. Please configure an external reranker model.',
+            provider='anthropic',
             model=model
         )
 
