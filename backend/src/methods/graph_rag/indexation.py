@@ -9,9 +9,11 @@ from utils.agent import Agent
 from database.rag_classes import Document, Tokens, Chunk
 from pathlib import Path
 from utils.progress import ProgressBar, tqdm, TwoLevelProgressTracker
+from utils.threading_utils import get_executor_threads
 import numpy as np
 from sqlalchemy.orm import Session
 import os
+import concurrent.futures
 
 class GraphRagIndexation:
 
@@ -62,28 +64,63 @@ class GraphRagIndexation:
     def clean_entities(self, db_name: str):
         self.data_manager.create_merged_entities_table(db_name=db_name)
 
-    def extract_entities_with_progress(self, db_name: str, to_process_norm, config_server, reset_preprocess, chunk_size: int=1024, overlap: bool=True, tracker=None):
+    def _process_single_document(self, path_doc: str, doc_index: int, config_server, reset_preprocess, chunk_size: int, overlap: bool, db_name: str):
+        document = DocumentText(path=path_doc, doc_index=doc_index, agent=self.agent, config_server=config_server, splitter=self.splitter, reset_preprocess=reset_preprocess)
+        chunks = document.chunks(chunk_size=chunk_size, chunk_overlap=overlap)
+        doc_name = Path(path_doc).name
+        (entities, relations, input_tokens, output_tokens) = extract_entities_relations(
+            agent=self.agent, model=self.llm_model, chunks=chunks, 
+            doc_name=doc_name, language=self.language
+        )
+        return {
+            'path_doc': path_doc,
+            'entities': entities,
+            'relations': relations,
+            'document_base': document.convert_in_base(),
+            'input_tokens': np.sum(input_tokens),
+            'output_tokens': np.sum(output_tokens)
+        }
+
+    def extract_entities_with_progress(self, db_name: str, to_process_norm, config_server, reset_preprocess, chunk_size: int=1024, overlap: bool=True, tracker=None, max_workers: int=10):
         documents_nb_input_tokens = 0
         documents_nb_output_tokens = 0
         
-        for (k, path_doc) in enumerate(to_process_norm):
-            if tracker:
-                doc_name = Path(path_doc).name
-                tracker.update_sub(k + 1, f"Extracting entities ({k+1}/{len(to_process_norm)}) - {doc_name}")
+        if max_workers <= get_executor_threads():
+            max_workers = 1
+        
+        completed = 0
+        total_docs = len(to_process_norm)
+        
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_doc = {
+                executor.submit(
+                    self._process_single_document, 
+                    path_doc, k, config_server, reset_preprocess, chunk_size, overlap, db_name
+                ): path_doc
+                for k, path_doc in enumerate(to_process_norm)
+            }
             
-            document = DocumentText(path=path_doc, doc_index=k, agent=self.agent, config_server=config_server, splitter=self.splitter, reset_preprocess=reset_preprocess)
-            chunks = document.chunks(chunk_size=chunk_size, chunk_overlap=overlap)
-            name_docs = [str(Path(path_doc).name) for i in range(len(chunks))]
-            path_docs = [str(Path(path_doc).parent) for i in range(len(chunks))]
-            (entities, relations, input_tokens, output_tokens) = extract_entities_relations(agent=self.agent, model=self.llm_model, chunks=chunks, doc_name=name_docs[0], language=self.language)
-            documents_nb_input_tokens += np.sum(input_tokens)
-            documents_nb_output_tokens += np.sum(output_tokens)
-            for instance in entities:
-                self.data_manager.add_instance(instance, db_name=db_name)
-            for instance in relations:
-                self.data_manager.add_instance(instance, db_name=db_name)
-            document_base = document.convert_in_base()
-            self.data_manager.add_instance(document_base, db_name=db_name)
+            for future in concurrent.futures.as_completed(future_to_doc):
+                path_doc = future_to_doc[future]
+                completed += 1
+                
+                if tracker:
+                    doc_name = Path(path_doc).name
+                    tracker.update_sub(completed, f"Extracting entities ({completed}/{total_docs}) - {doc_name}")
+                
+                try:
+                    result = future.result()
+                    
+                    for instance in result['entities']:
+                        self.data_manager.add_instance(instance, db_name=db_name)
+                    for instance in result['relations']:
+                        self.data_manager.add_instance(instance, db_name=db_name)
+                    self.data_manager.add_instance(result['document_base'], db_name=db_name)
+                    
+                    documents_nb_input_tokens += result['input_tokens']
+                    documents_nb_output_tokens += result['output_tokens']
+                except Exception as exc:
+                    print(f'Error processing document {path_doc}: {exc}')
         
         documents_tokens = Tokens(title='documents', embedding_tokens=0, input_tokens=int(documents_nb_input_tokens), output_tokens=int(documents_nb_output_tokens))
         self.data_manager.add_instance(documents_tokens, db_name=db_name)
@@ -177,7 +214,10 @@ class GraphRagIndexation:
         tracker = None
         if progress_callback:
             tracker = TwoLevelProgressTracker(total_steps, progress_callback)
-            tracker.update_global(f"Starting GraphRAG indexation ({len(dbs_name)} database(s))...")
+            tracker.update_global(
+                f"Starting indexation ({len(dbs_name)} database(s))", 
+                step_name="Initializing"
+            )
         
         for db_name in dbs_name:
             (need_extraction, docs_to_process) = self.check_extraction_necessity(db_name=db_name)
@@ -194,7 +234,8 @@ class GraphRagIndexation:
                     db_name=db_name,
                     config_server=config_server,
                     reset_preprocess=reset_preprocess,
-                    tracker=tracker
+                    tracker=tracker,
+                    max_workers=config_server.get('max_workers', 10)
                 )
                 
                 if tracker:
@@ -202,28 +243,40 @@ class GraphRagIndexation:
                 
                 # Étape 2: Clean entities
                 if tracker:
-                    tracker.update_global(f"Merging entities ({db_name})...")
+                    tracker.update_global(
+                        f"Processing database: {db_name}", 
+                        step_name="Merging entities"
+                    )
                 self.clean_entities(db_name=db_name)
                 if tracker:
                     tracker.complete_step(f"Merging completed ({db_name})")
                 
                 # Étape 3: Create graph
                 if tracker:
-                    tracker.update_global(f"Creating graph ({db_name})...")
+                    tracker.update_global(
+                        f"Processing database: {db_name}", 
+                        step_name="Creating graph"
+                    )
                 g = self.create_graph(db_name=db_name)
                 if tracker:
                     tracker.complete_step(f"Graph created ({db_name})")
                 
                 # Étape 4: Describe communities
                 if tracker:
-                    tracker.update_global(f"Processing communities ({db_name})...")
+                    tracker.update_global(
+                        f"Processing database: {db_name}", 
+                        step_name="Processing communities"
+                    )
                 self.describe_communities(g, db_name=db_name)
                 if tracker:
                     tracker.complete_step(f"Communities processed ({db_name})")
                 
                 # Étape 5: Embeddings (local + global avec sous-progression)
                 if tracker:
-                    tracker.update_global(f"Creating embeddings ({db_name})...")
+                    tracker.update_global(
+                        f"Processing database: {db_name}", 
+                        step_name="Creating embeddings"
+                    )
                 
                 self.save_vb_local(db_name=db_name, tracker=tracker)
                 self.save_vb_global(db_name=db_name, tracker=tracker)

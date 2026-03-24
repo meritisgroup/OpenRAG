@@ -31,7 +31,7 @@
     },
     "storage_path": "./storage",
     "storage_data_path": "./data/databases",
-    "max_workers": 45,
+    "max_workers": 50,
     "device": "cpu",
     "mode": "default",
     "local_params": {
