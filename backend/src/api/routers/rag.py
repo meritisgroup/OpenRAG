@@ -161,6 +161,8 @@ def generate_answer(request: GenerateRequest):
     
     end_time = time.time()
     
+    info = get_session_info(request.session_id)
+    
     context = result.get('context', [])
     if isinstance(context, list):
         context_data = [
@@ -182,7 +184,8 @@ def generate_answer(request: GenerateRequest):
         impacts=result.get('impacts', [0, 0, '']),
         energy=result.get('energy', [0, 0, '']),
         original_query=request.query,
-        time=end_time - start_time
+        time=end_time - start_time,
+        databases=info.get('databases', []) if info else []
     )
 
 

@@ -110,8 +110,11 @@ if (prompt := st.chat_input('Waiting for the RAG to be initialed' if not st.sess
                     'nb_output_tokens': 0,
                     'context': '',
                     'impacts': [0, 0, ''],
-                    'energy': [0, 0, '']
+                    'energy': [0, 0, ''],
+                    'databases': []
                 }
+            db_names = answer.get('databases', [])
+            db_str = f" ({', '.join(db_names)})" if db_names else ""
             impacts = f"Between {np.round(answer['impacts'][0] * 1000, 2)} and {np.round(answer['impacts'][1] * 1000, 2)} {answer['impacts'][2][1:]}" if answer['impacts'] != [0, 0, ''] else 'Only measurable with Mistral and OpenAI LLM host'
             energy = f"Between {np.round(answer['energy'][0] * 1000, 2)} and {np.round(answer['energy'][1] * 1000, 2)} {answer['energy'][2][1:]}" if answer['energy'] != [0, 0, ''] else 'Only measurable with Mistral and OpenAI LLM host'
             end_time = time.time()
@@ -122,6 +125,6 @@ if (prompt := st.chat_input('Waiting for the RAG to be initialed' if not st.sess
         st.markdown("\n            <style>\n            /* Style de l'expander */\n            .streamlit-expanderHeader {\n                background-color:\n                color: white !important;\n                font-weight: normal !important;\n                border-radius: 8px;\n                padding: 8px;\n                text-transform: lowercase !important;\n            }\n            .streamlit-expanderHeader:hover {\n                background-color:\n                  /* vert un peu plus foncé au hover */\n            }\n            </style>\n            ", unsafe_allow_html=True)
         with st.expander('💡 View context used'):
             st.text(str(context))
-        formated_answer += f"{answer['answer']} \n\n**Input tokens:** {answer['nb_input_tokens']}  \n**Output tokens:** {answer['nb_output_tokens']}  \n**Computing time:** {end_time - start_time:.2f} seconds  \n**Greenhouse gas emissions:**  {impacts}  \n**Power consumption:** {energy}"
+        formated_answer = f"**{st.session_state['all_rags'][st.session_state['rag_name']]}{db_str}:**  \n{answer['answer']} \n\n**Input tokens:** {answer['nb_input_tokens']}  \n**Output tokens:** {answer['nb_output_tokens']}  \n**Computing time:** {end_time - start_time:.2f} seconds  \n**Greenhouse gas emissions:**  {impacts}  \n**Power consumption:** {energy}"
         empty.write(formated_answer)
         st.session_state.messages.append({'role': 'ai', 'content': formated_answer})

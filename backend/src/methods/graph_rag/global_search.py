@@ -8,9 +8,10 @@ import numpy as np
 
 class GlobalSearch(Search):
 
-    def __init__(self, agent: Agent, model: str, data_manager, pre_filter_size: int=3, language: str='EN') -> None:
+    def __init__(self, agent: Agent, model: str, data_manager, pre_filter_size: int=3, max_chunks: int=10, language: str='EN') -> None:
         self.data_manager = data_manager
         self.pre_filter = pre_filter_size
+        self.max_chunks = max_chunks
         self.language = language
         self.agent = agent
         self.model = model
@@ -56,6 +57,7 @@ class GlobalSearch(Search):
             if community_title in useful_entities.keys():
                 entities += self.data_manager.query_filter(table_class=MergeEntityOverall, filter=MergeEntityOverall.id.in_(useful_entities[community_title]))
         sorted_entities = sorted(entities, key=lambda x: int(x.degree), reverse=True)
+        sorted_entities = sorted_entities[:self.max_chunks]
         chunks = []
         i = 0
         for entity in sorted_entities:

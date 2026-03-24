@@ -19,6 +19,7 @@ from utils.agent import get_Agent
 from utils.open_doc import Opener
 from .progress_tracker import ProgressTracker
 from .plot_generator import PlotGenerator
+from utils.pdf_report_generator import generate_benchmark_report
 
 
 class BenchmarkOrchestrator:
@@ -73,8 +74,6 @@ class BenchmarkOrchestrator:
             
             scores = self._extract_scores(results)
             results['scores'] = scores
-            
-            self._generate_pdf_report(results, plots)
             
             files = self._save_results(results, config)
             
@@ -302,103 +301,11 @@ class BenchmarkOrchestrator:
             print(traceback.format_exc())
     
     def _create_plot_report(self, plots: Dict[str, Any], report_dir: str) -> None:
-        import plotly.graph_objects as go
-        import subprocess
-        
-        BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-        template_path = os.path.join(BASE_DIR, '..', 'evaluation', 'plot_report_template.tex')
-        
-        if not os.path.exists(template_path):
-            print(f"Warning: LaTeX template not found at {template_path}")
-            return
-        
-        with open(template_path, 'r', encoding='utf-8') as report_template:
-            content = report_template.read()
-        
-        if 'token_graph' in plots:
-            go.Figure(plots['token_graph']).write_image(os.path.join(report_dir, 'tokens.png'), format='png')
-            content = content.replace('{token_graph_path}', 'tokens.png')
-        if 'ground_truth_graph' in plots:
-            go.Figure(plots['ground_truth_graph']).write_image(os.path.join(report_dir, 'ground_truth.png'), format='png')
-            content = content.replace('{gt_graph_path}', 'ground_truth.png')
-        if 'context_graph' in plots:
-            go.Figure(plots['context_graph']).write_image(os.path.join(report_dir, 'context.png'), format='png')
-            content = content.replace('{context_graph_path}', 'context.png')
-        if 'time_graph' in plots:
-            go.Figure(plots['time_graph']).write_image(os.path.join(report_dir, 'time_graph.png'), format='png')
-            content = content.replace('{time_graph}', 'time_graph.png')
-        if 'arena_graphs' in plots:
-            for (match, fig) in plots['arena_graphs'].items():
-                go.Figure(fig).write_image(os.path.join(report_dir, f'{match}.png'), format='png')
-            content = content.replace('{report_arena_graph}', 'report_arena_graph.png')
-        if 'report_arena_graph' in plots:
-            go.Figure(plots['report_arena_graph']).write_image(os.path.join(report_dir, 'report_arena_graph.png'), format='png')
-            example_arena = None
-            for file in os.listdir(report_dir):
-                if '_v_' in file:
-                    example_arena = file
-                    break
-            if example_arena:
-                content = content.replace('{example_arena_graph}', example_arena)
-        final_report = content
-        if 'impact_graph' in plots and plots['impact_graph'] is not None:
-            go.Figure(plots['impact_graph']).write_image(os.path.join(report_dir, 'impact_graph.png'), format='png')
-            final_report = self._add_impact_sequence(final_report)
-        if 'energy_graph' in plots and plots['energy_graph'] is not None:
-            go.Figure(plots['energy_graph']).write_image(os.path.join(report_dir, 'energy_graph.png'), format='png')
-            final_report = self._add_energy_sequence(final_report)
-        tex_filename = 'plot_report.tex'
-        tex_path = os.path.join(report_dir, tex_filename)
-        with open(tex_path, 'w+', encoding='utf-8') as f:
-            f.write(final_report)
-        self._tex_to_pdf(tex_path)
-    
-    def _tex_to_pdf(self, tex_file_path: str) -> None:
-        import subprocess
-        if not os.path.exists(tex_file_path):
-            print(f'File not found: {tex_file_path}')
-            return
-        tex_dir = os.path.dirname(os.path.abspath(tex_file_path))
-        tex_filename = os.path.basename(tex_file_path)
-        try:
-            result = subprocess.run(['pdflatex', '-interaction=nonstopmode', tex_filename], cwd=tex_dir, check=True, capture_output=True, text=True)
-            pdf_path = tex_file_path.replace('.tex', '.pdf')
-            if os.path.exists(pdf_path):
-                print(f'PDF created successfully: {pdf_path}')
-            else:
-                print(f'PDF file not created. pdflatex output: {result.stdout[-500:] if len(result.stdout) > 500 else result.stdout}')
-        except FileNotFoundError:
-            print('Error: pdflatex not found. Please install a LaTeX distribution.')
-        except subprocess.CalledProcessError as e:
-            print(f'Error during PDF generation: {e}')
-    
-    def _add_impact_sequence(self, template: str) -> str:
-        end = template.find('\\end{document}')
-        new_template = template[:end]
-        new_template += '''
-                        \\section{Greenhouse gas emissions}
-                        Here is an estimation of how much greenhouse gas each RAG has emitted while performing the benchmark.
-                        \\begin{figure}[H]
-                        \\centering
-                        \\includegraphics[width=14cm]{impact_graph.png}
-                        \\end{figure}
-                        '''
-        new_template += template[end:]
-        return new_template
-    
-    def _add_energy_sequence(self, template: str) -> str:
-        end = template.find('\\end{document}')
-        new_template = template[:end]
-        new_template += '''
-                        \\section{Power consumption}
-                        Here is an estimation of how much power each RAG has used while performing the benchmark.
-                        \\begin{figure}[H]
-                        \\centering
-                        \\includegraphics[width=14cm]{energy_graph.png}
-                        \\end{figure}
-                        '''
-        new_template += template[end:]
-        return new_template
+        pdf_path = generate_benchmark_report(plots, report_dir)
+        if os.path.exists(pdf_path):
+            print(f'PDF created successfully: {pdf_path}')
+        else:
+            print(f'PDF file not created at {pdf_path}')
     
     def _save_results(
         self,

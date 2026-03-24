@@ -39,13 +39,13 @@ class GraphRagAgent(BaseRAGAgent):
 
     def get_rag_context(self, query: str, method: str='global', nb_chunks: int=2) -> str:
         if method == 'global':
-            search = GlobalSearch(agent=self.agent, model=self.llm_model, data_manager=self.data_manager, pre_filter_size=nb_chunks, language=self.language)
+            search = GlobalSearch(agent=self.agent, model=self.llm_model, data_manager=self.data_manager, pre_filter_size=nb_chunks, max_chunks=nb_chunks * 5, language=self.language)
         else:
-            search = LocalSearch(agent=self.agent, model=self.llm_model, data_manager=self.data_manager, start_node=nb_chunks, language=self.language)
+            search = LocalSearch(agent=self.agent, model=self.llm_model, data_manager=self.data_manager, start_node=nb_chunks, max_chunks=nb_chunks * 5, language=self.language)
         return search.get_context(query=query)
 
     @handle_errors(reraise=True, exception_types=(LLMError,))
-    def generate_answer(self, query: str, method: str='global', nb_chunks: str=2, options_generation=None) -> dict:
+    def generate_answer(self, query: str, method: str='global', nb_chunks: int=2, options_generation=None) -> dict:
         (impacts, energies) = ([0, 0, ''], [0, 0, ''])
         if self.reformulate_query:
             (query, input_t, output_t, impacts, energies) = self._reformulate_query_if_needed(query=query, nb_reformulation=1)

@@ -15,6 +15,7 @@ from methods.contextual_retrieval_rag.agent import ContextualRetrievalRagAgent
 from methods.advanced_rag.agent import AdvancedRag
 from methods.agentic_rag_router.agent import AgenticRouterRAG
 from methods.naive_chatbot.agent import NaiveChatbot
+from methods.hyde_rag.agent import HydeRagAgent
 
 
 @dataclass
@@ -40,7 +41,8 @@ RAG_REGISTRY: dict[str, RAGConfig] = {
     ),
     'merger': RAGConfig(
         agent_class=MergerRagAgent,
-        aliases=['merger_rag']
+        aliases=['merger_rag'],
+        supported_in_custom=False  # Ne peut pas être utilisé directement, doit être créé via l'interface merge
     ),
     'naive_chatbot': RAGConfig(
         agent_class=NaiveChatbot,
@@ -82,5 +84,9 @@ RAG_REGISTRY: dict[str, RAGConfig] = {
     'contextual_retrieval': RAGConfig(
         agent_class=ContextualRetrievalRagAgent,
         aliases=['contextual_retrieval_rag']
+    ),
+    'hyde': RAGConfig(
+        agent_class=HydeRagAgent,
+        aliases=['hyde_rag']
     ),
 }

@@ -71,6 +71,7 @@ class GenerateResponse(BaseModel):
     energy: List[Any]
     original_query: Optional[str] = None
     time: Optional[float] = None
+    databases: Optional[List[str]] = None
 
 
 class AgentStatus(BaseModel):

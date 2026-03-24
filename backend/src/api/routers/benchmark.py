@@ -18,6 +18,7 @@ from services.plot_generator import PlotGenerator, _convert_to_serializable
 from evaluation import end_to_end_evaluators
 from evaluation.agent_evaluator import DataFramePreparator, AgentEvaluator
 from factory.rag_registry import RAG_REGISTRY
+from utils.pdf_report_generator import generate_benchmark_report
 
 router = APIRouter()
 
@@ -221,8 +222,36 @@ def download_benchmark_file(benchmark_id: str, file_type: str):
     
     file_path = os.path.join(tracker.report_dir, file_map[file_type])
     
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail=f"File not found: {file_type}")
+    if file_type == 'pdf':
+        if not os.path.exists(file_path):
+            results_file = os.path.join(tracker.report_dir, 'results_bench.pkl')
+            if not os.path.exists(results_file):
+                raise HTTPException(status_code=404, detail="Results not found, cannot generate PDF")
+            
+            try:
+                with open(results_file, 'rb') as f:
+                    results = pickle.load(f)
+                
+                plots = results.get('plots', {})
+                benchmark_type = results.get('type_bench', 'all')
+                
+                if not plots:
+                    all_rags = _get_all_rags()
+                    plot_gen = PlotGenerator(all_rags)
+                    scores = results.get('scores', _extract_scores_from_results(results))
+                    results_with_scores = results.copy()
+                    results_with_scores['scores'] = scores
+                    plots = plot_gen.generate_all_plots(results_with_scores, benchmark_type)
+                
+                generate_benchmark_report(plots, tracker.report_dir)
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Failed to generate PDF: {str(e)}")
+        
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail="PDF could not be generated")
+    else:
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail=f"File not found: {file_type}")
     
     return FileResponse(
         file_path,
