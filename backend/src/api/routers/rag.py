@@ -2,7 +2,7 @@ import json
 import os
 import shutil
 import time
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 from typing import Dict, Any, List, Optional
 from elasticsearch import Elasticsearch
@@ -10,9 +10,9 @@ from elasticsearch import Elasticsearch
 from api.schemas.rag import (
     CreateAgentRequest, GenerateRequest, GenerateResponse,
     IndexRequest, RAGMethod, AgentStatus, ChunkInfo,
-    ModelValidationResult, RAGValidationResponse
+    ModelValidationResult, RAGValidationResponse, IndexationStatusResponse
 )
-from api.main import set_agent, session_exists, get_agent, get_session_info
+from api.main import set_agent, session_exists, get_agent, get_session_info, set_indexation_status, get_indexation_status
 from factory_RagAgent import get_rag_agent, get_custom_rag_agent, change_config_server
 from factory import RAGFactory
 from utils.factory_name_dataset_vectorbase import get_name
@@ -129,18 +129,29 @@ def create_agent(request: CreateAgentRequest):
 
 
 @router.post("/index")
-def run_indexation(request: IndexRequest):
+def run_indexation(request: IndexRequest, background_tasks: BackgroundTasks):
     agent = get_agent(request.session_id)
     if agent is None:
         raise HTTPException(status_code=404, detail="Agent not found for session")
     
-    agent.indexation_phase(
-        reset_index=request.reset_index,
-        reset_preprocess=request.reset_preprocess
-    )
+    set_indexation_status(request.session_id, "running", 0.0, "Starting indexation...")
+    
+    def run_indexation_task():
+        try:
+            agent.indexation_phase(
+                reset_index=request.reset_index,
+                reset_preprocess=request.reset_preprocess,
+                progress_callback=lambda progress, message, sub_progress=0.0, sub_message="": 
+                    set_indexation_status(request.session_id, "running", progress, message, sub_progress, sub_message)
+            )
+            set_indexation_status(request.session_id, "completed", 100.0, "Indexation completed", 0.0, "")
+        except Exception as e:
+            set_indexation_status(request.session_id, "error", 0.0, "Indexation failed", 0.0, "", str(e))
+    
+    background_tasks.add_task(run_indexation_task)
     
     return {
-        "status": "indexed",
+        "status": "started",
         "session_id": request.session_id
     }
 
@@ -207,6 +218,12 @@ def get_agent_status(session_id: str):
         nb_input_tokens=agent.nb_input_tokens if hasattr(agent, 'nb_input_tokens') else 0,
         nb_output_tokens=agent.nb_output_tokens if hasattr(agent, 'nb_output_tokens') else 0
     )
+
+
+@router.get("/index/status/{session_id}", response_model=IndexationStatusResponse)
+def get_indexation_status_endpoint(session_id: str):
+    status = get_indexation_status(session_id)
+    return IndexationStatusResponse(**status)
 
 
 @router.post("/generate-names")

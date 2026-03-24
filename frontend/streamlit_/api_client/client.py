@@ -102,12 +102,19 @@ class APIClient:
         sid = session_id or self._session_id
         if not sid:
             raise SessionNotFoundError('No session')
-        
+
         return self._request('POST', '/api/rag/index', json={
             'session_id': sid,
             'reset_index': reset_index,
             'reset_preprocess': reset_preprocess
         })
+
+    def get_indexation_status(self, session_id: Optional[str] = None) -> Dict[str, Any]:
+        sid = session_id or self._session_id
+        if not sid:
+            raise SessionNotFoundError('No session')
+
+        return self._request('GET', f'/api/rag/index/status/{sid}')
     
     def generate_answer(self, query: str, nb_chunks: int = 5,
                         options_generation: Optional[Dict[str, Any]] = None,

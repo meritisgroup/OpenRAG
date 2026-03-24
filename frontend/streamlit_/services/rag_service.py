@@ -50,6 +50,11 @@ class RAGService:
             reset_preprocess=reset_preprocess,
             session_id=session_id
         )
+
+    @classmethod
+    def get_indexation_status(cls, session_id: Optional[str] = None) -> Dict[str, Any]:
+        client = cls.get_client()
+        return client.get_indexation_status(session_id=session_id)
     
     @classmethod
     def generate_answer(cls, query: str, nb_chunks: int = 5,

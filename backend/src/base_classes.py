@@ -16,7 +16,7 @@ class RagAgent(ABC):
     nb_output_tokens: int
 
     @abstractmethod
-    def indexation_phase(self, reset_index: bool=False, reset_preprocess: bool=False, overlap: bool=True, **kwargs) -> None:
+    def indexation_phase(self, reset_index: bool=False, reset_preprocess: bool=False, overlap: bool=True, progress_callback=None, **kwargs) -> None:
         pass
 
     @abstractmethod

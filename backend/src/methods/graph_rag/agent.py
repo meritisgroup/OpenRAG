@@ -19,7 +19,7 @@ class GraphRagAgent(BaseRAGAgent):
         self.prompts = PROMPTS[self.language]
         self.system_prompt = self._get_system_prompt(self.prompts)
 
-    def indexation_phase(self, reset_index: bool=False, overlap: bool=True, reset_preprocess=False) -> None:
+    def indexation_phase(self, reset_index: bool=False, overlap: bool=True, reset_preprocess=False, progress_callback=None, **kwargs) -> None:
         if reset_preprocess:
             reset_index = True
         if reset_index:
@@ -28,7 +28,7 @@ class GraphRagAgent(BaseRAGAgent):
                 self.data_manager.delete_collection(vb_name=db_name, name='graph_rag_global')
             self.data_manager.clean_database()
         index = GraphRagIndexation(data_manager=self.data_manager, storage_path=self.storage_path, language=self.language, agent=self.agent, type_text_splitter=self.type_text_splitter, data_preprocessing=self.config_server['data_preprocessing'], embedding_model=self.embedding_model, llm_model=self.llm_model)
-        index.run_pipeline(chunk_size=self.chunk_size, overlap=overlap, config_server=self.config_server, reset_preprocess=reset_preprocess)
+        index.run_pipeline(chunk_size=self.chunk_size, overlap=overlap, config_server=self.config_server, reset_preprocess=reset_preprocess, progress_callback=progress_callback)
 
     def get_infos_embeddings(self):
         infos = {}

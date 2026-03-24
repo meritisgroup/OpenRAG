@@ -37,7 +37,7 @@ class NaiveRagIndexation:
             embedding_model = self.embedding_model
         self.splitter = get_splitter(type_text_splitter=type_text_splitter, data_preprocessing=data_preprocessing, agent=self.agent, embedding_model=embedding_model)
 
-    def run_pipeline(self, config_server, reset_preprocess: bool=False, chunk_size: int=1024, chunk_overlap: bool=True, max_workers: int=1) -> None:
+    def run_pipeline(self, config_server, reset_preprocess: bool=False, chunk_size: int=1024, chunk_overlap: bool=True, max_workers: int=1, progress_callback=None) -> None:
         docs_already_processed = [res[0] for res in self.data_manager.query(Document.path)]
         to_process_norm = [Path(p).resolve().as_posix() for p in self.data_manager.get_list_path_documents()]
         docs_already_norm = [Path(p).resolve().as_posix() for p in docs_already_processed]
@@ -45,7 +45,7 @@ class NaiveRagIndexation:
         if max_workers <= get_executor_threads():
             max_workers = 1
         self.data_manager.create_collection()
-        progress_bar = ProgressBar(total=len(docs_to_process))
+        progress_bar = ProgressBar(total=len(docs_to_process), callback=progress_callback)
         index = 0
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {executor.submit(process_single_doc, self.data_manager, path_doc, i, config_server, self.agent, self.splitter, chunk_size, chunk_overlap, reset_preprocess): path_doc for (i, path_doc) in enumerate(docs_to_process)}

@@ -13,14 +13,14 @@ class QueryBasedRagAgent(AdvancedRag):
         self.data_manager.add_table(Chunk)
         self.prompts = prompts[self.language]
 
-    def indexation_phase(self, reset_index: bool=False, reset_preprocess: bool=False, overlap: bool=True) -> None:
+    def indexation_phase(self, reset_index: bool=False, reset_preprocess: bool=False, overlap: bool=True, progress_callback=None, **kwargs) -> None:
         if reset_preprocess:
             reset_index = True
         if reset_index:
             self.data_manager.delete_collection()
             self.data_manager.clean_database()
         qb_index = QbRagIndexation(language=self.language, agent=self.agent, data_manager=self.data_manager, type_text_splitter=self.type_text_splitter, data_preprocessing=self.config_server['data_preprocessing'], embedding_model=self.embedding_model, llm_model=self.llm_model)
-        qb_index.run_pipeline(chunk_size=self.chunk_size, config_server=self.config_server, chunk_overlap=overlap, reset_preprocess=reset_preprocess, max_workers=self.config_server['max_workers'])
+        qb_index.run_pipeline(chunk_size=self.chunk_size, config_server=self.config_server, chunk_overlap=overlap, reset_preprocess=reset_preprocess, max_workers=self.config_server['max_workers'], progress_callback=progress_callback)
 
     def remove_duplicate_chunks(self, chunks):
         seen_texts = set()

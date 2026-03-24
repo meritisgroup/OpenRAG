@@ -29,7 +29,7 @@ class MergerRagAgent(NaiveRagAgent):
                     infos[key] += temp_infos[key]
         return infos
 
-    def indexation_phase(self, reset_index: bool=False, overlap: bool=True, reset_preprocess=False) -> None:
+    def indexation_phase(self, reset_index: bool=False, overlap: bool=True, reset_preprocess=False, progress_callback=None, **kwargs) -> None:
         if reset_preprocess:
             reset_index = True
         if reset_index:
@@ -37,7 +37,7 @@ class MergerRagAgent(NaiveRagAgent):
                 self.rag_agents[rag_name].data_manager.delete_collection()
                 self.rag_agents[rag_name].data_manager.clean_database()
         for rag_name in self.rag_list:
-            self.rag_agents[rag_name].indexation_phase(reset_index=reset_index, overlap=overlap, reset_preprocess=reset_preprocess)
+            self.rag_agents[rag_name].indexation_phase(reset_index=reset_index, overlap=overlap, reset_preprocess=reset_preprocess, progress_callback=progress_callback)
             if reset_preprocess:
                 reset_preprocess = False
 
