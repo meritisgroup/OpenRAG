@@ -36,25 +36,51 @@ if selected_model_name != '➕ Add a new model':
             st.session_state['edit_model_type'] = selected_model.get('type', 'llm')
             st.session_state['edit_model_api_key'] = selected_model.get('api_key', '')
             st.session_state['edit_model_url'] = selected_model.get('url', '')
+            st.session_state['edit_azure_endpoint'] = selected_model.get('azure_endpoint', '')
+            st.session_state['edit_api_version'] = selected_model.get('api_version', '2024-02-01')
             st.session_state['selected_model_prev'] = selected_model_name
+PROVIDERS_WITH_URL = ['custom (openaiSDK-compatible)', 'cohere']
+PROVIDERS_WITH_AZURE_ENDPOINT = ['azure']
+
 if selected_model_name == '➕ Add a new model':
-        new_model_name = st.text_input('Model name', key='new_model_name')
-        new_model_url = st.text_input('Model URL', key='new_model_url')
-        new_model_api_key = st.text_input('API Key', type='password', key='new_model_api_key')
+        new_model_name = st.text_input('Model name (deployment name for Azure)', key='new_model_name')
         new_model_type = st.selectbox('Model type', ['llm', 'reranker', 'embedding'])
-        new_model_provider = st.selectbox('Provider', ['openai', 'anthropic', 'mistral', 'cohere', 'custom (openaiSDK-compatible)'], key='new_model_provider')
+        new_model_provider = st.selectbox('Provider', ['openai', 'azure', 'anthropic', 'mistral', 'cohere', 'custom (openaiSDK-compatible)'], key='new_model_provider')
+        
+        if new_model_provider == 'azure':
+            new_azure_endpoint = st.text_input('Azure Endpoint', placeholder='https://your-resource.openai.azure.com', key='new_azure_endpoint')
+            new_api_version = st.text_input('API Version', value='2024-02-01', key='new_api_version')
+        elif new_model_provider in PROVIDERS_WITH_URL:
+            new_model_url = st.text_input('Model URL', key='new_model_url')
+        new_model_api_key = st.text_input('API Key', type='password', key='new_model_api_key')
+        
         if st.button('Add model'):
             model_name_val = st.session_state.get('new_model_name', '')
             if model_name_val:
                 if model_name_val in models_infos:
                     st.warning('This model already exists!')
                 else:
-                    models_infos[model_name_val] = {
-                        'url': st.session_state.get('new_model_url', ''),
-                        'api_key': st.session_state.get('new_model_api_key', ''),
-                        'type': new_model_type,
-                        'provider': st.session_state.get('new_model_provider', 'openai')
-                    }
+                    if new_model_provider == 'azure':
+                        models_infos[model_name_val] = {
+                            'azure_endpoint': st.session_state.get('new_azure_endpoint', ''),
+                            'api_version': st.session_state.get('new_api_version', '2024-02-01'),
+                            'api_key': st.session_state.get('new_model_api_key', ''),
+                            'type': new_model_type,
+                            'provider': 'azure'
+                        }
+                    elif new_model_provider in PROVIDERS_WITH_URL:
+                        models_infos[model_name_val] = {
+                            'url': st.session_state.get('new_model_url', ''),
+                            'api_key': st.session_state.get('new_model_api_key', ''),
+                            'type': new_model_type,
+                            'provider': st.session_state.get('new_model_provider', 'openai')
+                        }
+                    else:
+                        models_infos[model_name_val] = {
+                            'api_key': st.session_state.get('new_model_api_key', ''),
+                            'type': new_model_type,
+                            'provider': st.session_state.get('new_model_provider', 'openai')
+                        }
                     ConfigService.update_models(models_infos)
                     st.session_state['models_infos'] = models_infos
                     st.success(f"Model '{model_name_val}' added ✅")
@@ -70,21 +96,39 @@ else:
                 with col2:
                     new_api_key = st.text_input('API Key', value=selected_model.get('api_key', ''), type='password', key='edit_model_api_key')
                 with col3:
-                    provider_options = ['openai', 'anthropic', 'mistral', 'custom (openaiSDK-compatible)']
+                    provider_options = ['openai', 'azure', 'anthropic', 'mistral', 'cohere', 'custom (openaiSDK-compatible)']
                     current_provider = selected_model.get('provider', 'openai')
                     if current_provider in ['custom']:
                         current_provider = 'custom (openaiSDK-compatible)'
                     if current_provider not in provider_options:
                         current_provider = provider_options[0]
                     new_provider = st.selectbox('Provider', provider_options, index=provider_options.index(current_provider) if current_provider in provider_options else 0, key='edit_model_provider')
-            new_url = st.text_input('URL', value=selected_model.get('url', ''), key='edit_model_url')
+            
+            if new_provider == 'azure' or selected_model.get('provider') == 'azure':
+                new_azure_endpoint = st.text_input('Azure Endpoint', value=selected_model.get('azure_endpoint', ''), placeholder='https://your-resource.openai.azure.com', key='edit_azure_endpoint')
+                new_api_version = st.text_input('API Version', value=selected_model.get('api_version', '2024-02-01'), key='edit_api_version')
+            elif new_provider in PROVIDERS_WITH_URL or selected_model.get('url'):
+                new_url = st.text_input('URL', value=selected_model.get('url', ''), key='edit_model_url')
+            
             col_empty, col1_btn, col_empty1, col2_btn, col_empty2 = st.columns([0.5, 2, 0.5, 2, 0.5])
             with col1_btn:
                 if st.button('💾 Save changes', use_container_width=True):
-                    models_infos[selected_model_name]['url'] = st.session_state.get('edit_model_url', selected_model.get('url', ''))
+                    current_provider_val = st.session_state.get('edit_model_provider', selected_model.get('provider', 'openai'))
+                    if current_provider_val == 'azure':
+                        models_infos[selected_model_name]['azure_endpoint'] = st.session_state.get('edit_azure_endpoint', selected_model.get('azure_endpoint', ''))
+                        models_infos[selected_model_name]['api_version'] = st.session_state.get('edit_api_version', selected_model.get('api_version', '2024-02-01'))
+                        models_infos[selected_model_name].pop('url', None)
+                    elif current_provider_val in PROVIDERS_WITH_URL:
+                        models_infos[selected_model_name]['url'] = st.session_state.get('edit_model_url', selected_model.get('url', ''))
+                        models_infos[selected_model_name].pop('azure_endpoint', None)
+                        models_infos[selected_model_name].pop('api_version', None)
+                    else:
+                        models_infos[selected_model_name].pop('url', None)
+                        models_infos[selected_model_name].pop('azure_endpoint', None)
+                        models_infos[selected_model_name].pop('api_version', None)
                     models_infos[selected_model_name]['api_key'] = st.session_state.get('edit_model_api_key', selected_model.get('api_key', ''))
                     models_infos[selected_model_name]['type'] = st.session_state.get('edit_model_type', selected_model.get('type', 'llm'))
-                    models_infos[selected_model_name]['provider'] = st.session_state.get('edit_model_provider', selected_model.get('provider', 'openai'))
+                    models_infos[selected_model_name]['provider'] = current_provider_val
                     ConfigService.update_models(models_infos)
                     st.session_state['models_infos'] = models_infos
                     st.success('Changes saved ✅')

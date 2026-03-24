@@ -3,13 +3,13 @@ import concurrent.futures
 import anthropic
 from pydantic import BaseModel
 import numpy as np
-from core.interfaces.illm_provider import ILLMProvider
+from core.interfaces.llm_provider import LLMProvider
 from core.error_handler import LLMError
 from utils.threading_utils import get_executor_threads
 from utils.ecologits_init import init_ecologits
 
 
-class AnthropicProvider(ILLMProvider):
+class AnthropicProvider(LLMProvider):
     
     def __init__(
         self,
@@ -234,7 +234,7 @@ class AnthropicProvider(ILLMProvider):
                 original_error=e
             )
 
-    def embeddings(self, texts: Union[str, List[str]], model: str) -> Dict[str, Any]:
+    def embeddings(self, texts: Union[str, List[str]], model: str, input_type: Optional[str] = None) -> Dict[str, Any]:
         raise LLMError(
             'Anthropic does not provide native embeddings. Please configure an external embedding model (e.g., OpenAI text-embedding-3-small).',
             provider='anthropic',

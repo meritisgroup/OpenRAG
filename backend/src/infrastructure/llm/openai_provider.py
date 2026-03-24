@@ -1,8 +1,8 @@
 from typing import Dict, Any
-from .base_provider import BaseLLMProvider
+from .openai_compatible_provider import OpenAICompatibleProvider
 from core.error_handler import LLMError
 
-class OpenAIProvider(BaseLLMProvider):
+class OpenAIProvider(OpenAICompatibleProvider):
 
     def __init__(self, models_infos: Dict[str, Any], language: str='EN', max_attempts: int=5, max_workers: int=10, api_key: str=None, base_url: str=None):
         super().__init__(models_infos, language, max_attempts, max_workers)

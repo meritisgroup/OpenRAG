@@ -1,2 +1,2 @@
-from .illm_provider import ILLMProvider
-__all__ = ['ILLMProvider']
+from .llm_provider import LLMProvider
+__all__ = ['LLMProvider']

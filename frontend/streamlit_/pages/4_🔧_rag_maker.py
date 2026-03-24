@@ -317,7 +317,7 @@ with col1:
             disable = True
         else:
             disable = False
-        st.session_state['rags_to_merge']['rags'][all_rags_list[i]] = st.checkbox(label=st.session_state['all_rags'][all_rags_list[i]], value=st.session_state['rags_to_merge']['rags'][all_rags_list[i]], disabled=disable)
+        st.session_state['rags_to_merge']['rags'][all_rags_list[i]] = st.checkbox(label=st.session_state['all_rags'][all_rags_list[i]], value=st.session_state['rags_to_merge']['rags'].get(all_rags_list[i], False), disabled=disable)
         if st.session_state['rags_to_merge']['rags'][all_rags_list[i]]:
             rags_to_merge_list.append(all_rags_list[i])
             rags_config_to_merge_list.append(get_config_rag(rag_name=all_rags_list[i]))
@@ -327,7 +327,7 @@ with col2:
             disable = True
         else:
             disable = False
-        st.session_state['rags_to_merge']['rags'][all_rags_list[i]] = st.checkbox(label=st.session_state['all_rags'][all_rags_list[i]], value=st.session_state['rags_to_merge']['rags'][all_rags_list[i]], disabled=disable)
+        st.session_state['rags_to_merge']['rags'][all_rags_list[i]] = st.checkbox(label=st.session_state['all_rags'][all_rags_list[i]], value=st.session_state['rags_to_merge']['rags'].get(all_rags_list[i], False), disabled=disable)
         if st.session_state['rags_to_merge']['rags'][all_rags_list[i]]:
             rags_to_merge_list.append(all_rags_list[i])
             rags_config_to_merge_list.append(get_config_rag(rag_name=all_rags_list[i]))
@@ -337,7 +337,7 @@ with col3:
             disable = True
         else:
             disable = False
-        st.session_state['rags_to_merge']['rags'][all_rags_list[i]] = st.checkbox(label=st.session_state['all_rags'][all_rags_list[i]], value=st.session_state['rags_to_merge']['rags'][all_rags_list[i]], disabled=disable)
+        st.session_state['rags_to_merge']['rags'][all_rags_list[i]] = st.checkbox(label=st.session_state['all_rags'][all_rags_list[i]], value=st.session_state['rags_to_merge']['rags'].get(all_rags_list[i], False), disabled=disable)
         if st.session_state['rags_to_merge']['rags'][all_rags_list[i]]:
             rags_to_merge_list.append(all_rags_list[i])
             rags_config_to_merge_list.append(get_config_rag(rag_name=all_rags_list[i]))
