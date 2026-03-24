@@ -111,10 +111,22 @@ class TwoLevelProgressTracker:
         self.sub_total = total
         self.sub_current = 0
     
-    def update_global(self, message: str):
-        """Met à jour la progression globale uniquement"""
+    def update_global(self, message: str, step_name: str = None):
+        """Met à jour la progression globale
+        
+        Args:
+            message: Message global (ex: "Processing database: mydb")
+            step_name: Nom de l'étape (ex: "Extraction", "Merging", "Graph")
+        """
         progress = self.current_step * 100 / self.total_steps if self.total_steps > 0 else 100.0
-        self.callback(progress, message, 0.0, "")
+        
+        if step_name:
+            step_number = self.current_step + 1
+            full_message = f"Step {step_number}/{self.total_steps}: {step_name} ({message})"
+        else:
+            full_message = f"GraphRAG: {message}"
+        
+        self.callback(progress, full_message, 0.0, "")
     
     def update_sub(self, sub_current: int, sub_message: str):
         """Met à jour la sous-progression (ex: documents dans extraction)"""
