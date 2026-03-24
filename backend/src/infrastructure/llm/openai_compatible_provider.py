@@ -6,12 +6,12 @@ from pydantic import BaseModel
 import numpy as np
 from openai import OpenAI
 from utils.ecologits_init import init_ecologits
-from core.interfaces.illm_provider import ILLMProvider
+from core.interfaces.llm_provider import LLMProvider
 from core.error_handler import LLMError
 from utils.agent_functions import predict, multiple_predict, predict_json, predict_images, predict_image, rerank, RerankedChunk
 from utils.threading_utils import get_executor_threads
 
-class BaseLLMProvider(ILLMProvider):
+class OpenAICompatibleProvider(LLMProvider):
 
     def __init__(self, models_infos: Dict[str, Any], language: str='EN', max_attempts: int=5, max_workers: int=10):
         self.models_infos = models_infos
@@ -54,7 +54,7 @@ class BaseLLMProvider(ILLMProvider):
         except Exception as e:
             raise LLMError(f'JSON prediction failed for model {model}', provider=self.__class__.__name__, model=model, original_error=e)
 
-    def embeddings(self, texts: Union[str, List[str]], model: str) -> Dict[str, Any]:
+    def embeddings(self, texts: Union[str, List[str]], model: str, input_type: Optional[str] = None) -> Dict[str, Any]:
         try:
             embeddings = self.clients[model].embeddings.create(input=texts, model=model)
             if isinstance(texts, list):

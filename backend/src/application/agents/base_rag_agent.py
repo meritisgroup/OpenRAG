@@ -7,7 +7,7 @@ from core.config_manager import RAGAgentConfig
 from core.error_handler import RAGError, handle_errors, LLMError, DatabaseError, VectorStoreError
 from database.rag_classes import Chunk, Document
 from infrastructure.llm.llm_provider_factory import LLMProviderFactory
-from infrastructure.llm.base_provider import BaseLLMProvider
+from infrastructure.llm.openai_compatible_provider import OpenAICompatibleProvider
 from utils.agent_functions import get_system_prompt
 from infrastructure.database.coordinated_data_manager import get_management_data
 from methods.query_reformulation.query_reformulation import query_reformulation
@@ -38,7 +38,7 @@ class BaseRAGAgent(RagAgent, TokenCounterMixin):
             self.agent = self.providers[first_model]
             print(f"Warning: Model '{self.llm_model}' not found in providers, using '{first_model}'")
         else:
-            self.agent = BaseLLMProvider(models_infos=models_infos, language=self.language, max_attempts=config_server.get('max_attempts', 5), max_workers=config_server.get('max_workers', 10))
+            self.agent = OpenAICompatibleProvider(models_infos=models_infos, language=self.language, max_attempts=config_server.get('max_attempts', 5), max_workers=config_server.get('max_workers', 10))
             self.providers = {self.llm_model: self.agent}
         self.data_manager = get_management_data(dbs_name=self.dbs_name, data_folders_name=self.data_folders_name, storage_path=self.storage_path, config_server=config_server, agent=self.agent)
         self.response_builder = RAGResponseBuilder()

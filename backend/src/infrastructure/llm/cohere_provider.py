@@ -1,6 +1,6 @@
 from typing import Dict, List, Any, Optional, Union
 import concurrent.futures
-from mistralai import Mistral
+import cohere
 from pydantic import BaseModel
 import numpy as np
 from core.interfaces.llm_provider import LLMProvider
@@ -9,7 +9,7 @@ from utils.threading_utils import get_executor_threads
 from utils.ecologits_init import init_ecologits
 
 
-class MistralProvider(LLMProvider):
+class CohereProvider(LLMProvider):
 
     def __init__(
         self,
@@ -31,15 +31,18 @@ class MistralProvider(LLMProvider):
         for key in self.models_infos.keys():
             model_config = self.models_infos[key]
             provider = model_config.get('provider', '').lower()
-            if provider == 'mistral':
+            if provider == 'cohere':
                 api_key = model_config.get('api_key', '')
                 if api_key:
                     clients[key] = api_key
         return clients
 
+    def _get_client(self, api_key: str) -> cohere.ClientV2:
+        return cohere.ClientV2(api_key=api_key)
+
     @property
     def provider_name(self) -> str:
-        return 'mistral'
+        return 'cohere'
 
     @property
     def is_available(self) -> bool:
@@ -65,26 +68,26 @@ class MistralProvider(LLMProvider):
 
             if model not in self.clients:
                 raise LLMError(
-                    f'Model {model} not configured for Mistral',
-                    provider='mistral',
+                    f'Model {model} not configured for Cohere',
+                    provider='cohere',
                     model=model
                 )
 
             api_key = self.clients[model]
+            client = self._get_client(api_key)
 
-            with Mistral(api_key=api_key) as mistral:
-                response = mistral.chat.complete(
-                    model=model,
-                    messages=[
-                        {'role': 'system', 'content': system_prompt},
-                        {'role': 'user', 'content': prompt}
-                    ],
-                    temperature=temperature or self.temperature
-                )
+            response = client.chat(
+                model=model,
+                messages=[
+                    {'role': 'system', 'content': system_prompt},
+                    {'role': 'user', 'content': prompt}
+                ],
+                temperature=temperature or self.temperature
+            )
 
-            answer = response.choices[0].message.content
-            input_tokens = response.usage.prompt_tokens
-            output_tokens = response.usage.completion_tokens
+            answer = response.message.content[0].text
+            input_tokens = response.usage.tokens.input_tokens
+            output_tokens = response.usage.tokens.output_tokens
 
             impacts = [0, 0, '']
             energy = [0, 0, '']
@@ -111,10 +114,17 @@ class MistralProvider(LLMProvider):
                 'impacts': impacts,
                 'energy': energy
             }
+        except cohere.errors.CohereError as e:
+            raise LLMError(
+                f'Cohere API error: {str(e)}',
+                provider='cohere',
+                model=model,
+                original_error=e
+            )
         except Exception as e:
             raise LLMError(
                 f'Prediction failed for model {model}',
-                provider='mistral',
+                provider='cohere',
                 model=model,
                 original_error=e
             )
@@ -178,7 +188,7 @@ class MistralProvider(LLMProvider):
         except Exception as e:
             raise LLMError(
                 f'Multiple predictions failed for model {model}',
-                provider='mistral',
+                provider='cohere',
                 model=model,
                 original_error=e
             )
@@ -194,32 +204,32 @@ class MistralProvider(LLMProvider):
         try:
             if model not in self.clients:
                 raise LLMError(
-                    f'Model {model} not configured for Mistral',
-                    provider='mistral',
+                    f'Model {model} not configured for Cohere',
+                    provider='cohere',
                     model=model
                 )
 
             api_key = self.clients[model]
+            client = self._get_client(api_key)
 
-            with Mistral(api_key=api_key) as mistral:
-                response = mistral.chat.complete(
-                    model=model,
-                    messages=[
-                        {'role': 'system', 'content': system_prompt},
-                        {'role': 'user', 'content': prompt}
-                    ],
-                    response_format={"type": "json_object"},
-                    temperature=temperature or self.temperature
-                )
+            response = client.chat(
+                model=model,
+                messages=[
+                    {'role': 'system', 'content': system_prompt},
+                    {'role': 'user', 'content': prompt}
+                ],
+                response_format={"type": "json_object"},
+                temperature=temperature or self.temperature
+            )
 
             import json
-            answer = response.choices[0].message.content
+            answer = response.message.content[0].text
             parsed = json.loads(answer)
             return json_format.model_validate(parsed)
         except Exception as e:
             raise LLMError(
                 f'JSON prediction failed for model {model}',
-                provider='mistral',
+                provider='cohere',
                 model=model,
                 original_error=e
             )
@@ -228,36 +238,46 @@ class MistralProvider(LLMProvider):
         try:
             if model not in self.clients:
                 raise LLMError(
-                    f'Model {model} not configured for Mistral',
-                    provider='mistral',
+                    f'Model {model} not configured for Cohere',
+                    provider='cohere',
                     model=model
                 )
 
             api_key = self.clients[model]
+            client = self._get_client(api_key)
 
             if isinstance(texts, str):
                 texts = [texts]
 
-            with Mistral(api_key=api_key) as mistral:
-                response = mistral.embeddings.create(
-                    model=model,
-                    inputs=texts
-                )
+            response = client.embed(
+                texts=texts,
+                model=model,
+                input_type=input_type or "search_document",
+                embedding_types=["float"]
+            )
 
-            embeddings = [item.embedding for item in response.data]
+            embeddings = [item.embedding for item in response.embeddings]
 
             return {
                 'embeddings': embeddings,
                 'model': model,
+                'nb_tokens': response.meta.tokens.input_tokens + response.meta.tokens.output_tokens,
                 'usage': {
-                    'prompt_tokens': response.usage.prompt_tokens,
-                    'total_tokens': response.usage.total_tokens
+                    'prompt_tokens': response.meta.tokens.input_tokens,
+                    'total_tokens': response.meta.tokens.input_tokens + response.meta.tokens.output_tokens
                 }
             }
+        except cohere.errors.CohereError as e:
+            raise LLMError(
+                f'Cohere API error: {str(e)}',
+                provider='cohere',
+                model=model,
+                original_error=e
+            )
         except Exception as e:
             raise LLMError(
                 f'Embeddings failed for model {model}',
-                provider='mistral',
+                provider='cohere',
                 model=model,
                 original_error=e
             )
@@ -271,8 +291,8 @@ class MistralProvider(LLMProvider):
         temperature: float = 0
     ) -> Dict[str, Any]:
         raise LLMError(
-            'Mistral does not provide native image analysis. Please configure a vision model (e.g., Anthropic).',
-            provider='mistral',
+            'Cohere does not provide native image analysis. Please configure a vision model (e.g., Anthropic).',
+            provider='cohere',
             model=model
         )
 
@@ -286,8 +306,8 @@ class MistralProvider(LLMProvider):
         max_workers: int = 10
     ) -> List[Dict[str, Any]]:
         raise LLMError(
-            'Mistral does not provide native image analysis. Please configure a vision model (e.g., Anthropic).',
-            provider='mistral',
+            'Cohere does not provide native image analysis. Please configure a vision model (e.g., Anthropic).',
+            provider='cohere',
             model=model
         )
 
@@ -298,11 +318,48 @@ class MistralProvider(LLMProvider):
         model: str,
         max_workers: int = 10
     ) -> Dict[str, Any]:
-        raise LLMError(
-            'Mistral does not provide native reranking. Please configure an external reranker model.',
-            provider='mistral',
-            model=model
-        )
+        try:
+            if model not in self.clients:
+                raise LLMError(
+                    f'Model {model} not configured for Cohere',
+                    provider='cohere',
+                    model=model
+                )
+
+            api_key = self.clients[model]
+            client = self._get_client(api_key)
+
+            documents = [chunk.text for chunk in chunk_list]
+
+            response = client.rerank(
+                query=query,
+                documents=documents,
+                model=model
+            )
+
+            ordered_by_index = sorted(response.results, key=lambda x: x.index)
+            scores = [item.relevance_score for item in ordered_by_index]
+
+            input_tokens = response.meta.tokens.input_tokens + response.meta.tokens.output_tokens
+
+            return {
+                'scores': scores,
+                'nb_input_tokens': [input_tokens]
+            }
+        except cohere.errors.CohereError as e:
+            raise LLMError(
+                f'Cohere API error: {str(e)}',
+                provider='cohere',
+                model=model,
+                original_error=e
+            )
+        except Exception as e:
+            raise LLMError(
+                f'Reranking failed for model {model}',
+                provider='cohere',
+                model=model,
+                original_error=e
+            )
 
     def release_memory(self) -> None:
         pass

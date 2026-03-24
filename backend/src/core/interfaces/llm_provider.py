@@ -3,7 +3,7 @@ from typing import Dict, List, Any, Optional, Union
 from pydantic import BaseModel
 import numpy as np
 
-class ILLMProvider(ABC):
+class LLMProvider(ABC):
 
     @abstractmethod
     def predict(self, prompt: str, system_prompt: str, model: str, temperature: float=0, options_generation: Optional[Dict[str, Any]]=None) -> Dict[str, Any]:
@@ -18,7 +18,7 @@ class ILLMProvider(ABC):
         pass
 
     @abstractmethod
-    def embeddings(self, texts: Union[str, List[str]], model: str) -> Dict[str, Any]:
+    def embeddings(self, texts: Union[str, List[str]], model: str, input_type: Optional[str] = None) -> Dict[str, Any]:
         pass
 
     @abstractmethod

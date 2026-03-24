@@ -1,11 +1,11 @@
 from typing import Dict, List, Any, Union
 import numpy as np
-from core.interfaces.illm_provider import ILLMProvider
+from core.interfaces.llm_provider import LLMProvider
 from core.error_handler import LLMError
 
 class EmbeddingService:
 
-    def __init__(self, provider: ILLMProvider):
+    def __init__(self, provider: LLMProvider):
         self.provider = provider
 
     def embed_text(self, text: str, model: str) -> List[float]:

@@ -13,6 +13,10 @@ def init_session_state(st):
     is_backend_up = _check_backend_connection(st)
     just_came_up = st.session_state.get('backend_just_came_up', False)
     
+    if is_backend_up:
+        es_connected = _check_elasticsearch_connection(st)
+        st.session_state['elasticsearch_connected'] = es_connected
+    
     if is_backend_up and just_came_up:
         _init_config(st, force=True)
         _init_providers(st, force=True)
@@ -321,9 +325,9 @@ def _check_elasticsearch_connection(st) -> bool:
 
 def _init_connection_status(st):
     if 'backend_connected' not in st.session_state:
-        st.session_state['backend_connected'] = True
+        st.session_state['backend_connected'] = False
     if 'elasticsearch_connected' not in st.session_state:
-        st.session_state['elasticsearch_connected'] = True
+        st.session_state['elasticsearch_connected'] = False
     if 'last_health_check' not in st.session_state:
         st.session_state['last_health_check'] = datetime.min
     if 'last_es_check' not in st.session_state:
