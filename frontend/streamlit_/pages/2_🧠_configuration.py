@@ -39,13 +39,18 @@ if selected_model_name != '➕ Add a new model':
             st.session_state['edit_azure_endpoint'] = selected_model.get('azure_endpoint', '')
             st.session_state['edit_api_version'] = selected_model.get('api_version', '2024-02-01')
             st.session_state['selected_model_prev'] = selected_model_name
-PROVIDERS_WITH_URL = ['custom (openaiSDK-compatible)', 'cohere']
+PROVIDERS_WITH_URL = ['OpenAI SDK compatible (ollama, vllm, lm studio, ...)', 'cohere']
 PROVIDERS_WITH_AZURE_ENDPOINT = ['azure']
+
+def get_provider_internal_name(display_name: str) -> str:
+    if display_name == 'OpenAI SDK compatible (ollama, vllm, lm studio, ...)':
+        return 'custom'
+    return display_name
 
 if selected_model_name == '➕ Add a new model':
         new_model_name = st.text_input('Model name (deployment name for Azure)', key='new_model_name')
         new_model_type = st.selectbox('Model type', ['llm', 'reranker', 'embedding'])
-        new_model_provider = st.selectbox('Provider', ['openai', 'azure', 'anthropic', 'mistral', 'cohere', 'custom (openaiSDK-compatible)'], key='new_model_provider')
+        new_model_provider = st.selectbox('Provider', ['OpenAI SDK compatible (ollama, vllm, lm studio, ...)', 'openai', 'azure', 'anthropic', 'mistral', 'cohere', 'gemini', 'openrouter', 'deepseek', 'kimi', 'glm', 'groq'], key='new_model_provider')
         
         if new_model_provider == 'azure':
             new_azure_endpoint = st.text_input('Azure Endpoint', placeholder='https://your-resource.openai.azure.com', key='new_azure_endpoint')
@@ -73,13 +78,13 @@ if selected_model_name == '➕ Add a new model':
                             'url': st.session_state.get('new_model_url', ''),
                             'api_key': st.session_state.get('new_model_api_key', ''),
                             'type': new_model_type,
-                            'provider': st.session_state.get('new_model_provider', 'openai')
+                            'provider': get_provider_internal_name(st.session_state.get('new_model_provider', 'openai'))
                         }
                     else:
                         models_infos[model_name_val] = {
                             'api_key': st.session_state.get('new_model_api_key', ''),
                             'type': new_model_type,
-                            'provider': st.session_state.get('new_model_provider', 'openai')
+                            'provider': get_provider_internal_name(st.session_state.get('new_model_provider', 'openai'))
                         }
                     ConfigService.update_models(models_infos)
                     st.session_state['models_infos'] = models_infos
@@ -96,10 +101,10 @@ else:
                 with col2:
                     new_api_key = st.text_input('API Key', value=selected_model.get('api_key', ''), type='password', key='edit_model_api_key')
                 with col3:
-                    provider_options = ['openai', 'azure', 'anthropic', 'mistral', 'cohere', 'custom (openaiSDK-compatible)']
+                    provider_options = ['OpenAI SDK compatible (ollama, vllm, lm studio, ...)', 'openai', 'azure', 'anthropic', 'mistral', 'cohere', 'gemini', 'openrouter', 'deepseek', 'kimi', 'glm', 'groq']
                     current_provider = selected_model.get('provider', 'openai')
                     if current_provider in ['custom']:
-                        current_provider = 'custom (openaiSDK-compatible)'
+                        current_provider = 'OpenAI SDK compatible (ollama, vllm, lm studio, ...)'
                     if current_provider not in provider_options:
                         current_provider = provider_options[0]
                     new_provider = st.selectbox('Provider', provider_options, index=provider_options.index(current_provider) if current_provider in provider_options else 0, key='edit_model_provider')
@@ -128,7 +133,7 @@ else:
                         models_infos[selected_model_name].pop('api_version', None)
                     models_infos[selected_model_name]['api_key'] = st.session_state.get('edit_model_api_key', selected_model.get('api_key', ''))
                     models_infos[selected_model_name]['type'] = st.session_state.get('edit_model_type', selected_model.get('type', 'llm'))
-                    models_infos[selected_model_name]['provider'] = current_provider_val
+                    models_infos[selected_model_name]['provider'] = get_provider_internal_name(current_provider_val)
                     ConfigService.update_models(models_infos)
                     st.session_state['models_infos'] = models_infos
                     st.success('Changes saved ✅')

@@ -6,5 +6,29 @@
     "ollama": {
         "url": null,
         "api_key": "ollama"
+    },
+    "gemini": {
+        "url": "https://generativelanguage.googleapis.com/v1beta/openai",
+        "api_key": ""
+    },
+    "openrouter": {
+        "url": "https://openrouter.ai/api/v1",
+        "api_key": ""
+    },
+    "deepseek": {
+        "url": "https://api.deepseek.com",
+        "api_key": ""
+    },
+    "kimi": {
+        "url": "https://api.moonshot.cn/v1",
+        "api_key": ""
+    },
+    "glm": {
+        "url": "https://open.bigmodel.cn/api/paas/v4",
+        "api_key": ""
+    },
+    "groq": {
+        "url": "https://api.groq.com/openai/v1",
+        "api_key": ""
     }
 }
