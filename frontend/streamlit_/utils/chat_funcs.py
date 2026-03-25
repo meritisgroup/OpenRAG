@@ -33,7 +33,7 @@ def get_model_error_message(model_key: str, model_name: str, error_msg: str, rag
     ))
 
 
-def get_chat_agent(rag_method, databases_name, session_state=None, validate_models: bool = True):
+def get_chat_agent(rag_method, databases_name, session_state=None, validate_models: bool = True, create_new_session: bool = False):
     """
     Crée un agent RAG avec validation optionnelle des modèles
     
@@ -42,6 +42,7 @@ def get_chat_agent(rag_method, databases_name, session_state=None, validate_mode
         databases_name: Liste des bases de données
         session_state: État de session (optionnel)
         validate_models: Si True, valide les modèles avant création (défaut: True)
+        create_new_session: Si True, crée une nouvelle session (utile pour multi-RAG)
     
     Returns:
         session_id: ID de session pour l'agent créé
@@ -70,9 +71,9 @@ def get_chat_agent(rag_method, databases_name, session_state=None, validate_mode
                 databases_name=databases_name,
                 config_server=custom_config,
                 models_infos=session_state['models_infos'],
-                validate_models=validate_models
+                validate_models=validate_models,
+                create_new_session=create_new_session
             )
-            # Stocker la config du RAG actif pour l'utiliser dans generate_answer
             session_state['active_rag_config'] = custom_config.copy()
         elif 'merge_rags' in session_state.keys() and rag_method in session_state['merge_rags']:
             merge_config = client.get_merge_rag(rag_method)
@@ -82,29 +83,19 @@ def get_chat_agent(rag_method, databases_name, session_state=None, validate_mode
                 databases_name=databases_name,
                 config_server=merge_config,
                 models_infos=session_state['models_infos'],
-                validate_models=validate_models
+                validate_models=validate_models,
+                create_new_session=create_new_session
             )
-            # Stocker la config du RAG actif pour l'utiliser dans generate_answer
             session_state['active_rag_config'] = merge_config.copy()
-        elif 'merge_rags' in session_state.keys() and rag_method in session_state['merge_rags']:
-            merge_config = client.get_merge_rag(rag_method)
-            merge_config['params_host_llm'] = config['params_host_llm']
-            session_id = RAGService.get_chat_agent(
-                rag_method='merger',
-                databases_name=databases_name,
-                config_server=merge_config,
-                models_infos=session_state['models_infos'],
-                validate_models=validate_models
-            )
         else:
             session_id = RAGService.get_chat_agent(
                 rag_method=rag_method,
                 databases_name=databases_name,
                 config_server=config,
                 models_infos=session_state['models_infos'],
-                validate_models=validate_models
+                validate_models=validate_models,
+                create_new_session=create_new_session
             )
-            # Stocker la config du RAG actif pour l'utiliser dans generate_answer
             session_state['active_rag_config'] = config.copy()
         
         session_state['api_session_id'] = session_id
