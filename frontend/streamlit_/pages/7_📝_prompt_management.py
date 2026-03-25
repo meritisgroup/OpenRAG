@@ -5,7 +5,7 @@ from streamlit_.core.config import API_BASE_URL
 
 _client = APIClient(API_BASE_URL)
 
-st.markdown('# Advanced Configurations')
+st.markdown('# Prompt Management')
 default = 'default'
 if 'all_system_prompt' not in st.session_state:
     st.session_state['all_system_prompt'] = st.session_state['config_server'].get('all_system_prompt', {})
@@ -25,7 +25,6 @@ if 'editing_prompt' not in st.session_state:
 
 def save_modification():
     st.session_state['config_server']['all_system_prompt'] = st.session_state['all_system_prompt']
-    st.session_state['config_server']['chunk_length'] = st.session_state['chunk_length']
     try:
         _client.update_config(st.session_state['config_server'])
     except APIError as e:
@@ -87,28 +86,3 @@ if keys_without_default:
         save_modification()
         st.success(f'Prompt deleted')
         st.rerun()
-st.markdown('## Chunk length')
-if 'chunk_length' not in st.session_state:
-    st.session_state['chunk_length'] = st.session_state['config_server'].get('chunk_length', 500)
-if 'numeric' not in st.session_state:
-    st.session_state['numeric'] = st.session_state['config_server'].get('chunk_length', 500)
-if 'indexing' not in st.session_state:
-    st.session_state['indexing'] = False
-
-
-def update_slider_from_num():
-    st.session_state['chunk_length'] = st.session_state['numeric']
-    st.session_state['indexing'] = True
-    save_modification()
-
-
-def update_num_from_slider():
-    st.session_state['numeric'] = st.session_state['chunk_length']
-    st.session_state['indexing'] = True
-    save_modification()
-
-
-st.number_input('Chunk length', value=st.session_state['numeric'], key='numeric', on_change=update_slider_from_num, step=10)
-st.slider(label='**Choose length of chunks for indexing phases:**', min_value=0, max_value=2000, step=10, value=st.session_state['chunk_length'], help=' Keep in mind that too long or too short chunks can make the retrieval harder and decrease accuracy ', key='chunk_length', on_change=update_num_from_slider)
-if st.session_state['indexing']:
-    st.warning("You changed the chunk length, don't forget to rerun the indexing 😉")

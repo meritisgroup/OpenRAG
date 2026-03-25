@@ -327,23 +327,36 @@ if 'split' not in st.session_state:
     st.session_state['split'] = st.session_state['config_server'].get('TextSplitter', 'TextSplitter')
 st.selectbox('**Choose TextSplitter:**', splitter_dic.keys(), help='- **Semantic Splitting** : Spots semantic similarities between sentences and chunks accordingly \n\n                                - **Recursive Splitting** : Divides text into smaller segments in a hierarchical and iterative manner, using a series of separators to preserve the structure and context of the text. \n\n                                - **Length Splitting** : Splits text into chunks of fixed size\n                                ', format_func=lambda x: splitter_dic[x], index=list(splitter_dic.keys()).index(st.session_state['split']), key='split')
 
-if 'reformulate' not in st.session_state:
-    st.session_state['reformulate'] = st.session_state['config_server'].get('reformulate_query', False)
-st.toggle('**Query reformulation ?**', help='Wether your query is reformulated by an LLM *before* being sent to the RAG', value=st.session_state['reformulate'], key='reformulate')
+if 'chunk_length' not in st.session_state:
+    st.session_state['chunk_length'] = st.session_state['config_server'].get('chunk_length', 500)
+st.slider(label='**Chunk length:**', min_value=0, max_value=2000, step=10, value=st.session_state['chunk_length'], help='Keep in mind that too long or too short chunks can make the retrieval harder and decrease accuracy', key='chunk_length')
+st.session_state['config_server']['chunk_length'] = st.session_state['chunk_length']
 
 if 'chunk' not in st.session_state:
     st.session_state['chunk'] = st.session_state['config_server'].get('nb_chunks', 5)
 st.slider(label='**Choose number of chunks to retrieve per query:**', min_value=0, max_value=500, step=5, value=st.session_state['chunk'], help='The higher the number of value, the better the results of the RAG agent will be.\n                                                           However a number of chunk too large might slow down the answer time and increase costs', key='chunk')
 st.session_state['config_server']['nb_chunks'] = st.session_state['chunk']
 
+if st.session_state.get('reranker_model'):
+    if 'nb_chunks_reranker' not in st.session_state:
+        st.session_state['nb_chunks_reranker'] = st.session_state['config_server'].get('nb_chunks_reranker', 200)
+    st.slider(label='**Number of chunks after reranking:**', min_value=0, max_value=500, step=5, value=st.session_state['nb_chunks_reranker'], help='The higher the number of chunks, better RAG agent might perform. However, a number of chunks too large can slow down responses and increase costs.', key='nb_chunks_reranker')
+    st.session_state['config_server']['nb_chunks_reranker'] = st.session_state['nb_chunks_reranker']
+
+if 'reformulate' not in st.session_state:
+    st.session_state['reformulate'] = st.session_state['config_server'].get('reformulate_query', False)
+st.toggle('**Query reformulation ?**', help='Wether your query is reformulated by an LLM *before* being sent to the RAG', value=st.session_state['reformulate'], key='reformulate')
+
 if st.button('Save Configuration', type='primary', use_container_width=True):
     # Save locally modified parameters before calling server
     local_params_to_preserve = {
         'TextSplitter': st.session_state['split'],
+        'chunk_length': st.session_state['chunk_length'],
         'reformulate_query': st.session_state['reformulate'],
         'type_retrieval': st.session_state['ret'],
         'data_preprocessing': st.session_state['data_prep'],
         'nb_chunks': st.session_state['chunk'],
+        'nb_chunks_reranker': st.session_state.get('nb_chunks_reranker'),
         'language': st.session_state['lang'],
         # Models by role
         'model': st.session_state.get('model'),
