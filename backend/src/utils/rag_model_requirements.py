@@ -17,12 +17,12 @@ RAG_MODEL_REQUIREMENTS = {
         'optional': ['reranker_model']
     },
     'agentic': {
-        'required': ['model', 'embedding_model'],
-        'optional': ['reranker_model']
+        'required': ['model', 'embedding_model', 'reranker_model'],
+        'optional': []
     },
     'agentic_router': {
-        'required': ['model', 'embedding_model'],
-        'optional': ['reranker_model']
+        'required': ['model', 'embedding_model', 'reranker_model'],
+        'optional': []
     },
     'reranker_rag': {
         'required': ['model', 'embedding_model', 'reranker_model'],

@@ -13,6 +13,7 @@ from .deepseek_provider import DeepSeekProvider
 from .kimi_provider import KimiProvider
 from .glm_provider import GLMProvider
 from .groq_provider import GroqProvider
+from .composite_provider import CompositeProvider
 
 class LLMProviderFactory:
     _provider_classes = {
@@ -27,7 +28,7 @@ class LLMProviderFactory:
         'kimi': KimiProvider,
         'glm': GLMProvider,
         'groq': GroqProvider,
-        'custom': OpenAIProvider,
+        'custom': OpenAICompatibleProvider,
         'default': OpenAICompatibleProvider
     }
 
@@ -72,6 +73,15 @@ class LLMProviderFactory:
         if not issubclass(provider_class, LLMProvider):
             raise ConfigurationError(f'Provider class must implement LLMProvider interface', config_key='provider_class', config_value=provider_class.__name__)
         cls._provider_classes[provider_type.lower()] = provider_class
+
+    @classmethod
+    def create_composite_provider(cls, models_infos: Dict[str, Any], language: str='EN', max_attempts: int=5, max_workers: int=10) -> CompositeProvider:
+        """
+        Crée un provider composite qui agrège tous les providers et route
+        automatiquement vers le bon provider selon le modèle demandé.
+        """
+        providers = cls.create_all_providers(models_infos, language, max_attempts, max_workers)
+        return CompositeProvider(providers=providers)
 
     @classmethod
     def get_available_providers(cls) -> list[str]:

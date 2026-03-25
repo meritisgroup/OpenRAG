@@ -25,11 +25,17 @@ class OpenAICompatibleProvider(LLMProvider):
     def _create_clients(self) -> Dict[str, OpenAI]:
         clients = {}
         for key in self.models_infos.keys():
-            if 'api_key' in self.models_infos[key] and 'url' in self.models_infos[key]:
-                url = self.models_infos[key]['url']
-                if url is not None:
-                    url = url + '/v1' if not url.endswith('/v1') else url
-                clients[key] = OpenAI(api_key=self.models_infos[key]['api_key'], base_url=url)
+            model_info = self.models_infos[key]
+            api_key = model_info.get('api_key', '').strip()
+            url = model_info.get('url')
+            if isinstance(url, str):
+                url = url.strip() if url.strip() else None
+            
+            if url:
+                url = url + '/v1' if not url.endswith('/v1') else url
+                clients[key] = OpenAI(api_key=api_key or 'dummy', base_url=url)
+            elif api_key:
+                clients[key] = OpenAI(api_key=api_key)
         return clients
 
     def predict(self, prompt: str, system_prompt: str, model: str, temperature: float=0, options_generation: Optional[Dict[str, Any]]=None) -> Dict[str, Any]:

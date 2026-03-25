@@ -1,10 +1,10 @@
 {
-    "model": "openai/gpt-oss-20b",
-    "embedding_model": "BAAI/bge-m3",
+    "model": "gemma3:1b",
+    "embedding_model": "all-minilm:33m",
     "reranker_model": "BAAI/bge-reranker-v2-m3",
     "model_for_image": null,
     "default_mode_provider": "ollama",
-    "chunk_length": 500,
+    "chunk_length": 200,
     "chunk_overlap": true,
     "nb_chunks": 40,
     "nb_chunks_reranker": 200,

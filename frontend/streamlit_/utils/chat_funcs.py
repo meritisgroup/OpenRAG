@@ -3,6 +3,36 @@ import re
 from streamlit_.services import RAGService
 
 
+def get_model_error_message(model_key: str, model_name: str, error_msg: str, rag_method: str):
+    """
+    Retourne un message d'erreur explicite selon le type de modèle.
+    Returns: (error_title, error_detail)
+    """
+    messages = {
+        'reranker_model': (
+            f"Le reranker '{model_name}' n'est pas disponible",
+            f"Le reranker est obligatoire pour {rag_method}. Vérifiez que votre serveur de reranking est accessible et que le modèle '{model_name}' est disponible."
+        ),
+        'model': (
+            f"Le modèle LLM '{model_name}' n'est pas disponible",
+            f"Le modèle de langage est obligatoire. Vérifiez que votre serveur LLM est accessible et que le modèle '{model_name}' est disponible."
+        ),
+        'embedding_model': (
+            f"Le modèle d'embedding '{model_name}' n'est pas disponible",
+            f"Le modèle d'embedding est obligatoire. Vérifiez que votre serveur d'embedding est accessible et que le modèle '{model_name}' est disponible."
+        ),
+        'model_for_image': (
+            f"Le modèle de vision '{model_name}' n'est pas disponible",
+            f"Le modèle pour les images est configuré mais non disponible. Vérifiez que le modèle '{model_name}' est accessible."
+        )
+    }
+    
+    return messages.get(model_key, (
+        f"Le modèle '{model_name}' ({model_key}) n'est pas disponible",
+        error_msg
+    ))
+
+
 def get_chat_agent(rag_method, databases_name, session_state=None, validate_models: bool = True):
     """
     Crée un agent RAG avec validation optionnelle des modèles
@@ -85,23 +115,28 @@ def get_chat_agent(rag_method, databases_name, session_state=None, validate_mode
         error_data = e.args[0] if e.args else {}
         
         if isinstance(error_data, dict):
-            # Erreur de validation des modèles
-            if 'validation' in error_data:
+            # L'erreur peut être wrappée dans 'detail' (FastAPI)
+            detail_data = error_data.get('detail', error_data)
+            
+            if isinstance(detail_data, dict) and 'validation' in detail_data:
                 st.error("⚠️ Certains modèles nécessaires ne sont pas disponibles :")
-                validation = error_data['validation']
+                validation = detail_data['validation']
                 
                 for model_key, result in validation.get('models', {}).items():
                     if not result.get('available', False):
                         model_name = result.get('name', 'N/A')
                         error_msg = result.get('error', 'Erreur inconnue')
-                        st.error(f"- {model_name} ({model_key}): {error_msg}")
+                        
+                        title, detail_msg = get_model_error_message(model_key, model_name, error_msg, rag_method)
+                        st.error(f"❌ {title}")
+                        st.error(f"   {detail_msg}")
                 
                 # Afficher un résumé
                 st.warning("💡 Veuillez vérifier la disponibilité des modèles dans la page de configuration")
-                st.stop()  # Arrêter l'exécution sans afficher de traceback
-            elif 'error' in error_data:
+                st.stop()
+            elif isinstance(detail_data, dict) and 'error' in detail_data:
                 # Autre erreur avec message
-                st.error(f"❌ Erreur: {error_data['error']}")
+                st.error(f"❌ Erreur: {detail_data['error']}")
                 st.stop()
             else:
                 # Autre erreur sans message explicite
