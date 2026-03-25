@@ -18,9 +18,61 @@ with st.sidebar:
         st.warning('⚠️ Backend not connected or no RAG method available')
         st.stop()
     
-    if st.session_state['selected_rag_method'] not in rag_list:
-        st.session_state['selected_rag_method'] = rag_list[0]
-    rag_method = st.selectbox('**What RAG Method do you want to try ?**', options=rag_list, format_func=lambda x: st.session_state['all_rags'][x], key='selected_rag_method', on_change=reset_success_button)
+    if 'rags_availability' not in st.session_state:
+        with st.spinner("Checking models availability..."):
+            try:
+                client = st.session_state.get('api_client')
+                if client:
+                    RAGService.set_client(client)
+                availability = RAGService.get_rags_availability(
+                    config=st.session_state['config_server'],
+                    models_infos=st.session_state['models_infos']
+                )
+                st.session_state['rags_availability'] = availability.get('rags', {})
+            except Exception as e:
+                st.session_state['rags_availability'] = {}
+                st.warning(f"Could not check RAG availability: {e}")
+    
+    rags_availability = st.session_state.get('rags_availability', {})
+    available_rags = {k: st.session_state['all_rags'][k] for k in rag_list 
+                      if rags_availability.get(k, {}).get('available', True)}
+    unavailable_rags = {k: st.session_state['all_rags'][k] for k in rag_list 
+                        if not rags_availability.get(k, {}).get('available', True)}
+    
+    if not available_rags:
+        st.error('⚠️ No RAG available with current model configuration')
+        if unavailable_rags:
+            with st.expander(f"📋 {len(unavailable_rags)} RAG(s) unavailable"):
+                for rag_id, rag_name in unavailable_rags.items():
+                    rag_info = rags_availability.get(rag_id, {})
+                    missing = rag_info.get('missing_models', {})
+                    if missing:
+                        missing_str = ", ".join([f"{k}" for k in missing.keys()])
+                        st.caption(f"**{rag_name}**: missing {missing_str}")
+        if st.button("🔄 Refresh availability"):
+            del st.session_state['rags_availability']
+            st.rerun()
+        st.stop()
+    
+    available_keys = list(available_rags.keys())
+    if st.session_state['selected_rag_method'] not in available_keys:
+        st.session_state['selected_rag_method'] = available_keys[0]
+    rag_method = st.selectbox('**What RAG Method do you want to try ?**', options=available_keys, format_func=lambda x: available_rags[x], key='selected_rag_method', on_change=reset_success_button)
+    
+    if unavailable_rags:
+        with st.expander(f"⚠️ {len(unavailable_rags)} RAG(s) unavailable"):
+            for rag_id, rag_name in unavailable_rags.items():
+                rag_info = rags_availability.get(rag_id, {})
+                missing = rag_info.get('missing_models', {})
+                if missing:
+                    missing_str = ", ".join([f"{k}" for k in missing.keys()])
+                    st.caption(f"**{rag_name}**: missing {missing_str}")
+    
+    if st.button("🔄 Refresh"):
+        if 'rags_availability' in st.session_state:
+            del st.session_state['rags_availability']
+        st.rerun()
+    
     if 'chat_database_name' not in st.session_state or st.session_state['chat_database_name'] is None:
         st.session_state['chat_database_name'] = []
     if len(st.session_state['all_databases']) == 0 or st.session_state['all_databases'] is None:

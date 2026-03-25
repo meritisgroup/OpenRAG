@@ -243,6 +243,13 @@ class APIClient:
         """Teste la disponibilité des modèles configurés"""
         return self._request('POST', '/api/config/models/test')
     
+    def get_rags_availability(self, config: Dict[str, Any], models_infos: Dict[str, Any]) -> Dict[str, Any]:
+        """Retourne la disponibilité de tous les RAGs selon les modèles configurés"""
+        return self._request('POST', '/api/rag/available', json={
+            'config': config,
+            'models_infos': models_infos
+        }, timeout=30)
+    
     def list_databases(self) -> List[Dict[str, Any]]:
         response = self._request('GET', '/api/databases')
         return response.get('databases', [])

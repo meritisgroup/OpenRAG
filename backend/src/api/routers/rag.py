@@ -10,7 +10,8 @@ from elasticsearch import Elasticsearch
 from api.schemas.rag import (
     CreateAgentRequest, GenerateRequest, GenerateResponse,
     IndexRequest, RAGMethod, AgentStatus, ChunkInfo,
-    ModelValidationResult, RAGValidationResponse, IndexationStatusResponse
+    ModelValidationResult, RAGValidationResponse, IndexationStatusResponse,
+    RAGAvailabilityRequest, RAGAvailabilityItem, RAGAvailabilityResponse
 )
 from api.main import set_agent, session_exists, get_agent, get_session_info, set_indexation_status, get_indexation_status
 from factory_RagAgent import get_rag_agent, get_custom_rag_agent, change_config_server
@@ -51,6 +52,78 @@ def list_rag_methods():
         for method_id in RAGFactory.list_available_rags():
             methods.append(RAGMethod(id=method_id, name=method_id))
     return methods
+
+
+@router.post("/available", response_model=RAGAvailabilityResponse)
+def get_available_rags(request: RAGAvailabilityRequest):
+    from .config import _test_model_availability
+    from utils.rag_model_requirements import get_required_models_for_rag
+    
+    all_rags_path = 'data/all_rags.json'
+    if os.path.exists(all_rags_path):
+        with open(all_rags_path, 'r') as f:
+            all_rags = json.load(f)
+    else:
+        all_rags = {r: r for r in RAGFactory.list_available_rags()}
+    
+    unique_models = {}
+    rag_requirements = {}
+    
+    for rag_id in all_rags.keys():
+        custom_rags_path = f'data/custom_rags/{rag_id}.json'
+        merge_rags_path = f'data/merge/{rag_id}.json'
+        
+        if os.path.exists(custom_rags_path):
+            with open(custom_rags_path, 'r') as f:
+                rag_config = json.load(f)
+        elif os.path.exists(merge_rags_path):
+            with open(merge_rags_path, 'r') as f:
+                rag_config = json.load(f)
+        else:
+            rag_config = request.config
+        
+        requirements = get_required_models_for_rag(rag_id, rag_config)
+        all_model_keys = requirements['required'] + requirements.get('optional', [])
+        rag_requirements[rag_id] = {}
+        
+        for model_key in all_model_keys:
+            model_name = rag_config.get(model_key, request.config.get(model_key, ''))
+            model_type = 'reranker' if 'reranker' in model_key else \
+                         'embedding' if 'embedding' in model_key else 'llm'
+            
+            model_info = request.models_infos.get(model_name, {}).copy()
+            model_info['type'] = model_type
+            
+            unique_models[(model_name, model_type)] = model_info
+            rag_requirements[rag_id][model_key] = (model_name, model_type)
+    
+    test_results = {}
+    for (model_name, model_type), model_info in unique_models.items():
+        if not model_name:
+            test_results[(model_name, model_type)] = {
+                'available': False,
+                'error': 'Modèle non configuré'
+            }
+        else:
+            test_results[(model_name, model_type)] = _test_model_availability(
+                model_name, model_info, timeout=5
+            )
+    
+    results = {}
+    for rag_id, rag_name in all_rags.items():
+        missing = {}
+        for model_key, (model_name, model_type) in rag_requirements[rag_id].items():
+            result = test_results.get((model_name, model_type), {})
+            if not result.get('available', False):
+                missing[model_key] = result.get('error', 'Non disponible')
+        
+        results[rag_id] = RAGAvailabilityItem(
+            name=rag_name,
+            available=len(missing) == 0,
+            missing_models=missing
+        )
+    
+    return RAGAvailabilityResponse(rags=results)
 
 
 @router.post("/create")

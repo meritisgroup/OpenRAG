@@ -82,3 +82,9 @@ class RAGService:
     def delete_session(cls, session_id: Optional[str] = None) -> bool:
         client = cls.get_client()
         return client.delete_session(session_id=session_id)
+    
+    @classmethod
+    def get_rags_availability(cls, config: Dict[str, Any], models_infos: Dict[str, Any]) -> Dict[str, Any]:
+        """Retourne la disponibilité de tous les RAGs selon les modèles configurés"""
+        client = cls.get_client()
+        return client.get_rags_availability(config=config, models_infos=models_infos)

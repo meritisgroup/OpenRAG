@@ -90,3 +90,18 @@ class IndexationStatusResponse(BaseModel):
     sub_progress: float = 0.0
     sub_message: str = ""
     error: Optional[str] = None
+
+
+class RAGAvailabilityRequest(BaseModel):
+    config: Dict[str, Any]
+    models_infos: Dict[str, Any]
+
+
+class RAGAvailabilityItem(BaseModel):
+    name: str
+    available: bool
+    missing_models: Dict[str, str]
+
+
+class RAGAvailabilityResponse(BaseModel):
+    rags: Dict[str, RAGAvailabilityItem]
