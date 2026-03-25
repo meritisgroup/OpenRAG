@@ -24,22 +24,39 @@ class RAGService:
     @classmethod
     def get_chat_agent(cls, rag_method: str, databases_name: List[str],
                         config_server: Dict[str, Any], models_infos: Dict[str, Any],
-                        validate_models: bool = True) -> str:
+                        validate_models: bool = True, create_new_session: bool = False) -> str:
         """
         Crée un agent RAG avec validation optionnelle des modèles
+        
+        Args:
+            rag_method: Type de RAG à créer
+            databases_name: Liste des bases de données
+            config_server: Configuration serveur
+            models_infos: Informations sur les modèles
+            validate_models: Si True, valide les modèles avant création
+            create_new_session: Si True, crée une nouvelle session (utile pour multi-RAG)
+        
+        Returns:
+            session_id: ID de session pour l'agent créé
         """
         client = cls.get_client()
-        if client.session_id is None:
-            client.create_session()
+        
+        if create_new_session:
+            session_id = client.create_session()
+        elif client.session_id is None:
+            session_id = client.create_session()
+        else:
+            session_id = client.session_id
         
         response = client.create_agent(
             rag_method=rag_method,
             config=config_server,
             models_infos=models_infos,
             databases=databases_name,
-            validate_models=validate_models
+            validate_models=validate_models,
+            session_id=session_id
         )
-        return client.session_id
+        return session_id
     
     @classmethod
     def run_indexation(cls, session_id: Optional[str] = None, reset_index: bool = False,
