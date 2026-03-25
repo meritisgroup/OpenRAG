@@ -1,6 +1,7 @@
 import streamlit as st
 import time
 import numpy as np
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from streamlit_.services import RAGService, ConfigService
 from streamlit_.utils.chat_funcs import get_chat_agent, handle_click, reset_success_button, change_default_prompt, prepare_show_context
 
@@ -238,30 +239,39 @@ if (prompt := st.chat_input('Waiting for the RAG to be initialed' if not st.sess
     
     if is_compare_mode:
         results = {}
-        for rag_method, session_id in active_sessions.items():
-            with st.spinner(f"Computing {st.session_state['all_rags'][rag_method]}..."):
-                start_time = time.time()
-                try:
-                    answer = RAGService.generate_answer(
-                        query=prompt,
-                        nb_chunks=st.session_state['config_server'].get('nb_chunks', 5),
-                        session_id=session_id
-                    )
-                except Exception as e:
-                    answer = {
-                        'answer': f"Error: {e}",
-                        'nb_input_tokens': 0,
-                        'nb_output_tokens': 0,
-                        'context': '',
-                        'impacts': [0, 0, ''],
-                        'energy': [0, 0, ''],
-                        'databases': []
-                    }
-                end_time = time.time()
-                results[rag_method] = {
-                    'answer': answer,
-                    'time': end_time - start_time
+        nb_chunks = st.session_state['config_server'].get('nb_chunks', 5)
+        
+        def generate_for_rag(rag_method: str, session_id: str):
+            start_time = time.time()
+            try:
+                answer = RAGService.generate_answer(
+                    query=prompt,
+                    nb_chunks=nb_chunks,
+                    session_id=session_id
+                )
+            except Exception as e:
+                answer = {
+                    'answer': f"Error: {e}",
+                    'nb_input_tokens': 0,
+                    'nb_output_tokens': 0,
+                    'context': '',
+                    'impacts': [0, 0, ''],
+                    'energy': [0, 0, ''],
+                    'databases': []
                 }
+            end_time = time.time()
+            return rag_method, {'answer': answer, 'time': end_time - start_time}
+        
+        rag_names = [st.session_state['all_rags'][rag] for rag in active_sessions.keys()]
+        with st.spinner(f"Computing {len(active_sessions)} RAGs in parallel ({', '.join(rag_names)})..."):
+            with ThreadPoolExecutor(max_workers=len(active_sessions)) as executor:
+                futures = {
+                    executor.submit(generate_for_rag, rag_method, session_id): rag_method
+                    for rag_method, session_id in active_sessions.items()
+                }
+                for future in as_completed(futures):
+                    rag_method, result = future.result()
+                    results[rag_method] = result
         
         st.markdown("---")
         st.markdown("### 📊 Comparison Results")
