@@ -20,8 +20,20 @@ def get_possible_embeddings_model(provider):
         return ['mxbai-embed-large:latest', 'bge-m3:latest', 'all-minilm:22m']
     elif provider == 'openai':
         return ['text-embedding-3-small', 'text-embedding-3-large', 'text-embedding-ada-002']
+    elif provider == 'gemini':
+        return ['text-embedding-004', 'embedding-001']
     elif provider == 'vllm':
         return ['BAAI/bge-m3', 'mixedbread-ai/mxbai-embed-large-v1', 'Qwen/Qwen3-Embedding-0.6B', 'sentence-transformers/all-MiniLM-L6-v2']
+    elif provider == 'openrouter':
+        return ['openai/text-embedding-3-small', 'openai/text-embedding-3-large', 'cohere/embed-multilingual-v3.0']
+    elif provider == 'deepseek':
+        return ['deepseek-embed']
+    elif provider == 'kimi':
+        return ['moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k']
+    elif provider == 'glm':
+        return ['embedding-2', 'embedding-3']
+    elif provider == 'groq':
+        return ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'mixtral-8x7b-32768']
     return []
 
 

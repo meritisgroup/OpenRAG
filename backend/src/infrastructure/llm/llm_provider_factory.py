@@ -7,6 +7,12 @@ from .mistral_provider import MistralProvider
 from .anthropic_provider import AnthropicProvider
 from .azure_openai_provider import AzureOpenAIProvider
 from .cohere_provider import CohereProvider
+from .gemini_provider import GeminiProvider
+from .openrouter_provider import OpenRouterProvider
+from .deepseek_provider import DeepSeekProvider
+from .kimi_provider import KimiProvider
+from .glm_provider import GLMProvider
+from .groq_provider import GroqProvider
 
 class LLMProviderFactory:
     _provider_classes = {
@@ -15,6 +21,12 @@ class LLMProviderFactory:
         'anthropic': AnthropicProvider,
         'azure': AzureOpenAIProvider,
         'cohere': CohereProvider,
+        'gemini': GeminiProvider,
+        'openrouter': OpenRouterProvider,
+        'deepseek': DeepSeekProvider,
+        'kimi': KimiProvider,
+        'glm': GLMProvider,
+        'groq': GroqProvider,
         'custom': OpenAIProvider,
         'default': OpenAICompatibleProvider
     }
