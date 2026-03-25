@@ -56,25 +56,27 @@ def _test_model_availability(model_name: str, model_info: dict, timeout: int = 1
 
         client = OpenAI(api_key=api_key, base_url=base_url, timeout=timeout)
 
-        # Vérifier d'abord si le modèle existe dans la liste des modèles disponibles (pour tous les types)
-        try:
-            available_models = client.models.list()
-            available_model_names = [m.id for m in available_models.data]
+        # Vérifier d'abord si le modèle existe dans la liste des modèles disponibles
+        # SAUF pour les rerankers (ils n'ont généralement pas l'endpoint /v1/models)
+        if model_type != 'reranker':
+            try:
+                available_models = client.models.list()
+                available_model_names = [m.id for m in available_models.data]
 
-            # Vérifier si le modèle demandé est dans la liste (recherche exacte ou partielle)
-            model_exists = (
-                model_name in available_model_names or
-                any(model_name.lower() in m.lower() or m.lower() in model_name.lower() for m in available_model_names)
-            )
+                # Vérifier si le modèle demandé est dans la liste (recherche exacte ou partielle)
+                model_exists = (
+                    model_name in available_model_names or
+                    any(model_name.lower() in m.lower() or m.lower() in model_name.lower() for m in available_model_names)
+                )
 
-            if not model_exists:
-                models_list_str = ', '.join(available_model_names[:10])
-                if len(available_model_names) > 10:
-                    models_list_str += '...'
-                return {'available': False, 'error': f'Modèle "{model_name}" non trouvé sur le serveur. Modèles disponibles: {models_list_str}'}
-        except Exception:
-            # Si la liste des modèles échoue, on continue avec le test normal
-            pass
+                if not model_exists:
+                    models_list_str = ', '.join(available_model_names[:10])
+                    if len(available_model_names) > 10:
+                        models_list_str += '...'
+                    return {'available': False, 'error': f'Modèle "{model_name}" non trouvé sur le serveur. Modèles disponibles: {models_list_str}'}
+            except Exception:
+                # Si la liste des modèles échoue, on continue avec le test normal
+                pass
 
         if model_type == 'embedding':
             response = client.embeddings.create(input="test", model=model_name)
@@ -189,7 +191,11 @@ def _validate_rag_models(rag_name: str, config: dict, models_infos: dict, timeou
             continue
         
         model_info = models_infos[model_name]
-        test_result = _test_model_availability(model_name, model_info, timeout)
+        
+        try:
+            test_result = _test_model_availability(model_name, model_info, timeout)
+        except Exception as e:
+            test_result = {'available': False, 'error': f'Erreur lors du test de connexion: {str(e)}'}
         
         results['models'][model_key] = {
             'name': model_name,

@@ -22,7 +22,7 @@
         "url": "http://host.docker.internal:30003",
         "api_key": "",
         "type": "reranker",
-        "provider": "openai"
+        "provider": "custom"
     },
     "gpt-4.1-mini": {
         "url": null,
@@ -36,21 +36,25 @@
     "BAAI/bge-m3": {
         "url": "http://host.docker.internal:30001",
         "api_key": "",
-        "type": "embedding"
+        "type": "embedding",
+        "provider": "custom"
     },
     "openai/gpt-oss-20b": {
         "url": "http://host.docker.internal:30002",
         "api_key": "",
-        "type": "llm"
+        "type": "llm",
+        "provider": "custom"
     },
     "gemma3:1b": {
         "url": "http://host.docker.internal:11434",
         "api_key": "",
-        "type": "llm"
+        "type": "llm",
+        "provider": "custom"
     },
     "all-minilm:33m": {
         "url": "http://host.docker.internal:11434",
-        "api_key": "",
-        "type": "embedding"
+        "api_key": "ollama",
+        "type": "embedding",
+        "provider": "custom"
     }
 }
