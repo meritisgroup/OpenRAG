@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-from streamlit_.services import BenchmarkService
+from streamlit_.services import BenchmarkService, RAGService
 from streamlit_.api_client import APIClient
 from streamlit_.api_client.exceptions import APIError
 from streamlit_.core.config import API_BASE_URL
@@ -11,44 +11,83 @@ NO_QUERY_FILES_PLACEHOLDER = 'No query files available'
 st.markdown('# Benchmark Generation')
 st.markdown('## Choose RAG techniques to benchmark:')
 
-all_rags = list(st.session_state['all_rags'].keys())
+rag_list = list(st.session_state['all_rags'].keys())
 
-if not all_rags:
+if not rag_list:
     st.warning('⚠️ Backend not connected or no RAG method available')
     st.stop()
 
-nb_rags = len(all_rags)
+if 'rags_availability' not in st.session_state:
+    with st.spinner("Checking models availability..."):
+        try:
+            client = st.session_state.get('api_client')
+            if client:
+                RAGService.set_client(client)
+            availability = RAGService.get_rags_availability(
+                config=st.session_state['config_server'],
+                models_infos=st.session_state['models_infos']
+            )
+            st.session_state['rags_availability'] = availability.get('rags', {})
+        except Exception as e:
+            st.session_state['rags_availability'] = {}
+            st.warning(f"Could not check RAG availability: {e}")
+
+rags_availability = st.session_state.get('rags_availability', {})
+available_rags = [k for k in rag_list if rags_availability.get(k, {}).get('available', True)]
+unavailable_rags = {k: st.session_state['all_rags'][k] for k in rag_list 
+                    if not rags_availability.get(k, {}).get('available', True)}
+
+nb_rags = len(rag_list)
 rags_per_column = nb_rags // 3 if nb_rags % 3 == 0 else nb_rags // 3 + 1
 
 col1, col2, col3 = st.columns(3)
 
 with col1:
     for i in range(rags_per_column):
-        disable = all_rags[i] == 'main' and st.session_state.hf_token in [None, '']
-        st.session_state['benchmark']['rags'][all_rags[i]] = st.checkbox(
-            label=st.session_state['all_rags'][all_rags[i]],
-            value=st.session_state['benchmark']['rags'].get(all_rags[i], False),
+        rag_id = rag_list[i]
+        is_available = rags_availability.get(rag_id, {}).get('available', True)
+        disable = not is_available or (rag_id == 'main' and st.session_state.hf_token in [None, ''])
+        st.session_state['benchmark']['rags'][rag_id] = st.checkbox(
+            label=st.session_state['all_rags'][rag_id],
+            value=st.session_state['benchmark']['rags'].get(rag_id, False) and is_available,
             disabled=disable
         )
 
 with col2:
     for i in range(rags_per_column, 2 * rags_per_column):
         if i < nb_rags:
-            disable = all_rags[i] == 'main' and st.session_state.hf_token in [None, '']
-            st.session_state['benchmark']['rags'][all_rags[i]] = st.checkbox(
-                label=st.session_state['all_rags'][all_rags[i]],
-                value=st.session_state['benchmark']['rags'].get(all_rags[i], False),
+            rag_id = rag_list[i]
+            is_available = rags_availability.get(rag_id, {}).get('available', True)
+            disable = not is_available or (rag_id == 'main' and st.session_state.hf_token in [None, ''])
+            st.session_state['benchmark']['rags'][rag_id] = st.checkbox(
+                label=st.session_state['all_rags'][rag_id],
+                value=st.session_state['benchmark']['rags'].get(rag_id, False) and is_available,
                 disabled=disable
             )
 
 with col3:
     for i in range(2 * rags_per_column, nb_rags):
-        disable = all_rags[i] == 'main' and st.session_state.hf_token in [None, '']
-        st.session_state['benchmark']['rags'][all_rags[i]] = st.checkbox(
-            label=st.session_state['all_rags'][all_rags[i]],
-            value=st.session_state['benchmark']['rags'].get(all_rags[i], False),
+        rag_id = rag_list[i]
+        is_available = rags_availability.get(rag_id, {}).get('available', True)
+        disable = not is_available or (rag_id == 'main' and st.session_state.hf_token in [None, ''])
+        st.session_state['benchmark']['rags'][rag_id] = st.checkbox(
+            label=st.session_state['all_rags'][rag_id],
+            value=st.session_state['benchmark']['rags'].get(rag_id, False) and is_available,
             disabled=disable
         )
+
+if unavailable_rags:
+    with st.expander(f"⚠️ {len(unavailable_rags)} RAG(s) unavailable"):
+        for rag_id, rag_name in unavailable_rags.items():
+            rag_info = rags_availability.get(rag_id, {})
+            missing = rag_info.get('missing_models', {})
+            if missing:
+                missing_str = ", ".join([f"{k}" for k in missing.keys()])
+                st.caption(f"**{rag_name}**: missing {missing_str}")
+
+    if st.button("🔄 Refresh availability", key="refresh_benchmark_availability"):
+        del st.session_state['rags_availability']
+        st.rerun()
 
 st.markdown('## Import your list of queries')
 left, right = st.columns([0.5, 0.15], vertical_alignment='bottom')
