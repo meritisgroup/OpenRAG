@@ -7,7 +7,10 @@ import numpy as np
 import concurrent.futures
 from pathlib import Path
 import time
+import logging
 from utils.threading_utils import get_executor_threads
+
+logger = logging.getLogger(__name__)
 
 def indexation(data_manager, doc_chunks, path_docs):
     tokens = 0
@@ -38,10 +41,14 @@ class NaiveRagIndexation:
         self.splitter = get_splitter(type_text_splitter=type_text_splitter, data_preprocessing=data_preprocessing, agent=self.agent, embedding_model=embedding_model)
 
     def run_pipeline(self, config_server, reset_preprocess: bool=False, chunk_size: int=1024, chunk_overlap: bool=True, max_workers: int=1, progress_callback=None) -> None:
+        logger.debug(f'[run_pipeline] Starting indexation pipeline')
         docs_already_processed = [res[0] for res in self.data_manager.query(Document.path)]
+        logger.debug(f'[run_pipeline] docs_already_processed count: {len(docs_already_processed)}')
         to_process_norm = [Path(p).resolve().as_posix() for p in self.data_manager.get_list_path_documents()]
+        logger.debug(f'[run_pipeline] to_process_norm count: {len(to_process_norm)}')
         docs_already_norm = [Path(p).resolve().as_posix() for p in docs_already_processed]
         docs_to_process = [doc for doc in to_process_norm if doc not in docs_already_norm]
+        logger.debug(f'[run_pipeline] docs_to_process count: {len(docs_to_process)}')
         if max_workers <= get_executor_threads():
             max_workers = 1
         self.data_manager.create_collection()
@@ -52,11 +59,13 @@ class NaiveRagIndexation:
             for future in concurrent.futures.as_completed(futures):
                 path_doc = futures[future]
                 result = future.result()
+                logger.debug(f'[run_pipeline] Processing result: name={result["name"]}, parent_path={result["parent_path"]}')
                 new_doc = Document(name=result['name'], path=result['path'], embedding_tokens=result['embedding_tokens'], input_tokens=0, output_tokens=0)
                 progress_bar.update(index)
                 index += 1
                 self.data_manager.add_instance(instance=new_doc, path=result['parent_path'])
         progress_bar.clear()
+        logger.debug(f'[run_pipeline] Finished processing {index} documents')
         return None
 
 def contexts_to_prompts(contexts, docs_name):

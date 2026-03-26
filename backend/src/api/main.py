@@ -8,11 +8,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from factory import RAGFactory
-from core.error_handler import configure_logging
 
-log_file = os.getenv('LOG_FILE')
-if log_file:
-    configure_logging(log_file=log_file)
+
 
 agent_cache: Dict[str, Dict[str, Any]] = {}
 

@@ -5,9 +5,12 @@ from sqlalchemy import create_engine, delete
 from sqlalchemy.orm import Session, DeclarativeMeta
 from utils.progress import tqdm
 import numpy as np
+import logging
 
 from database.rag_classes import Base, Document, Entity, Relation, MergeEntityOverall, MergeEntityDocument
 from database.clean import DescriptionClean, Agent
+
+logger = logging.getLogger(__name__)
 
 class DataBase:
 
@@ -110,6 +113,7 @@ class DatabaseManager:
 
     def add_database(self, db_name: str, data_folder_name: str, storage_data_path: str) -> DataBase:
         data_path = os.path.join(storage_data_path, data_folder_name)
+        logger.debug(f'[add_database] Adding db_name={db_name}, data_path={data_path}, resolved={Path(data_path).resolve()}')
         self.databases[db_name] = {}
         self.databases[db_name]['path'] = data_path
         self.databases[db_name]['database'] = DataBase(db_name=db_name, path=self.storage_path, path_data=data_path)
@@ -145,13 +149,18 @@ class DatabaseManager:
     def find_db_name_path(self, path: str) -> Optional[str]:
         path = str(path)
         base_dir = Path(path).resolve()
+        logger.debug(f'[find_db_name_path] Looking for DB matching path: {base_dir}')
         for db_name in self.databases.keys():
             candidate = Path(self.databases[db_name]['path']).resolve()
+            logger.debug(f'[find_db_name_path]   Checking against db_name={db_name}, candidate={candidate}')
             try:
-                candidate.relative_to(base_dir)
+                rel = base_dir.relative_to(candidate)
+                logger.debug(f'[find_db_name_path]   MATCH! db_name={db_name}, relative={rel}')
                 return db_name
             except ValueError:
+                logger.debug(f'[find_db_name_path]   No match for db_name={db_name}')
                 pass
+        logger.warning(f'[find_db_name_path] NO MATCH FOUND for path={base_dir}')
         return None
 
     def create_engine_connections(self) -> None:
@@ -172,10 +181,15 @@ class DatabaseManager:
                 self.databases[db_name]['database'].add_table(table_class)
 
     def add_instance(self, instance: Base, db_name: str=None, path: str=None) -> None:
+        logger.debug(f'[add_instance] Called with db_name={db_name}, path={path}')
         if db_name is None:
             db_name = self.find_db_name_path(path)
+            logger.debug(f'[add_instance] find_db_name_path returned: {db_name}')
         if db_name is not None:
+            logger.debug(f'[add_instance] Adding instance to db_name={db_name}')
             self.databases[db_name]['database'].add_instance(instance=instance)
+        else:
+            logger.warning(f'[add_instance] FAILED: db_name is None, available databases: {list(self.databases.keys())}')
 
     def update_instance(self, db_name: str=None) -> None:
         if db_name is not None:

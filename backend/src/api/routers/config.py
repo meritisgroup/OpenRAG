@@ -222,7 +222,16 @@ def get_config():
 
 @router.put("")
 def update_config(request: ConfigUpdateRequest):
-    _save_json(CONFIG_PATH, request.config)
+    config = request.config
+    
+    local_params = config.get('local_params', {})
+    prompt_name = local_params.get('generation_system_prompt_name', 'default')
+    all_prompts = config.get('all_system_prompt', {})
+    
+    if prompt_name not in all_prompts and prompt_name != 'default':
+        config['local_params']['generation_system_prompt_name'] = 'default'
+    
+    _save_json(CONFIG_PATH, config)
     return {"status": "updated"}
 
 

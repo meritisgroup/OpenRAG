@@ -142,7 +142,13 @@ def get_chat_agent(rag_method, databases_name, session_state=None, validate_mode
 def change_default_prompt():
     try:
         default_value = st.session_state['config_server']['local_params']['generation_system_prompt_name']
-        st.session_state['system_prompt_selected'] = default_value
+        all_prompts = st.session_state['config_server']['all_system_prompt']
+        
+        if default_value in all_prompts:
+            st.session_state['system_prompt_selected'] = default_value
+        else:
+            st.session_state['system_prompt_selected'] = 'default'
+            st.session_state['config_server']['local_params']['generation_system_prompt_name'] = 'default'
     except Exception as e:
         st.session_state['system_prompt_selected'] = 'default'
 

@@ -10,6 +10,9 @@
 !/backend/data/*/
 /backend/data/*/*
 !/backend/data/*/.gitkeep
+/backend/storage/*
+!/backend/storage/.gitkeep
+/backend/data/logs/*
 **/__pycache__/
 /infrastructure/ollama/fine_tune
 /docker/*
