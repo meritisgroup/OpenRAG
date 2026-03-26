@@ -1,6 +1,6 @@
 {
-    "model": "gemma3:1b",
-    "embedding_model": "all-minilm:33m",
+    "model": "openai/gpt-oss-20b",
+    "embedding_model": "BAAI/bge-m3",
     "reranker_model": "BAAI/bge-reranker-v2-m3",
     "model_for_image": null,
     "default_mode_provider": "ollama",

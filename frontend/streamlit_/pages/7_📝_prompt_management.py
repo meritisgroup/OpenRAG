@@ -6,83 +6,140 @@ from streamlit_.core.config import API_BASE_URL
 _client = APIClient(API_BASE_URL)
 
 st.markdown('# Prompt Management')
-default = 'default'
-if 'all_system_prompt' not in st.session_state:
-    st.session_state['all_system_prompt'] = st.session_state['config_server'].get('all_system_prompt', {})
-if 'system_prompt' not in st.session_state:
-    st.session_state['system_prompt'] = {}
-    st.session_state['system_prompt']['new_name'] = ''
-    st.session_state['system_prompt']['new_prompt'] = ''
-if 'prompt_added' not in st.session_state:
-    st.session_state['prompt_added'] = False
-if 'adding_prompt' not in st.session_state:
-    st.session_state['adding_prompt'] = False
-if 'modifying_prompt' not in st.session_state:
-    st.session_state['modifying_prompt'] = False
+
 if 'editing_prompt' not in st.session_state:
     st.session_state['editing_prompt'] = None
+if 'adding_prompt' not in st.session_state:
+    st.session_state['adding_prompt'] = False
+if 'prompt_to_delete' not in st.session_state:
+    st.session_state['prompt_to_delete'] = None
 
 
-def save_modification():
-    st.session_state['config_server']['all_system_prompt'] = st.session_state['all_system_prompt']
+def save_prompts():
     try:
         _client.update_config(st.session_state['config_server'])
+        return True
     except APIError as e:
         st.error(f"Error saving configuration: {e}")
+        return False
 
 
-st.markdown('## System prompt creation')
-add_new_prompt = st.button(label='Add a new prompt system')
-if add_new_prompt:
-    st.session_state['adding_prompt'] = True
-if st.session_state['adding_prompt']:
-    (left, right) = st.columns([6, 1], vertical_alignment='bottom')
-    name = left.text_input(label='**System Prompt name**', placeholder='System prompt name: alphanumeric characters, underscores and hyphens only', label_visibility='collapsed')
-    prompt = left.text_area(label='**Your system prompt**', placeholder='Your system prompt', label_visibility='collapsed')
-    add_prompt_btn = right.button(label='Add prompt', type='primary', use_container_width=True)
-    if add_prompt_btn:
-        if name in st.session_state['all_system_prompt'].keys() or '"' in name:
-            st.error('This name is already taken or incorrect, please choose a new name')
-        elif name and prompt:
-            st.session_state['all_system_prompt'][name] = prompt
-            save_modification()
-            st.success('Prompt added!')
-            st.session_state['system_prompt_name'] = ''
-            st.session_state['system_prompt_prompt'] = ''
-            st.session_state['adding_prompt'] = False
+st.markdown('## Existing Prompts')
+
+prompts = st.session_state['config_server']['all_system_prompt']
+default_key = 'default'
+
+for prompt_name, prompt_content in prompts.items():
+    is_default = prompt_name == default_key
+    is_editing = st.session_state['editing_prompt'] == prompt_name
+    
+    with st.container(border=True):
+        col_header, col_actions = st.columns([4, 1])
+        
+        with col_header:
+            st.markdown(f"**{prompt_name}**")
+            if is_default:
+                st.caption("_System default (cannot be deleted)_")
+        
+        with col_actions:
+            if st.button("Edit", key=f"edit_btn_{prompt_name}", use_container_width=True):
+                st.session_state['editing_prompt'] = prompt_name
+                st.session_state['adding_prompt'] = False
+                st.rerun()
+        
+        if is_editing:
+            new_content = st.text_area(
+                label="Prompt content",
+                value=prompt_content,
+                key=f"edit_content_{prompt_name}",
+                height=200,
+                label_visibility="collapsed"
+            )
+            
+            col_save, col_cancel = st.columns(2)
+            with col_save:
+                if st.button("Save", key=f"save_btn_{prompt_name}", type="primary", use_container_width=True):
+                    st.session_state['config_server']['all_system_prompt'][prompt_name] = new_content
+                    if save_prompts():
+                        st.success('Prompt saved!')
+                    st.session_state['editing_prompt'] = None
+                    st.rerun()
+            with col_cancel:
+                if st.button("Cancel", key=f"cancel_btn_{prompt_name}", use_container_width=True):
+                    st.session_state['editing_prompt'] = None
+                    st.rerun()
         else:
-            st.error('Please fill in both the name and the prompt before adding.')
-st.markdown('## Modify your prompts')
-modify_prompt = st.button(label='Modify a prompt system')
-if modify_prompt:
-    st.session_state['modifying_prompt'] = True
-if st.session_state['modifying_prompt']:
-    (left, right) = st.columns([6, 1], vertical_alignment='bottom')
-    system_prompt_name = left.selectbox(label='Your prompts', options=st.session_state['all_system_prompt'].keys())
-    modify_prompt_btn = right.button(label='Modify prompt', type='primary', use_container_width=True)
-    if modify_prompt_btn:
-        st.session_state['editing_prompt'] = system_prompt_name
-    if st.session_state['editing_prompt']:
-        (left, right) = st.columns([6, 1], vertical_alignment='bottom')
-        prompt_to_edit = st.session_state['editing_prompt']
-        new_prompt = left.text_area(label='system prompt', value=st.session_state['all_system_prompt'][prompt_to_edit])
-        changes = right.button(label='Save changes', type='primary', use_container_width=True, disabled=system_prompt_name == default)
-        if changes:
-            st.session_state['all_system_prompt'][prompt_to_edit] = new_prompt
-            save_modification()
-            st.success('Prompt changed!')
-            st.session_state['editing_prompt'] = None
-            st.session_state['modifying_prompt'] = False
+            st.text(prompt_content)
+        
+        if not is_default and not is_editing:
+            if st.button("Delete", key=f"del_btn_{prompt_name}", type="secondary", use_container_width=True):
+                st.session_state['prompt_to_delete'] = prompt_name
+                st.rerun()
+
+if st.session_state['prompt_to_delete']:
+    prompt_to_delete = st.session_state['prompt_to_delete']
+    st.warning(f"Are you sure you want to delete **{prompt_to_delete}**?")
+    col_confirm, col_cancel = st.columns(2)
+    with col_confirm:
+        if st.button("Yes, delete", key="confirm_delete", type="primary"):
+            st.session_state['config_server']['all_system_prompt'].pop(prompt_to_delete, None)
+            
+            if st.session_state['config_server']['local_params']['generation_system_prompt_name'] == prompt_to_delete:
+                st.session_state['config_server']['local_params']['generation_system_prompt_name'] = 'default'
+            
+            if save_prompts():
+                st.success(f'Prompt "{prompt_to_delete}" deleted')
+            st.session_state['prompt_to_delete'] = None
             st.rerun()
-keys_without_default = [k for k in st.session_state['all_system_prompt'].keys() if k != default]
-if keys_without_default:
-    st.markdown('## Delete a prompt')
-    prompt_to_delete = st.selectbox('Select a document to delete:', keys_without_default)
-    if st.button('Delete selected prompt'):
-        st.session_state['editing_prompt'] = default
-        st.session_state['modifying_prompt'] = False
-        st.session_state['adding_prompt'] = False
-        st.session_state['all_system_prompt'].pop(prompt_to_delete, None)
-        save_modification()
-        st.success(f'Prompt deleted')
+    with col_cancel:
+        if st.button("Cancel", key="cancel_delete"):
+            st.session_state['prompt_to_delete'] = None
+            st.rerun()
+
+st.markdown('---')
+
+if st.session_state['adding_prompt']:
+    with st.container(border=True):
+        st.markdown('**Add New Prompt**')
+        
+        new_name = st.text_input(
+            label="Prompt name",
+            placeholder="Enter a unique name (alphanumeric, underscores, hyphens)",
+            key="new_prompt_name"
+        )
+        
+        new_content = st.text_area(
+            label="Prompt content",
+            placeholder="Enter your system prompt...",
+            key="new_prompt_content",
+            height=200
+        )
+        
+        col_add, col_cancel = st.columns(2)
+        with col_add:
+            if st.button("Add Prompt", key="confirm_add", type="primary", use_container_width=True):
+                if not new_name:
+                    st.error("Please enter a name for the prompt.")
+                elif not new_content:
+                    st.error("Please enter the prompt content.")
+                elif new_name in st.session_state['config_server']['all_system_prompt']:
+                    st.error("A prompt with this name already exists.")
+                elif '"' in new_name:
+                    st.error("Prompt name cannot contain quotes.")
+                else:
+                    st.session_state['config_server']['all_system_prompt'][new_name] = new_content
+                    if save_prompts():
+                        st.success(f'Prompt "{new_name}" added!')
+                    st.session_state['adding_prompt'] = False
+                    st.rerun()
+        
+        with col_cancel:
+            if st.button("Cancel", key="cancel_add", use_container_width=True):
+                st.session_state['adding_prompt'] = False
+                st.rerun()
+
+elif st.session_state['prompt_to_delete'] is None:
+    if st.button("Add New Prompt", type="primary", use_container_width=True):
+        st.session_state['adding_prompt'] = True
+        st.session_state['editing_prompt'] = None
         st.rerun()

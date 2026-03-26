@@ -96,8 +96,6 @@ with st.sidebar:
         st.warning('⚠️ No database available, please create one in the databases page')
     else:
         st.multiselect(label='**Choose Database(s) for retrieval**', options=st.session_state['all_databases'], key='chat_database_name')
-    if 'all_system_prompt' not in st.session_state:
-        st.session_state['all_system_prompt'] = st.session_state['config_server']['all_system_prompt']
     if 'system_prompt_selected' not in st.session_state:
         st.session_state['system_prompt_selected'] = 'default'
 
@@ -117,7 +115,7 @@ with st.sidebar:
             pass
     
     change_default_prompt()
-    system_prompt_selected = st.selectbox(label='**Choose system prompt**', options=st.session_state['all_system_prompt'].keys(), key='system_prompt_selected', on_change=force_system_prompt)
+    system_prompt_selected = st.selectbox(label='**Choose system prompt**', options=st.session_state['config_server']['all_system_prompt'].keys(), key='system_prompt_selected', on_change=force_system_prompt)
     reset_index = st.checkbox(label='Reset indexing', value=False)
     reset_preprocess = st.checkbox(label='Reset preprocessing', value=False)
     
