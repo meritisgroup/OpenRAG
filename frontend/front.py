@@ -30,10 +30,10 @@ benchmark = st.Page('streamlit_/pages/3_📚_benchmark.py', title='Benchmark')
 rag_maker = st.Page('streamlit_/pages/4_🔧_rag_maker.py', title='Rag Maker')
 databases = st.Page('streamlit_/pages/5_🌐_databases.py', title='Databases')
 documentation = st.Page('streamlit_/pages/6_📖_documentation.py', title='Documentation')
-advanced_configuration = st.Page('streamlit_/pages/7_🛠️_advanced_configuration.py', title='Advanced Configuration')
+prompt_management = st.Page('streamlit_/pages/7_📝_prompt_management.py', title='Prompt Management')
 metadatas = st.Page('streamlit_/pages/8_⚡_metadatas.py', title='Metadatas')
 
-pg = st.navigation([chat, config, benchmark, rag_maker, databases, documentation, advanced_configuration, metadatas])
+pg = st.navigation([chat, config, benchmark, rag_maker, databases, documentation, prompt_management, metadatas])
 
 st.set_page_config(page_title='OpenRAG by Meritis', page_icon='streamlit_/images/symbole_meritis.png', layout='wide')
 st.set_option('client.showSidebarNavigation', True)
