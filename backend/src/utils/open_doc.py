@@ -1,3 +1,4 @@
+import logging
 from .tools import list_folders
 from pptx import Presentation
 from docx import Document
@@ -5,6 +6,8 @@ from openpyxl import load_workbook
 from utils.splitter import MarkdownHeaderTextSplitter
 import fitz
 import os
+
+logger = logging.getLogger(__name__)
 
 def get_position(shape):
     return shape.left + shape.top
@@ -93,7 +96,7 @@ class Opener:
 
     @property
     def save(self):
-        print(f'The opener is set on "{self._save}" mode')
+        logger.info(f'The opener is set on "{self._save}" mode')
         return self._save
 
     @save.setter

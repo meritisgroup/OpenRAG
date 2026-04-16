@@ -30,7 +30,7 @@ class APIClient:
             try:
                 error_data = e.response.json()
                 raise APIError(error_data)
-            except:
+            except Exception:
                 raise APIError(str(e))
         except requests.exceptions.RequestException as e:
             raise APIError(str(e))

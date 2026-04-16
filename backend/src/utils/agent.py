@@ -1,9 +1,8 @@
+import logging
 from .agent_functions import predict, multiple_predict, predict_json, predict_images, predict_image, predict_mistral, multiple_predict_mistral, rerank, RerankedChunk
 from ecologits import EcoLogits
 from openai import OpenAI
 from mistralai import Mistral
-from jsonschema import validate
-import json
 import concurrent.futures
 import requests
 import time
@@ -14,6 +13,8 @@ from .agent_functions import np_array_to_file
 from .threading_utils import get_executor_threads
 from pydantic import BaseModel
 from database.rag_classes import Chunk
+
+logger = logging.getLogger(__name__)
 
 def get_Agent(config_server: dict, models_infos: dict):
     language = config_server.get('language', 'EN')
@@ -60,7 +61,7 @@ class Agent_openai(Agent):
 
     def embeddings(self, texts, model):
         embeddings = self.clients[model].embeddings.create(input=texts, model=model)
-        if type(texts) is type([]):
+        if isinstance(texts, list):
             vector_embeddings = [embeddings.data[k].embedding for k in range(len(texts))]
         else:
             vector_embeddings = [embeddings.data[0].embedding]
@@ -109,7 +110,7 @@ class Agent_openai(Agent):
                         (json_response, nb_input_tokens) = future.result()
                         unordered_results.append((original_index, json_response.score, nb_input_tokens))
                     except Exception as exc:
-                        print(f'La tâche {original_index} a échoué: {exc}')
+                        logger.error(f'La tâche {original_index} a échoué: {exc}')
                 unordered_results.sort(key=lambda x: x[0])
                 scores = [result[1] for result in unordered_results]
                 input_tokens = [result[2] for result in unordered_results]

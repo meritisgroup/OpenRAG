@@ -1,9 +1,12 @@
+import logging
 from utils.agent import Agent
 from database.database_class import DataBase
 from database.rag_classes import MergeEntityOverall, Relation, Chunk
 from .prompts import PROMPTS
 import ast
 import re
+
+logger = logging.getLogger(__name__)
 
 class LocalSearch:
 
@@ -45,13 +48,13 @@ class LocalSearch:
         (entities, entities_names) = ([], [])
         db_names = self.data_manager.get_dbs_name()
         collection_name = 'graph_rag_local'
-        print(f'[DEBUG] Local Search: Looking for collection "{collection_name}" in vectorbases: {list(self.data_manager.vectorbases.keys()) if hasattr(self.data_manager, "vectorbases") else "N/A"}')
+        logger.debug(f'Local Search: Looking for collection "{collection_name}" in vectorbases: {list(self.data_manager.vectorbases.keys()) if hasattr(self.data_manager, "vectorbases") else "N/A"}')
         for entity in entities_in_query:
-            if type(entity) is type('str') and entity is not None:
+            if isinstance(entity, str) and entity is not None:
                 try:
                     closest_entities = self.data_manager.k_search(queries=entity, collection_name=collection_name, k=self.start_node, output_fields=['text'])
                 except Exception as e:
-                    print(f'Warning: {collection_name} collection not found: {e}')
+                    logger.warning(f'{collection_name} collection not found: {e}')
                     closest_entities = [[]]
                 for closest_entity in closest_entities[0]:
                     entity_in_db = self.data_manager.query_filter(table_class=MergeEntityOverall, filter=MergeEntityOverall.name == closest_entity['text'])[0]
@@ -93,8 +96,8 @@ class LocalSearch:
         remaining_slots = self.max_chunks - len(entities) - len(both_relations)
         single_relations = single_relations[:max(0, remaining_slots)]
         for relation in single_relations:
-            adding_relations += adding_relation.replace('{entity_source}', relation.source).replace('{entity_target}', relation.target).replace('{relation_description}', relation.description) + '\n\n'
-            new_chunk = Chunk(text=adding_relation.replace('{entity_source}', relation.source).replace('{entity_target}', relation.target).replace('{relation_description}', relation.description), id=i)
+            adding_relations += adding_relation.replace('{source}', relation.source).replace('{target}', relation.target).replace('{relation_description}', relation.description) + '\n\n'
+            new_chunk = Chunk(text=adding_relation.replace('{source}', relation.source).replace('{target}', relation.target).replace('{relation_description}', relation.description), id=i)
             chunks.append(new_chunk)
             i += 1
         context = context_template.replace('{entities}', adding_entities).replace('{relations}', adding_relations)

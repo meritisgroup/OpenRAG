@@ -8,10 +8,12 @@ def get_name(rag_name, config_server, additionnal_name=''):
     names = []
     for embedding_model in embedding_models:
         name = '{}_'.format(re.sub('[\\\\/:*?"<>|]', '_', embedding_model))
-        if rag_name == 'naive' or rag_name == 'crag' or rag_name == 'reranker_rag' or (rag_name == 'query_reformulation_rag') or (rag_name == 'self') or (rag_name == 'main') or (rag_name == 'naive_chatbot') or (rag_name == 'agentic') or (rag_name == 'agentic_router'):
+        if rag_name in ('naive', 'crag', 'reranker_rag', 'query_reformulation_rag', 'self', 'hyde', 'naive_chatbot', 'agentic', 'agentic_router'):
             name = name + '{}_{}'.format(config_server['type_retrieval'], config_server['TextSplitter'])
         elif rag_name == 'graph':
             name = 'graph_rag_{}_{}_{}'.format(name, config_server['type_retrieval'], config_server['TextSplitter'])
+        elif rag_name == 'reasoning':
+            name = 'reasoning_rag_{}_{}_{}'.format(name, config_server['type_retrieval'], config_server['TextSplitter'])
         elif rag_name == 'query_based':
             name = 'query_rag_{}_{}_{}'.format(name, config_server['type_retrieval'], config_server['TextSplitter'])
         elif rag_name == 'advanced_rag':

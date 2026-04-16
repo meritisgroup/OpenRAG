@@ -16,6 +16,7 @@ from methods.advanced_rag.agent import AdvancedRag
 from methods.agentic_rag_router.agent import AgenticRouterRAG
 from methods.naive_chatbot.agent import NaiveChatbot
 from methods.hyde_rag.agent import HydeRagAgent
+from methods.reasoning_rag.agent import ReasoningRagAgent
 
 
 @dataclass
@@ -88,5 +89,9 @@ RAG_REGISTRY: dict[str, RAGConfig] = {
     'hyde': RAGConfig(
         agent_class=HydeRagAgent,
         aliases=['hyde_rag']
+    ),
+    'reasoning': RAGConfig(
+        agent_class=ReasoningRagAgent,
+        aliases=['reasoning_rag']
     ),
 }

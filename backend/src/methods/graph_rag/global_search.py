@@ -1,3 +1,4 @@
+import logging
 from utils.agent import Agent
 from base_classes import Search
 from database.database_class import DataBase
@@ -5,6 +6,8 @@ from database.rag_classes import MergeEntityOverall, Community, Chunk
 from .prompts import PROMPTS
 import json
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 class GlobalSearch(Search):
 
@@ -21,12 +24,12 @@ class GlobalSearch(Search):
         useful_entities = {}
         db_names = self.data_manager.get_dbs_name()
         collection_name = 'graph_rag_global'
-        print(f'[DEBUG] Global Search: Looking for collection "{collection_name}" in vectorbases: {list(self.data_manager.vectorbases.keys()) if hasattr(self.data_manager, "vectorbases") else "N/A"}')
+        logger.debug(f'Global Search: Looking for collection "{collection_name}" in vectorbases: {list(self.data_manager.vectorbases.keys()) if hasattr(self.data_manager, "vectorbases") else "N/A"}')
         try:
             top_k_communities = self.data_manager.k_search(queries=query, collection_name=collection_name, k=self.pre_filter)
-            print(f'[DEBUG] Global Search: Successfully found {len(top_k_communities[0]) if top_k_communities else 0} communities in collection')
+            logger.debug(f'Global Search: Successfully found {len(top_k_communities[0]) if top_k_communities else 0} communities in collection')
         except Exception as e:
-            print(f'Warning: {collection_name} collection not found, using empty context: {e}')
+            logger.warning(f'{collection_name} collection not found, using empty context: {e}')
             top_k_communities = [[]]
         tokens_counter = {}
         tokens_counter['nb_input_tokens'] = 0
@@ -43,7 +46,7 @@ class GlobalSearch(Search):
         try:
             dic_communities = json.loads(evaluated_communities['texts'])
         except Exception as e:
-            print("Couldn't use evaluated communities for building the context :", e)
+            logger.error("Couldn't use evaluated communities for building the context : %s", e)
             dic_communities = useful_communities
         (context, chunks) = self._build_context(dic_communities, useful_entities)
         return (context, chunks, tokens_counter)

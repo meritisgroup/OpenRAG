@@ -8,6 +8,9 @@ import numpy as np
 import concurrent.futures
 from pathlib import Path
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 from utils.progress import ProgressBar, tqdm
 import os
 from pydantic import BaseModel
@@ -69,7 +72,8 @@ def indexation(data_manager, doc_chunks, path_docs, model, agent, prompts_templa
                     questions_docs.append(questions1[i])
                     new_chunk = Chunk_query.from_chunk(chunk=doc_chunks[k], query=questions1[i])
                     final_chunks.append(new_chunk)
-            except Exception:
+            except Exception as e:
+                logger.warning(f"Failed to parse questions for chunk: {e}")
                 elements_to_retry.append(elements[k])
         if len(elements_to_retry) > 0:
             list_questions = generates_questions(chunks=elements_to_retry, temperature=1, prompts_template=prompts_template, agent=agent, model=model, text_to_show='Regenerate fail questions')

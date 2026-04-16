@@ -12,5 +12,6 @@
     "reranker_rag": "Reranker RAG",
     "agentic": "Agentic RAG",
     "agentic_router": "Agentic Router RAG",
-    "hyde": "HyDE RAG"
+    "hyde": "HyDE RAG",
+    "reasoning": "Reasoning RAG"
 }

@@ -1,3 +1,4 @@
+import logging
 from utils.agent import Agent
 from .graph_creation import Graph
 from database.database_class import DataBase
@@ -6,6 +7,8 @@ from .prompts import PROMPTS
 import json
 import re
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 class CommunityDescription:
 
@@ -50,7 +53,7 @@ class CommunityDescription:
         prompts_to_process = []
         system_prompts_to_process = []
         communities_to_process = []
-        print(f'[DEBUG] process_communities: Total communities in graph: {len(self.graph.communities)}')
+        logger.debug(f'process_communities: Total communities in graph: {len(self.graph.communities)}')
         for community in self.graph.communities:
             already_treated = len(self.db.query_filter(table_class=Community, filter=Community.entities_ids == community).all()) > 0
             if not already_treated:
@@ -58,7 +61,7 @@ class CommunityDescription:
                 communities_to_process.append(community)
                 prompts_to_process.append(prompt)
                 system_prompts_to_process.append(system_prompt)
-        print(f'[DEBUG] process_communities: Communities to process (new): {len(communities_to_process)}')
+        logger.debug(f'process_communities: Communities to process (new): {len(communities_to_process)}')
         if len(prompts_to_process) == 0:
             return
         tokens = 0
@@ -100,13 +103,13 @@ class CommunityDescription:
         input_tokens = np.sum(outputs['nb_input_tokens'])
         output_tokens = np.sum(outputs['nb_output_tokens'])
         new_communities = self.clean_outputs(llm_outputs, communities_to_process, deep_level)
-        print(f'[DEBUG] process_communities: Created {len(new_communities)} communities from LLM outputs')
+        logger.debug(f'process_communities: Created {len(new_communities)} communities from LLM outputs')
         for i, new_community in enumerate(new_communities):
-            print(f'[DEBUG] process_communities: Community {i+1}: title="{new_community.title}", entities_ids={len(new_community.entities_ids) if new_community.entities_ids else 0} entities')
+            logger.debug(f'process_communities: Community {i+1}: title="{new_community.title}", entities_ids={len(new_community.entities_ids) if new_community.entities_ids else 0} entities')
             self.db.add_instance(new_community)
         communities_tokens = Tokens(title='communities', embedding_tokens=0, input_tokens=int(input_tokens), output_tokens=int(output_tokens))
         self.db.add_instance(communities_tokens)
-        print('[DEBUG] process_communities: Processing communities - ✅')
+        logger.debug('process_communities: Processing communities - ✅')
 
     def _handle_single_community(self, output):
         try:

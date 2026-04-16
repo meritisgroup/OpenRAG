@@ -1,3 +1,4 @@
+import logging
 from abc import ABC, abstractmethod
 from typing import Union
 import nltk
@@ -6,6 +7,8 @@ from pydantic import BaseModel
 from typing import List
 from .threading_utils import get_executor_threads
 import concurrent.futures
+
+logger = logging.getLogger(__name__)
 
 class Splitter(ABC):
 
@@ -30,7 +33,7 @@ class Splitter(ABC):
                             current_chunk = w
                     final_chunks.append(current_chunk)
                 else:
-                    print(f"CE TEXTE N'EST PAS PASSE {text}")
+                    logger.warning(f"CE TEXTE N'EST PAS PASSE {text}")
         return final_chunks
 
 class VectorBase:
@@ -50,7 +53,7 @@ class VectorBase:
         pass
 
     @abstractmethod
-    def k_search(self, queries: Union[str, list[str]], k: int, collection_name: str, output_fields: list[str]=['text'], filters: dict=None):
+    def k_search(self, queries: Union[str, list[str]], k: int, collection_name: str, output_fields: list[str] | None = None, filters: dict=None):
         pass
 
     def get_collection_name(self):
@@ -87,7 +90,7 @@ class Agent:
                 try:
                     results[index] = future.result()
                 except Exception as exc:
-                    print(f'Prompt #{index} a généré une exception : {exc}')
+                    logger.error(f'Prompt #{index} a généré une exception : {exc}')
         return results
 
     def multiple_predict(self, model: str, prompts: List[str], system_prompts: List[str], temperature: float=0, options_generation=None) -> str:

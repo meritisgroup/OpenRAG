@@ -28,7 +28,7 @@ RAG_MODEL_REQUIREMENTS = {
         'required': ['model', 'embedding_model', 'reranker_model'],
         'optional': []
     },
-    'query_reformulation': {
+    'query_reformulation_rag': {
         'required': ['model', 'embedding_model'],
         'optional': []
     },
@@ -40,7 +40,7 @@ RAG_MODEL_REQUIREMENTS = {
         'required': ['model', 'embedding_model'],
         'optional': []
     },
-    'corrective_rag': {
+    'crag': {
         'required': ['model', 'embedding_model'],
         'optional': []
     },
@@ -49,6 +49,18 @@ RAG_MODEL_REQUIREMENTS = {
         'optional': []
     },
     'query_based': {
+        'required': ['model', 'embedding_model'],
+        'optional': []
+    },
+    'self': {
+        'required': ['model', 'embedding_model'],
+        'optional': []
+    },
+    'hyde': {
+        'required': ['model', 'embedding_model'],
+        'optional': []
+    },
+    'reasoning': {
         'required': ['model', 'embedding_model'],
         'optional': []
     },
@@ -95,6 +107,13 @@ def get_required_models_for_rag(rag_name: str, config: dict) -> dict:
         'optional': []
     })
     
+    required = list(requirements['required'])
+    
+    # Ajuster selon type_retrieval - BM25 n'a pas besoin d'embeddings
+    type_retrieval = config.get('type_retrieval', 'embeddings')
+    if type_retrieval.lower() == 'bm25' and 'embedding_model' in required:
+        required.remove('embedding_model')
+    
     # Ajouter les modèles optionnels qui sont configurés
     optional_models = []
     for opt_model in requirements['optional']:
@@ -102,6 +121,6 @@ def get_required_models_for_rag(rag_name: str, config: dict) -> dict:
             optional_models.append(opt_model)
     
     return {
-        'required': requirements['required'],
+        'required': required,
         'optional': optional_models
     }

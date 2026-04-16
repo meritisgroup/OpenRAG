@@ -7,12 +7,9 @@ from .get_rags_to_merge import get_rag_to_merge
 class MergerRagAgent(NaiveRagAgent):
 
     def __init__(self, config_server: dict, models_infos: dict, dbs_name: list[str], data_folders_name: list[str]) -> None:
-        self.config_server = config_server
+        super().__init__(config_server=config_server, models_infos=models_infos, dbs_name=dbs_name, data_folders_name=data_folders_name, rag_name='merger')
         self.rag_list = config_server['rag_list']
-        self.agent = get_Agent(config_server, models_infos=models_infos)
-        self.nb_chunks = config_server['nb_chunks']
-        self.dbs_name = dbs_name
-        self.data_folders_name = data_folders_name
+        self.merge_agent = get_Agent(config_server, models_infos=models_infos)
         self.rag_agents = {}
         for i in range(len(self.rag_list)):
             rag_agent = get_rag_to_merge(rag_name=self.rag_list[i], config_server=self.config_server['rag_config_list'][i], models_infos=models_infos, databases_name=data_folders_name)
@@ -62,7 +59,7 @@ class MergerRagAgent(NaiveRagAgent):
             full_response['energy'][0] += response['energy'][0]
             full_response['energy'][1] += response['energy'][1]
             full_response['energy'][2] += response['energy'][2]
-        merged_answer = self.merge_answers(answers=list(self.list_answers.values()), query=query, agent=self.agent, options_generation=options_generation)
+        merged_answer = self.merge_answers(answers=list(self.list_answers.values()), query=query, agent=self.merge_agent, options_generation=options_generation)
         full_response['answer'] = merged_answer['texts']
         full_response['nb_input_tokens'] += np.sum(merged_answer['nb_input_tokens'])
         full_response['nb_output_tokens'] += np.sum(merged_answer['nb_output_tokens'])

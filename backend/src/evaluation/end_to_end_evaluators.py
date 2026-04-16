@@ -4,11 +4,13 @@ import numpy as np
 import re
 from utils.agent import Agent
 from .prompts import PROMPTS
+import logging
+logger = logging.getLogger(__name__)
 
 class GroundTruthComparison(Evaluator):
 
-    def __init__(self, agent: Agent, model: str, max_attemps: int=5, batch_size: int=10) -> None:
-        super().__init__(agent, max_attemps, batch_size)
+    def __init__(self, agent: Agent, model: str, max_attempts: int=5, batch_size: int=10) -> None:
+        super().__init__(agent, max_attempts, batch_size)
         self.agent = agent
         self.model = model
         self.system_prompt = PROMPTS[self.language]['rate_from_ground_truth']['SYSTEM_PROMPT']
@@ -56,15 +58,15 @@ class GroundTruthComparison(Evaluator):
                     all_scores[metric]['mean'] = np.mean(total_evaluations)
                     all_scores[metric]['total_evaluations'] = total_evaluations
             except Exception as e:
-                print(f"Error while processing the evaluations for the metric {metric.split(':')[0]} :", e)
+                logger.error(f"Error while processing the evaluations for the metric {metric.split(':')[0]} : {e}")
                 all_scores[metric]['mean'] = None
                 all_scores[metric]['total_evaluations'] = None
         return all_scores
 
 class MetricComparaison(Evaluator):
 
-    def __init__(self, agent: Agent, model: str, max_attemps=5, batch_size=10):
-        super().__init__(agent, max_attemps, batch_size)
+    def __init__(self, agent: Agent, model: str, max_attempts=5, batch_size=10):
+        super().__init__(agent, max_attempts, batch_size)
         self.agent = agent
         self.model = model
         self.system_prompt = PROMPTS[self.language]['rate_metric']['SYSTEM_PROMPT']
@@ -72,7 +74,6 @@ class MetricComparaison(Evaluator):
         self.metrics = PROMPTS[self.language]['metrics']
 
     def _get_prompts(self, metric: str, queries: list[str], ground_truths: list[str], first_answers: list[str], second_answers: list[str]) -> tuple[list[str], str]:
-        system_prompt = self.system_prompt.replace('{metric}', str(metric))
         system_prompt = self.system_prompt.replace('{metric}', str(metric))
         prompts = [self.prompt_template.replace('{query}', str(query)).replace('{ground_truth}', str(ground_truth)).replace('{answer_a}', str(first_answer)).replace('{answer_b}', str(second_answer)) for (query, first_answer, ground_truth, second_answer) in zip(queries, first_answers, ground_truths, second_answers)]
         return (prompts, system_prompt)
@@ -102,6 +103,6 @@ class MetricComparaison(Evaluator):
                 score_second_rag = sum((1 for eval in evaluations if eval.winner == 'B')) / total_evaluations * 100
                 all_scores[metric] = (score_first_rag, score_second_rag)
             except Exception as e:
-                print(f'Error while processing the evaluations for the metric {metric} :', e)
+                logger.error(f'Error while processing the evaluations for the metric {metric} : {e}')
                 all_scores[metric] = (None, None)
         return all_scores

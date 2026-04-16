@@ -184,7 +184,6 @@ class AgenticRouterRAG(AdvancedRag):
                     fallback_result = self._fallback_retrieval(sub_query, query_plan)
                     all_chunks.extend(fallback_result['chunks'])
                     sub_responses.append(fallback_result['response'])
-                    sub_responses.append(fallback_result['response'])
 
         return (all_chunks, sub_responses, {'input': total_input_tokens, 'output': total_output_tokens})
 
@@ -418,13 +417,12 @@ class AgenticRouterRAG(AdvancedRag):
         pass
 
     def _format_chunks(self, chunks: List[Chunk]) -> str:
-        """Formate les chunks pour l'affichage."""
         if not chunks:
             return "Aucun contexte disponible."
 
         return '\n\n'.join([
             f'[Doc {i + 1}] {chunk.text[:200]}...'
-            for (i, chunk) in enumerate(chunks[:5])  # Limiter à 5 chunks pour l'affichage
+            for (i, chunk) in enumerate(chunks[:5])
         ])
 
     def _deduplicate_chunks(self, chunks: List[Chunk]) -> List[Chunk]:
@@ -481,6 +479,3 @@ class AgenticRouterRAG(AdvancedRag):
         union = words1.union(words2)
 
         return len(intersection) / len(union) if union else 0.0
-
-    def _format_chunks(self, chunks: List[Chunk]) -> str:
-        return '\n\n'.join([f'[Doc {i + 1}] {chunk.text[:200]}...' for (i, chunk) in enumerate(chunks)])

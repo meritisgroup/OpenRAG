@@ -1,6 +1,6 @@
 import os
 import re
-from typing import Dict, List, Any, Optional, Type, Union
+from typing import Dict, List, Any, Optional, Type
 from .rag_registry import RAGConfig, RAG_REGISTRY
 from utils.factory_name_dataset_vectorbase import get_name
 
@@ -96,7 +96,6 @@ class RAGFactory:
         embedding_model = config_server.get('embedding_model', '')
         if isinstance(embedding_model, list):
             embedding_model = self._flatten_embedding_models(embedding_model, len(databases_name))
-            config_server['embedding_model'] = embedding_model
         
         return names, extended_databases
 
@@ -117,8 +116,7 @@ class RAGFactory:
         return names, databases_name
 
     def _flatten_embedding_models(self, embedding_models: List, db_count: int) -> List:
-        flattened = [embedding_models.copy()] * db_count
-        return [item for sublist in flattened for item in sublist]
+        return embedding_models.copy() * db_count
 
     @classmethod
     def list_available_rags(cls) -> List[str]:

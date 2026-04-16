@@ -87,7 +87,7 @@
 
         "smooth_generation" : {
             "SYSTEM_PROMPT" : "You are an AI assistant who has to answer honestly and exhaustive to the user using your knowledge and the provided context.",
-            "QUERY_TEMPLATE" : "-- Context --\n\n{context}\n\nEUsing your knowledge and the provided context, answer my question : {query}"
+            "QUERY_TEMPLATE" : "-- Context --\n\n{context}\n\nUsing your knowledge and the provided context, answer my question : {query}"
         },
         
         
@@ -109,7 +109,7 @@
         
         "safe_generation" : {
             "SYSTEM_PROMPT" : "You are an AI assistant who has to answer honestly and exhaustive to the user using the provided context.",
-            "QUERY_TEMPLATE" : "-- Context --\n\n{context}\n\nEUsing the provided context, answer my question : {query}"
+            "QUERY_TEMPLATE" : "-- Context --\n\n{context}\n\nUsing the provided context, answer my question : {query}"
         },
         
         "supported_generation" : {

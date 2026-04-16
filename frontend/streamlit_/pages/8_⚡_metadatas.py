@@ -1,7 +1,6 @@
 import streamlit as st
 import json
 import os
-import pandas as pd
 from streamlit_.utils.metadatas_funcs import save_new_metadata_key, load_metadatas_keys, save_individual_modification, save_global_modification, get_documents_of_database, get_metadatas, delete_metadata, delete_button
 st.markdown('# Metadatas')
 st.write('Select your database')
@@ -36,7 +35,7 @@ if st.session_state['metadata'] != []:
     if 'individual_mod_active' not in st.session_state:
         st.session_state.individual_mod_active = False
     if 'global_mod_active' not in st.session_state:
-        st.session_state.individual_mod_active = False
+        st.session_state.global_mod_active = False
     if middle.button(label='Global modification', type='primary', use_container_width=True):
         st.session_state.global_ui = True
         st.session_state.global_mod_active = True
@@ -65,7 +64,7 @@ if st.session_state.global_ui:
         with col1:
             st.write(f'{doc}')
         with col2:
-            metadatas_already_in_place['documents'][doc][key_to_change]
+            st.write(metadatas_already_in_place['documents'][doc][key_to_change])
         with col3:
             selected_docs[doc] = st.checkbox('', key=f'select_{doc}', value=False)
     (left, right) = (col1, col2) = st.columns([6, 1], vertical_alignment='bottom')
@@ -80,7 +79,7 @@ if st.session_state.global_ui:
 if st.session_state.individual_ui:
     if st.session_state.individual_mod_active and database_name is not None:
         document_list = get_documents_of_database(database_name)
-        display_db = pd.DataFrame(data={'Doc Name': document_list})
+        display_db = [{'Doc Name': doc} for doc in document_list]
         metadata_inputs = {}
         (col1, col2, col3) = st.columns([3, 2, 2])
         with col1:
@@ -94,11 +93,12 @@ if st.session_state.individual_ui:
             with col1:
                 st.markdown(f"<p style='margin: 0; padding-top: 3px;'>{doc}</p>", unsafe_allow_html=True)
             with col2:
-                metadatas_already_in_place['documents'][doc][key_to_change]
+                st.write(metadatas_already_in_place['documents'][doc][key_to_change])
             with col3:
                 metadata_inputs[doc] = st.text_input(label=f'Metadata for {doc}', placeholder=f'**{key_to_change}**', key=f'input_{doc}', label_visibility='collapsed')
         (left, right) = (col1, col2) = st.columns([6, 1], vertical_alignment='bottom')
-        if right.button(label='Save', type='primary', use_container_width=True, on_click=save_individual_modification(database_name, key_to_change, metadata_inputs)):
+        if right.button(label='Save', type='primary', use_container_width=True):
+            save_individual_modification(database_name, key_to_change, metadata_inputs)
             for k in list(st.session_state.keys()):
                 if k.startswith('input_'):
                     del st.session_state[k]

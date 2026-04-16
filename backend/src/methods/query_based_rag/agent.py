@@ -29,7 +29,7 @@ class QueryBasedRagAgent(AdvancedRag):
             if chunk.text not in seen_texts:
                 seen_texts.add(chunk.text)
                 unique_chunks.append(chunk)
-        return chunks
+        return unique_chunks
 
     def get_rag_context(self, query: str, nb_chunks: int=5, model: str=None, to_prompt=False, nb_try=1) -> str:
         agent = self.agent

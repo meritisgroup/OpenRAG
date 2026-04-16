@@ -1,4 +1,5 @@
 from __future__ import annotations
+import logging
 import os
 import json
 import pandas as pd
@@ -17,6 +18,8 @@ import html
 import numpy as np
 import secrets
 import string
+
+logger = logging.getLogger(__name__)
 _ALPHABET = string.ascii_letters + string.digits
 
 def make_chunk_id() -> str:
@@ -25,7 +28,7 @@ def make_chunk_id() -> str:
 def extract_entities_relations(agent: Agent, model: str, chunks: list[Chunk], doc_name: str, language: str='EN') -> tuple[list[Entity], list[Relation]]:
     output_language = 'english'
     if language == 'FR':
-        output_language == 'french'
+        output_language = 'french'
     context_base = dict(tuple_delimiter=PROMPTS[language]['DEFAULT_TUPLE_DELIMITER'], record_delimiter=PROMPTS[language]['DEFAULT_RECORD_DELIMITER'], completion_delimiter=PROMPTS[language]['DEFAULT_COMPLETION_DELIMITER'], language=output_language)
     (prompts, system_prompts) = _get_extract_prompts(chunks, context_base, language=language)
     system_prompt = system_prompts[0] if system_prompts else PROMPTS[language]['extraction_text']['SYSTEM_PROMPT']
@@ -61,7 +64,7 @@ def extract_entities_relations(agent: Agent, model: str, chunks: list[Chunk], do
 def _get_extract_prompts(chunks: list[Chunk], context_base, language) -> tuple[list[str], list[str]]:
     prompt_template = PROMPTS[language]['extraction_text']['QUERY_TEMPLATE']
     system_prompt_template = PROMPTS[language]['extraction_text']['SYSTEM_PROMPT']
-    prompts = [prompt_template.format(**context_base, input_text=chunk) for chunk in chunks]
+    prompts = [prompt_template.format(**context_base, input_text=chunk.text) for chunk in chunks]
     system_prompts = [system_prompt_template] * len(chunks)
     return (prompts, system_prompts)
 
@@ -88,7 +91,7 @@ def _clean_extraction_outputs(outputs: list[str], chunks: list[Chunk], context_b
                 if if_relation is not None:
                     new_edges.append(if_relation)
             except Exception as e:
-                print('Problem to handle the record', e)
+                logger.error('Problem to handle the record %s', e)
         already_processed += 1
         already_entities += len(new_nodes)
         already_relations += len(new_edges)

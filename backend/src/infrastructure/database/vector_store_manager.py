@@ -1,7 +1,10 @@
+import logging
 from typing import Optional, List
 from pathlib import Path
 from database.rag_classes import Chunk
 from utils.factory_vectorbase import get_vectorbase
+
+logger = logging.getLogger(__name__)
 
 class VectorStoreManager:
 
@@ -99,7 +102,7 @@ class VectorStoreManager:
         if vb_name is not None:
             if collection_name is not None:
                 collection_name = vb_name + '_' + collection_name
-            print(f'[DEBUG] k_search: vb_name={vb_name}, collection_name={collection_name}')
+            logger.debug(f'k_search: vb_name={vb_name}, collection_name={collection_name}')
             return self.vectorbases[vb_name]['vectorbase'].k_search(queries=queries, k=k, output_fields=output_fields, type_output=type_output, collection_name=collection_name)
         else:
             results = []
@@ -107,6 +110,6 @@ class VectorStoreManager:
                 collection_name_search = collection_name
                 if collection_name is not None:
                     collection_name_search = vb_name + '_' + collection_name
-                print(f'[DEBUG] k_search: vb_name={vb_name}, collection_name_search={collection_name_search}')
+                logger.debug(f'k_search: vb_name={vb_name}, collection_name_search={collection_name_search}')
                 results += self.vectorbases[vb_name]['vectorbase'].k_search(queries=queries, k=k, output_fields=output_fields, type_output=type_output, collection_name=collection_name_search)
             return results

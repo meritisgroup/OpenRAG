@@ -1,8 +1,11 @@
 import time
+import logging
 from typing import Dict, Any, List, Optional
 from streamlit_.api_client import APIClient
 from streamlit_.core.config import API_BASE_URL
 from streamlit_.api_client.exceptions import APIError
+
+logger = logging.getLogger(__name__)
 
 
 class BenchmarkService:
@@ -110,7 +113,7 @@ class BenchmarkService:
                 consecutive_errors = 0
             except APIError as e:
                 consecutive_errors += 1
-                print(f"Error fetching benchmark status (attempt {consecutive_errors}/{max_consecutive_errors}): {e}")
+                logger.warning("Error fetching benchmark status (attempt %d/%d): %s", consecutive_errors, max_consecutive_errors, e)
                 
                 if consecutive_errors >= max_consecutive_errors:
                     raise Exception(f"Failed to connect to benchmark after {max_consecutive_errors} attempts. Last error: {e}")

@@ -15,5 +15,5 @@ class NaiveSearch(Search):
         search_res = self.vb.k_search(queries=query, k=self.nb_chunks, output_fields=['text', 'doc_name'])
         chunks = [res['text'] for res in search_res[0]]
         docs_name = [res['doc_name'] for res in search_res[0]]
-        context = contexts_to_prompts(context=chunks, docs_name=docs_name)
+        context = contexts_to_prompts(contexts=chunks, docs_name=docs_name)
         return (context, docs_name)

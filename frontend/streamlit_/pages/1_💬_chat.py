@@ -1,9 +1,11 @@
 import streamlit as st
 import time
-import numpy as np
+import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from streamlit_.services import RAGService, ConfigService
 from streamlit_.utils.chat_funcs import get_chat_agent, handle_click, reset_success_button, change_default_prompt, prepare_show_context
+
+logger = logging.getLogger(__name__)
 
 st.markdown('# OpenRAG by Meritis')
 
@@ -112,7 +114,7 @@ with st.sidebar:
                 generation_system_prompt_name=st.session_state['config_server']['local_params']['generation_system_prompt_name']
             )
         except Exception as e:
-            pass
+            logger.warning("Failed to update system prompt: %s", e)
     
     change_default_prompt()
     system_prompt_selected = st.selectbox(label='**Choose system prompt**', options=st.session_state['config_server']['all_system_prompt'].keys(), key='system_prompt_selected', on_change=force_system_prompt)
@@ -158,10 +160,22 @@ with st.sidebar:
                 progress_bars[rag_method] = st.progress(0, text=f"Starting {rag_name}...")
                 status_placeholders[rag_method] = st.empty()
             
+            MAX_POLL_SECONDS = 600
+            start_poll = time.time()
             all_completed = False
+            all_failed = set()
+
             while not all_completed:
                 all_completed = True
+                elapsed = time.time() - start_poll
+
+                if elapsed > MAX_POLL_SECONDS:
+                    st.warning("Indexation timed out. Please check the backend status.")
+                    break
+
                 for rag_method, session_id in new_sessions.items():
+                    if rag_method in all_failed:
+                        continue
                     status = RAGService.get_indexation_status(session_id=session_id)
                     progress_bar = progress_bars[rag_method]
                     status_placeholder = status_placeholders[rag_method]
@@ -173,7 +187,7 @@ with st.sidebar:
                     elif status['status'] == 'error':
                         progress_bar.empty()
                         status_placeholder.error(f"{rag_name} failed: {status.get('error', 'Unknown error')}")
-                        all_completed = False
+                        all_failed.add(rag_method)
                     elif status['status'] == 'running':
                         all_completed = False
                         progress = status.get('progress', 0)
@@ -181,7 +195,12 @@ with st.sidebar:
                         progress_bar.progress(progress / 100, text=f"{rag_name}: {message}")
                         status_placeholder.info(message)
                     else:
-                        all_completed = False
+                        progress_bar.empty()
+                        status_placeholder.warning(f"{rag_name}: unknown status '{status['status']}'")
+                        all_failed.add(rag_method)
+                
+                if not all_completed:
+                    all_completed = len(all_failed) == len(new_sessions)
                 
                 if not all_completed:
                     time.sleep(3)
@@ -213,12 +232,12 @@ for message in st.session_state.messages:
                     st.markdown(answer['answer'])
                     st.caption(f"⏱️ {result['time']:.2f}s | 📊 {answer['nb_input_tokens']}/{answer['nb_output_tokens']} tokens")
                     
-                    if type(answer['context']) == list or type(answer['context']) == np.ndarray:
-                        context = prepare_show_context(chunks=answer['context'])
-                    else:
-                        context = answer['context']
-                    with st.expander("💡 Context used"):
-                        st.text(str(context)[:3000] + "..." if len(str(context)) > 3000 else str(context))
+            if isinstance(answer['context'], list):
+                context = prepare_show_context(chunks=answer['context'])
+            else:
+                context = answer['context']
+            with st.expander("💡 Context used"):
+                st.text(str(context)[:3000] + "..." if len(str(context)) > 3000 else str(context))
     else:
         with st.chat_message(message['role']):
             st.write(message['content'])
@@ -286,7 +305,7 @@ if (prompt := st.chat_input('Waiting for the RAG to be initialed' if not st.sess
                 st.markdown(answer['answer'])
                 st.caption(f"⏱️ {result['time']:.2f}s | 📊 {answer['nb_input_tokens']}/{answer['nb_output_tokens']} tokens")
                 
-                if type(answer['context']) == list or type(answer['context']) == np.ndarray:
+                if isinstance(answer['context'], list):
                     context = prepare_show_context(chunks=answer['context'])
                 else:
                     context = answer['context']
@@ -328,10 +347,10 @@ if (prompt := st.chat_input('Waiting for the RAG to be initialed' if not st.sess
                     }
                 db_names = answer.get('databases', [])
                 db_str = f" ({', '.join(db_names)})" if db_names else ""
-                impacts = f"Between {np.round(answer['impacts'][0] * 1000, 2)} and {np.round(answer['impacts'][1] * 1000, 2)} {answer['impacts'][2][1:]}" if answer['impacts'] != [0, 0, ''] else 'Only measurable with Mistral and OpenAI LLM host'
-                energy = f"Between {np.round(answer['energy'][0] * 1000, 2)} and {np.round(answer['energy'][1] * 1000, 2)} {answer['energy'][2][1:]}" if answer['energy'] != [0, 0, ''] else 'Only measurable with Mistral and OpenAI LLM host'
+                impacts = f"Between {round(answer['impacts'][0] * 1000, 2)} and {round(answer['impacts'][1] * 1000, 2)} {answer['impacts'][2][1:]}" if answer['impacts'] != [0, 0, ''] else 'Only measurable with Mistral and OpenAI LLM host'
+                energy = f"Between {round(answer['energy'][0] * 1000, 2)} and {round(answer['energy'][1] * 1000, 2)} {answer['energy'][2][1:]}" if answer['energy'] != [0, 0, ''] else 'Only measurable with Mistral and OpenAI LLM host'
                 end_time = time.time()
-            if type(answer['context']) == list or type(answer['context']) == np.ndarray:
+            if isinstance(answer['context'], list):
                 context = prepare_show_context(chunks=answer['context'])
             else:
                 context = answer['context']

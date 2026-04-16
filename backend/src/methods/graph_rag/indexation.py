@@ -1,3 +1,4 @@
+import logging
 from database.rag_classes import Relation, Community, MergeEntityOverall
 from database.database_class import DataBase
 from .extract_entities import extract_entities_relations
@@ -14,6 +15,8 @@ import numpy as np
 from sqlalchemy.orm import Session
 import os
 import concurrent.futures
+
+logger = logging.getLogger(__name__)
 
 class GraphRagIndexation:
 
@@ -120,7 +123,7 @@ class GraphRagIndexation:
                     documents_nb_input_tokens += result['input_tokens']
                     documents_nb_output_tokens += result['output_tokens']
                 except Exception as exc:
-                    print(f'Error processing document {path_doc}: {exc}')
+                    logger.error(f'Error processing document {path_doc}: {exc}')
         
         documents_tokens = Tokens(title='documents', embedding_tokens=0, input_tokens=int(documents_nb_input_tokens), output_tokens=int(documents_nb_output_tokens))
         self.data_manager.add_instance(documents_tokens, db_name=db_name)
@@ -177,9 +180,9 @@ class GraphRagIndexation:
         communities = [res.title for res in list(db.query(Community))]
         if tracker:
             tracker.set_sub_total(len(communities) // 10 + 1)
-        print(f'[DEBUG] save_vb_global: Found {len(communities)} communities to embed for db_name={db_name}')
+        logger.debug(f'save_vb_global: Found {len(communities)} communities to embed for db_name={db_name}')
         if communities:
-            print(f'[DEBUG] save_vb_global: First few communities: {communities[:3]}')
+            logger.debug(f'save_vb_global: First few communities: {communities[:3]}')
         with tqdm(range(1 + len(communities) // 10), desc='Embedding for global search') as progress_bar:
             for k in progress_bar:
                 if tracker:
@@ -191,10 +194,10 @@ class GraphRagIndexation:
                     for i in range(len(truncated_communities)):
                         truncated_communities[i] = Chunk(text=truncated_communities[i], document='', id=i + 1)
                     for j in range(0, len(truncated_communities), taille_batch):
-                        print(f'[DEBUG] save_vb_global: Adding batch {j}-{j+taille_batch} ({len(truncated_communities[j:j + taille_batch])} chunks) to collection graph_rag_global')
+                        logger.debug(f'save_vb_global: Adding batch {j}-{j+taille_batch} ({len(truncated_communities[j:j + taille_batch])} chunks) to collection graph_rag_global')
                         nb_tokens = np.sum(self.data_manager.add_str_batch_elements(collection_name='graph_rag_global', chunks=truncated_communities[j:j + taille_batch], display_message=False, vb_name=db_name))
                         communities_embedding_tokens += np.sum(nb_tokens)
-                        print(f'[DEBUG] save_vb_global: Batch added, tokens={nb_tokens}')
+                        logger.debug(f'save_vb_global: Batch added, tokens={nb_tokens}')
                 if k == len(communities) // 10:
                     progress_bar.set_description('Embedding for global search - ✅')
         community_instance.embedding_tokens = communities_embedding_tokens

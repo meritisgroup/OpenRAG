@@ -1,11 +1,9 @@
 import streamlit as st
-from ecologits import EcoLogits
 from dotenv import load_dotenv
 
 from streamlit_.core import init_session_state
 
 load_dotenv()
-EcoLogits.init()
 
 
 @st.fragment

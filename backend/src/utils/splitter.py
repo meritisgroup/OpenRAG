@@ -1,11 +1,13 @@
+import logging
 import re
-import time
 import nltk
 nltk.download('punkt_tab')
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from .base_classes import Splitter
 from typing import Any, TypedDict, Union
+
+logger = logging.getLogger(__name__)
 
 class LineType(TypedDict):
     metadata: dict[str, str]
@@ -196,9 +198,7 @@ class TextSplitter(Splitter):
                 chunks.append(chunk)
             if overlap and index < len(pieces):
                 index = max(start_index_of_current_chunk + 1, index - 1)
-        le = [len(c) for c in chunks]
         chunks = self.break_chunks(max_size_chunk=chunk_size * 1.2, chunks=chunks)
-        le1 = [len(c) for c in chunks]
         return chunks
 
 class Recursive_TextSplitter(Splitter):
@@ -285,6 +285,7 @@ class Semantic_TextSplitter(Splitter):
         self.model = embedding_model
 
     def compute_breakpoints(self, similarities, method='percentile', threshold=90):
+        threshold_value = 0
         try:
             if method == 'percentile':
                 threshold_value = np.percentile(similarities, threshold)
@@ -298,7 +299,7 @@ class Semantic_TextSplitter(Splitter):
             else:
                 raise ValueError("Invalid method. Choose 'percentile', 'standard_deviation', or 'interquartile'.")
         except Exception as e:
-            print("Couldn't compute breakpoints due to empty similarities")
+            logger.warning(f"Couldn't compute breakpoints: {e}")
         return [i for (i, sim) in enumerate(similarities) if sim < threshold_value]
 
     def split_text(self, text, chunk_size: int=1024, overlap: bool=False):

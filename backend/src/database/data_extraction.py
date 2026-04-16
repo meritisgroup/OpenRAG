@@ -1,3 +1,4 @@
+import logging
 from typing import List
 import os
 import re
@@ -11,6 +12,8 @@ from utils.splitter import get_splitter
 from .rag_classes import Chunk, Document
 import secrets
 import string
+
+logger = logging.getLogger(__name__)
 _ALPHABET = string.ascii_letters + string.digits
 
 def make_chunk_id() -> str:
@@ -40,7 +43,7 @@ class DocumentText:
                 self.save_content__(format='txt')
         except Exception as e:
             self.content = ''
-            print(f'Error "{e}" while trying to open doc {self.name_with_extension}')
+            logger.error(f'Error "{e}" while trying to open doc {self.name_with_extension}')
         self.name = '.'.join(self.name_with_extension.split('.')[:-1])
         self.extension = '.' + self.name_with_extension.split('.')[-1]
         self.text_splitter = splitter
@@ -67,7 +70,6 @@ class DocumentText:
     def chunks(self, chunk_size: int=1024, chunk_overlap: bool=True) -> list[Chunk]:
         results = []
         chunk_id = 1
-        '\n        '
         chunks = self.text_splitter.split_text(text=self.content, chunk_size=chunk_size, overlap=chunk_overlap)
         for (k, text) in enumerate(chunks):
             results.append(Chunk(text=text, document=self.name_with_extension, position_in_doc=k + 1, id=make_chunk_id()))

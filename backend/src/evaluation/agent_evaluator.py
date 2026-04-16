@@ -15,6 +15,8 @@ from utils.progress import ProgressBar
 from methods.naive_rag.indexation import concat_chunks
 import plotly.graph_objects as go
 from utils.pdf_report_generator import generate_benchmark_report
+import logging
+logger = logging.getLogger(__name__)
 
 class AgentEvaluator:
 
@@ -33,31 +35,31 @@ class AgentEvaluator:
     def get_evals(self, log_file, type='all'):
         results = {}
         if type == 'all' or type == 'ndcg':
-            print('Running nDCG ...')
+            logger.info('Running nDCG ...')
             context_ndcg_evaluations = self.ndcg_comparator.run_evaluations(log_file=log_file)
-            print('nDCG done  - ✅')
+            logger.info('nDCG done')
             results['ndcg_scores'] = context_ndcg_evaluations
         if type == 'all' or type == 'arena':
-            print('Running Arena Battles ...')
+            logger.info('Running Arena Battles ...')
             arena_matrix = self.arena.run_battles_scores(log_file=log_file)
-            print('Arena battles done  - ✅')
+            logger.info('Arena battles done')
             results['arena_scores'] = arena_matrix
         if type == 'all' or type == 'ground_truth':
-            print('Running Ground Truth comparison ...')
+            logger.info('Running Ground Truth comparison ...')
             (ground_truth_evaluations, ground_truth_evaluations_details) = self.ground_truth_comparator.run_evaluations(log_file=log_file)
             results['ground_truth_scores'] = ground_truth_evaluations
             results['ground_truth_evaluations_details'] = ground_truth_evaluations_details
-            print('Ground Truth comparison done  - ✅')
+            logger.info('Ground Truth comparison done')
         if type == 'all' or type == 'context_faithfulness':
-            print('Running context faithfulness ...')
+            logger.info('Running context faithfulness ...')
             context_faithfulness_evaluations = self.context_faithfulness_comparator.run_evaluations(log_file=log_file)
             results['context_faithfulness_scores'] = context_faithfulness_evaluations
-            print('Context faithfulness done  - ✅')
+            logger.info('Context faithfulness done')
         if type == 'all' or type == 'context_relevance':
-            print('Running context relevance ...')
+            logger.info('Running context relevance ...')
             context_relevance_evaluations = self.context_relevance_comparator.run_evaluations(log_file=log_file)
             results['context_relevance_scores'] = context_relevance_evaluations
-            print('Context relevance done  - ✅')
+            logger.info('Context relevance done')
         return results
 
     def _dict_to_figure(self, plot_dict):
@@ -68,9 +70,9 @@ class AgentEvaluator:
     def create_plot_report(self, plots, report_dir) -> str:
         pdf_path = generate_benchmark_report(plots, report_dir)
         if os.path.exists(pdf_path):
-            print(f'PDF created successfully: {pdf_path}')
+            logger.info(f'PDF created successfully: {pdf_path}')
         else:
-            print(f'PDF file not created at {pdf_path}')
+            logger.warning(f'PDF file not created at {pdf_path}')
         return report_dir
 
 class DataFramePreparator:

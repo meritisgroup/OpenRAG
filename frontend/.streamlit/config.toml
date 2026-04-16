@@ -15,7 +15,6 @@ disableWidgetStateDuplicationWarning = true
 
 [server]
 port = 8502
-enableCORS = false
 enableXsrfProtection = true
 maxUploadSize = 200
 headless = true

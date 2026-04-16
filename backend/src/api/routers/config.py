@@ -1,5 +1,6 @@
 import json
 import os
+import logging
 from fastapi import APIRouter, HTTPException
 
 from api.schemas.config import (
@@ -10,11 +11,29 @@ from api.schemas.config import (
 from factory import RAGFactory
 from factory_RagAgent import change_local_parameters, put_default_local_parameters, change_config_server
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
 
-CONFIG_PATH = 'data/base_config_server.json'
-PROVIDERS_PATH = 'data/providers_infos.json'
-MODELS_PATH = 'data/models_infos.json'
+from core.paths import CONFIG_PATH, PROVIDERS_PATH, MODELS_PATH, ALL_RAGS_PATH, DATABASES_DIR
+
+
+def _mask_secret(value: str) -> str:
+    if not value or len(value) < 8:
+        return '***' if value else ''
+    return value[:4] + '***' + value[-4:]
+
+
+def _mask_dict_secrets(data: dict, key_names=('api_key',)) -> dict:
+    masked = {}
+    for k, v in data.items():
+        if isinstance(v, dict):
+            masked[k] = _mask_dict_secrets(v, key_names)
+        elif k in key_names and isinstance(v, str):
+            masked[k] = _mask_secret(v)
+        else:
+            masked[k] = v
+    return masked
 
 
 def _load_json(path: str) -> dict:
@@ -74,8 +93,8 @@ def _test_model_availability(model_name: str, model_info: dict, timeout: int = 1
                     if len(available_model_names) > 10:
                         models_list_str += '...'
                     return {'available': False, 'error': f'Modèle "{model_name}" non trouvé sur le serveur. Modèles disponibles: {models_list_str}'}
-            except Exception:
-                # Si la liste des modèles échoue, on continue avec le test normal
+            except Exception as e:
+                logger.debug(f"Model list retrieval failed for {model_name}: {e}")
                 pass
 
         if model_type == 'embedding':
@@ -93,7 +112,8 @@ def _test_model_availability(model_name: str, model_info: dict, timeout: int = 1
                         return {'available': True, 'error': None}
                     else:
                         return {'available': False, 'error': 'Réponse invalide du serveur rerank (format incorrect)'}
-                except Exception:
+                except Exception as e:
+                    logger.debug(f"Failed to parse rerank response JSON: {e}")
                     return {'available': False, 'error': 'Réponse invalide du serveur rerank'}
             else:
                 error_detail = f'Code HTTP {response.status_code}'
@@ -103,7 +123,8 @@ def _test_model_availability(model_name: str, model_info: dict, timeout: int = 1
                         error_detail = error_json['error']
                     elif 'message' in error_json:
                         error_detail = error_json['message']
-                except:
+                except Exception as e:
+                    logger.debug(f"Failed to parse error response JSON: {e}")
                     pass
 
                 if response.status_code == 404:
@@ -257,7 +278,7 @@ def reset_local_params():
 def get_system_info():
     providers_data = _load_json(PROVIDERS_PATH)
     providers = [
-        ProviderInfo(name=name, api_key=data.get('api_key'), url=data.get('url'), type=data.get('type'))
+        ProviderInfo(name=name, api_key=_mask_secret(data.get('api_key')), url=data.get('url'), type=data.get('type'))
         for name, data in providers_data.items()
     ]
     
@@ -268,12 +289,12 @@ def get_system_info():
             provider=data.get('provider', ''),
             type=data.get('type', 'llm'),
             url=data.get('url'),
-            api_key=data.get('api_key')
+            api_key=_mask_secret(data.get('api_key'))
         )
         for name, data in models_data.items()
     ]
     
-    databases_path = 'data/databases'
+    databases_path = DATABASES_DIR
     databases = []
     if os.path.exists(databases_path):
         databases = [d for d in os.listdir(databases_path) if d != '.gitkeep']
@@ -397,8 +418,8 @@ def test_configured_models():
                                 'available': False,
                                 'error': f'Réponse invalide du serveur rerank (format de réponse incorrect). Vérifiez que l\'URL pointe vers un serveur de reranking'
                             }
-                    except Exception:
-                        # Réponse reçue mais pas du JSON valide
+                    except Exception as e:
+                        logger.debug(f"Invalid JSON in rerank response for {model_name}: {e}")
                         results[key] = {
                             'name': model_name,
                             'available': False,
@@ -413,7 +434,7 @@ def test_configured_models():
                             error_detail = error_json['error']
                         elif 'message' in error_json:
                             error_detail = error_json['message']
-                    except:
+                    except Exception:
                         pass
 
                     # Vérifier si l'erreur indique que le endpoint rerank n'existe pas
@@ -510,7 +531,7 @@ def change_server_config(request: ChangeConfigServerRequest):
 
 @router.get("/models")
 def get_models():
-    return _load_json(MODELS_PATH)
+    return _mask_dict_secrets(_load_json(MODELS_PATH))
 
 
 @router.put("/models")
@@ -521,7 +542,7 @@ def update_models(request: ModelsUpdateRequest):
 
 @router.get("/providers")
 def get_providers():
-    return _load_json(PROVIDERS_PATH)
+    return _mask_dict_secrets(_load_json(PROVIDERS_PATH))
 
 
 @router.put("/providers")
@@ -532,12 +553,10 @@ def update_providers(request: ProvidersUpdateRequest):
 
 @router.get("/all-rags")
 def get_all_rags():
-    path = 'data/all_rags.json'
-    return _load_json(path)
+    return _load_json(ALL_RAGS_PATH)
 
 
 @router.put("/all-rags")
 def update_all_rags(request: ConfigUpdateRequest):
-    path = 'data/all_rags.json'
-    _save_json(path, request.config)
+    _save_json(ALL_RAGS_PATH, request.config)
     return {"status": "updated"}

@@ -1,10 +1,12 @@
 import json
+import logging
 import os
-import pickle
 import shutil
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse
+
+logger = logging.getLogger(__name__)
 
 from api.schemas.benchmark import (
     BenchmarkStartRequest, BenchmarkStatus, BenchmarkCompleteResult,
@@ -19,10 +21,11 @@ from evaluation import end_to_end_evaluators
 from evaluation.agent_evaluator import DataFramePreparator, AgentEvaluator
 from factory.rag_registry import RAG_REGISTRY
 from utils.pdf_report_generator import generate_benchmark_report
+from utils.serialization import save_results_json, load_results_json
 
 router = APIRouter()
 
-REPORT_PATH = 'data/report'
+from core.paths import REPORT_PATH, QUERIES_DIR
 
 
 def _get_all_rags() -> dict:
@@ -112,13 +115,12 @@ def get_benchmark_result(benchmark_id: str):
                 detail=f"Benchmark not completed. Current status: {status.get('status')}"
             )
     
-    results_file = os.path.join(tracker.report_dir, 'results_bench.pkl')
+    results_file = os.path.join(tracker.report_dir, 'results_bench.json')
     if not os.path.exists(results_file):
         raise HTTPException(status_code=404, detail="Results file not found")
     
     try:
-        with open(results_file, 'rb') as f:
-            results = pickle.load(f)
+        results = load_results_json(results_file)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to load results: {str(e)}")
     
@@ -140,7 +142,7 @@ def get_benchmark_result(benchmark_id: str):
         try:
             plots = plot_gen.generate_all_plots(results_with_scores, benchmark_type)
         except Exception as e:
-            print(f"Error generating plots: {e}")
+            logger.error(f"Error generating plots: {e}")
             plots = {}
     else:
         missing_graphs = [k for k in ['context_graph', 'ground_truth_graph'] if k not in plots]
@@ -152,12 +154,12 @@ def get_benchmark_result(benchmark_id: str):
                     if k in new_plots and new_plots[k]:
                         plots[k] = new_plots[k]
             except Exception as e:
-                print(f"Error generating missing plots: {e}")
+                logger.error(f"Error generating missing plots: {e}")
     
     plots = _convert_to_serializable(plots)
     
     files = {
-        'results_pickle': os.path.join(tracker.report_dir, 'results_bench.pkl'),
+        'results_pickle': os.path.join(tracker.report_dir, 'results_bench.json'),
         'csv': os.path.join(tracker.report_dir, 'bench_df.csv'),
         'excel': os.path.join(tracker.report_dir, 'answers.xlsx'),
         'config': os.path.join(tracker.report_dir, 'config_server.json'),
@@ -214,7 +216,7 @@ def download_benchmark_file(benchmark_id: str, file_type: str):
         'excel': 'answers.xlsx',
         'pdf': 'plot_report.pdf',
         'config': 'config_server.json',
-        'results': 'results_bench.pkl'
+        'results': 'results_bench.json'
     }
     
     if file_type not in file_map:
@@ -224,13 +226,12 @@ def download_benchmark_file(benchmark_id: str, file_type: str):
     
     if file_type == 'pdf':
         if not os.path.exists(file_path):
-            results_file = os.path.join(tracker.report_dir, 'results_bench.pkl')
+            results_file = os.path.join(tracker.report_dir, 'results_bench.json')
             if not os.path.exists(results_file):
                 raise HTTPException(status_code=404, detail="Results not found, cannot generate PDF")
             
             try:
-                with open(results_file, 'rb') as f:
-                    results = pickle.load(f)
+                results = load_results_json(results_file)
                 
                 plots = results.get('plots', {})
                 benchmark_type = results.get('type_bench', 'all')
@@ -277,7 +278,7 @@ def generate_queries(request: GenerateQueriesRequest):
             file_path=file_path
         )
     except Exception as e:
-        print(f"Error generating queries: {traceback.format_exc()}")
+        logger.error(f"Error generating queries: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -289,6 +290,7 @@ def list_reports():
     reports = []
     for foldername in os.listdir(REPORT_PATH):
         folder = os.path.join(REPORT_PATH, foldername)
+        results_file = os.path.join(folder, 'results_bench.json')
         pkl_file = os.path.join(folder, 'results_bench.pkl')
         progress_file = os.path.join(folder, 'progress.json')
         
@@ -299,19 +301,26 @@ def list_reports():
                     progress_data = json.load(f)
                     status = progress_data.get('status', 'unknown')
             
-            if os.path.exists(pkl_file):
+            json_exists = os.path.exists(results_file)
+            pkl_exists = os.path.exists(pkl_file)
+            
+            if json_exists or pkl_exists:
                 try:
-                    with open(pkl_file, 'rb') as f:
-                        results = pickle.load(f)
+                    if json_exists:
+                        results = load_results_json(results_file)
+                    else:
+                        import pickle
+                        with open(pkl_file, 'rb') as f:
+                            results = pickle.load(f)
                     reports.append(BenchmarkReport(
                         report_id=foldername,
                         created_at=foldername,
-                        rag_names=list(results.get('df', {}).columns[2:]) if 'df' in results else [],
+                        rag_names=list(results.get('df', {}).columns[2:]) if 'df' in results and results['df'] is not None else [],
                         databases=results.get('databases', []),
                         type=results.get('type_bench', 'unknown')
                     ))
                 except Exception as e:
-                    print(f"Skipping incompatible report {foldername}: {e}")
+                    logger.warning(f"Skipping incompatible report {foldername}: {e}")
                     reports.append(BenchmarkReport(
                         report_id=foldername,
                         created_at=foldername,
@@ -334,14 +343,19 @@ def list_reports():
 @router.get("/report/{report_id}", response_model=BenchmarkResult)
 def get_report(report_id: str):
     folder = os.path.join(REPORT_PATH, report_id)
+    results_file = os.path.join(folder, 'results_bench.json')
     pkl_file = os.path.join(folder, 'results_bench.pkl')
     
-    if not os.path.exists(pkl_file):
+    if not os.path.exists(results_file) and not os.path.exists(pkl_file):
         raise HTTPException(status_code=404, detail="Report not found")
     
     try:
-        with open(pkl_file, 'rb') as f:
-            results = pickle.load(f)
+        if os.path.exists(results_file):
+            results = load_results_json(results_file)
+        else:
+            import pickle
+            with open(pkl_file, 'rb') as f:
+                results = pickle.load(f)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to load report: {str(e)}")
     
@@ -392,7 +406,7 @@ def run_benchmark(request: BenchmarkRequest):
             'Ground Truth comparison': 0.0
         }, f)
     
-    queries_path = os.path.join('data', 'queries', request.queries_doc_name)
+    queries_path = os.path.join(QUERIES_DIR, request.queries_doc_name)
     
     dataframe_preparator = DataFramePreparator(
         rag_agents=rag_agents,
@@ -439,9 +453,8 @@ def run_benchmark(request: BenchmarkRequest):
             'databases': request.databases
         }
     
-    results_file = os.path.join(report_dir, 'results_bench.pkl')
-    with open(results_file, 'wb') as f:
-        pickle.dump(results, f)
+    results_file = os.path.join(report_dir, 'results_bench.json')
+    save_results_json(results_file, results)
     
     df.to_csv(os.path.join(report_dir, 'bench_df.csv'), index=False)
     

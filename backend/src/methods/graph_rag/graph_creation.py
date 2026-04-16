@@ -1,3 +1,4 @@
+import logging
 import igraph as ig
 import leidenalg as la
 from typing import Union
@@ -6,6 +7,8 @@ import networkx as nx
 from pyvis.network import Network
 import numpy as np
 import warnings
+
+logger = logging.getLogger(__name__)
 
 class Weight:
 
@@ -34,17 +37,14 @@ class Graph:
     def __init__(self, entities: list[Union[MergeEntityDocument, MergeEntityOverall]], relations: list[Relation]) -> None:
         entities_names = [entity.name for entity in entities]
         cleaned_relations = [relation for relation in relations if relation.source in entities_names and relation.target in entities_names]
+        entity_lookup = {entity.name: entity.id for entity in entities}
         edges = []
         for relation in cleaned_relations:
-            source_name = relation.source
-            target_name = relation.target
-            for entity in entities:
-                if entity.name == source_name:
-                    source_id = entity.id
-                if entity.name == target_name:
-                    target_id = entity.id
-            edges.append((source_id, target_id))
-            edges.append((target_id, source_id))
+            source_id = entity_lookup.get(relation.source)
+            target_id = entity_lookup.get(relation.target)
+            if source_id is not None and target_id is not None:
+                edges.append((source_id, target_id))
+                edges.append((target_id, source_id))
         self.edges = edges
         directional_weights = [Weight(relation, cleaned_relations, entities).get_weight() for relation in cleaned_relations]
         weights = []
@@ -60,19 +60,19 @@ class Graph:
 
     def show_properties(self):
         res = ''
-        print('\n\n')
+        logger.info('')
         number_of_nodes = self.graph.vcount()
-        print(f'Nombre de noeuds : {number_of_nodes}')
+        logger.info(f'Nombre de noeuds : {number_of_nodes}')
         res += f'Nombre de noeuds : {number_of_nodes}' + '\n'
         degrees = self.graph.degree()
         degree_mean = sum(degrees) / len(degrees)
-        print(f'Degré moyen des noeuds : {degree_mean:.2f}')
+        logger.info(f'Degré moyen des noeuds : {degree_mean:.2f}')
         res += f'Degré moyen des noeuds : {degree_mean:.2f}' + '\n'
         maximal_degree = max(degrees)
         maximal_degree_node = degrees.index(maximal_degree)
-        print(f'ID du noeud de degré maximal : {maximal_degree_node}')
+        logger.info(f'ID du noeud de degré maximal : {maximal_degree_node}')
         res += f'ID du noeud de degré maximal : {maximal_degree_node}' + '\n'
-        print(f'Degré du noeud de degré maximal : {maximal_degree}\n')
+        logger.info(f'Degré du noeud de degré maximal : {maximal_degree}')
         res += f'Degré du noeud de degré maximal : {maximal_degree}\n'
         return res
 
@@ -82,9 +82,9 @@ class Graph:
         for (i, community) in enumerate(partitions):
             communities.append(community)
         communities_filtered = [community for community in communities if len(community) > 1]
-        print(f'[DEBUG] create_communities: Total partitions: {len(communities)}, Filtered (len>1): {len(communities_filtered)}')
+        logger.debug(f'create_communities: Total partitions: {len(communities)}, Filtered (len>1): {len(communities_filtered)}')
         for i, comm in enumerate(communities_filtered[:5]):
-            print(f'[DEBUG] create_communities: Community {i+1}: {len(comm)} entities')
+            logger.debug(f'create_communities: Community {i+1}: {len(comm)} entities')
         self.communities = communities_filtered
         return communities_filtered
 
@@ -96,7 +96,7 @@ class Graph:
 
     def retrieve_community_from_id(self, id: int) -> str:
         if self.communities == []:
-            print("Communities haven't been calculated.")
+            logger.warning("Communities haven't been calculated.")
             return -1
         for (k, sub_community) in enumerate(self.communities):
             for belonging_id in sub_community:

@@ -5,10 +5,11 @@ from .prompts import PROMPTS
 from utils.progress import ProgressBar
 from methods.naive_rag.indexation import concat_chunks
 from database.rag_classes import Chunk
-from methods.naive_rag.indexation import concat_chunks
 import pandas as pd
 import json
 import numpy as np
+import logging
+logger = logging.getLogger(__name__)
 
 class ArenaBattle:
 
@@ -20,7 +21,7 @@ class ArenaBattle:
         self.agent = agent
         self.model = model
         self.temperature = agent.temperature
-        self.metric_evaluator = MetricComparaison(agent=self.agent, max_attemps=max_attempts, batch_size=batch_size, model=self.model)
+        self.metric_evaluator = MetricComparaison(agent=self.agent, max_attempts=max_attempts, batch_size=batch_size, model=self.model)
         self.language = self.agent.language
         self.metrics: dict = PROMPTS[self.language]['metrics']
         self.eval_number = eval_number
@@ -36,7 +37,8 @@ class ArenaBattle:
                 (first_result, second_result) = dict_scores[metric]
                 try:
                     final_scores[metric] = ((first_result + first_mean * eval_idx) / (eval_idx + 1), (second_result + second_mean * eval_idx) / (eval_idx + 1))
-                except Exception:
+                except Exception as e:
+                    logger.warning(f"Failed to compute arena score for metric '{metric}': {e}")
                     final_scores[metric] = (None, None)
         return final_scores
 
@@ -73,7 +75,7 @@ class GroundTruthComparator:
 
     def __init__(self, dataframe: pd.DataFrame, agent: Agent, model: str, eval_number=1, max_attempts=5, batch_size=10):
         self.agent = agent
-        self.comparator = GroundTruthComparison(agent=agent, model=model, max_attemps=max_attempts, batch_size=batch_size)
+        self.comparator = GroundTruthComparison(agent=agent, model=model, max_attempts=max_attempts, batch_size=batch_size)
         self.language = self.agent.language
         self.metrics: dict = PROMPTS[self.language]['gt_metrics']
         self.dataframe = dataframe
@@ -125,7 +127,7 @@ class ContextRelevanceComparator:
     def __init__(self, dataframe: pd.DataFrame, agent: Agent, model: str, eval_number=1, max_attempts=5, batch_size=10):
         self.agent = agent
         self.model = model
-        self.evaluator = ContextRelevanceEvaluator(agent=self.agent, model=model, max_attemps=max_attempts, batch_size=batch_size)
+        self.evaluator = ContextRelevanceEvaluator(agent=self.agent, model=model, max_attempts=max_attempts, batch_size=batch_size)
         self.eval_number = eval_number
         self.dataframe = dataframe
         self.queries = dataframe['QUERIES']
@@ -133,13 +135,13 @@ class ContextRelevanceComparator:
 
     def process_evaluation(self, contexts: list[list[Chunk]]):
         final_scores = 0
-        mean = 0
         model_contexts = [concat_chunks(context) for context in contexts]
         for eval_idx in range(self.eval_number):
             result = self.evaluator.run_evaluation_pipeline(self.queries, model_contexts)
             try:
-                final_scores = (result + mean * eval_idx) / (eval_idx + 1)
-            except Exception:
+                final_scores = (result + final_scores * eval_idx) / (eval_idx + 1)
+            except Exception as e:
+                logger.warning(f'Evaluation iteration failed: {e}')
                 continue
         return final_scores
 
@@ -175,13 +177,13 @@ class ContextFaithfulnessComparator:
 
     def process_evaluation(self, answers: list[str], contexts: list[list[Chunk]]):
         final_scores = 0
-        mean = 0
         model_contexts = [concat_chunks(context) for context in contexts]
         for eval_idx in range(self.eval_number):
             result = self.evaluator.run_evaluation_pipeline(self.queries, answers, model_contexts)
             try:
-                final_scores = (result + mean * eval_idx) / (eval_idx + 1)
-            except Exception:
+                final_scores = (result + final_scores * eval_idx) / (eval_idx + 1)
+            except Exception as e:
+                logger.warning(f'Evaluation iteration failed: {e}')
                 continue
         return final_scores
 
@@ -217,12 +219,12 @@ class nDCGComparator:
 
     def process_evaluation(self, answers: list[str], contexts: list[list[dict]]):
         final_scores = 0
-        mean = 0
         for eval_idx in range(self.eval_number):
             result = self.evaluator.run_evaluation_pipeline(self.queries, answers, contexts)
             try:
-                final_scores = (result + mean * eval_idx) / (eval_idx + 1)
-            except Exception:
+                final_scores = (result + final_scores * eval_idx) / (eval_idx + 1)
+            except Exception as e:
+                logger.warning(f'Evaluation iteration failed: {e}')
                 continue
         return final_scores
 

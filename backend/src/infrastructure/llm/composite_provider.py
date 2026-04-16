@@ -19,9 +19,8 @@ class CompositeProvider(LLMProvider):
             return self.providers[model]
         available_models = list(self.providers.keys())
         raise LLMError(
-            f"Model '{model}' not found in available providers",
+            f"Model '{model}' not found in available providers. Available: {available_models[:10]}",
             model=model,
-            available_models=available_models[:10],
             provider='CompositeProvider'
         )
 

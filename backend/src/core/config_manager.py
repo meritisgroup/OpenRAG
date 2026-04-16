@@ -2,6 +2,9 @@ from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, List
 from pathlib import Path
 import json
+import os
+
+_CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'data', 'base_config_server.json')
 
 @dataclass
 class LLMConfig:
@@ -75,7 +78,7 @@ class AppConfig:
     options_generation: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def from_json(cls, config_path: str='data/base_config_server.json') -> 'AppConfig':
+    def from_json(cls, config_path: str=_CONFIG_PATH) -> 'AppConfig':
         config_file = Path(config_path)
         if not config_file.exists():
             raise FileNotFoundError(f'Configuration file not found: {config_path}')
@@ -93,11 +96,11 @@ class AppConfig:
         config.update({'storage_path': self.storage_path, 'storage_data_path': self.data_path, 'max_workers': self.max_workers, 'device': self.device, 'mode': self.mode, 'local_params': self.local_params, 'all_system_prompt': self.all_system_prompt, 'options_generation': self.options_generation})
         return config
 
-    def save(self, config_path: str='data/base_config_server.json') -> None:
+    def save(self, config_path: str=_CONFIG_PATH) -> None:
         config_file = Path(config_path)
         config_file.parent.mkdir(parents=True, exist_ok=True)
         with open(config_file, 'w', encoding='utf-8') as f:
             json.dump(self.to_legacy_dict(), f, indent=4, ensure_ascii=False)
 
-def load_config(config_path: str='data/base_config_server.json') -> AppConfig:
+def load_config(config_path: str=_CONFIG_PATH) -> AppConfig:
     return AppConfig.from_json(config_path)

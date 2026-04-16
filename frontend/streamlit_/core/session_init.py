@@ -1,9 +1,12 @@
-import pandas as pd
 from datetime import datetime
+import logging
+
 from streamlit_.utils.params_func import get_custom_rags_name, get_merge_rags_name
 from streamlit_.api_client import APIClient
 from streamlit_.api_client.exceptions import APIError
 from streamlit_.core.config import API_BASE_URL
+
+logger = logging.getLogger(__name__)
 
 
 def init_session_state(st):
@@ -77,7 +80,7 @@ def _check_backend_connection(st) -> bool:
             st.session_state['backend_just_came_up'] = False
         
         return is_connected
-    except:
+    except Exception:
         st.session_state['backend_connected'] = False
         st.session_state['last_backend_check'] = current_time
         st.session_state['backend_just_came_up'] = False
@@ -124,7 +127,7 @@ def _init_defaults(st):
     if 'benchmark' not in st.session_state:
         st.session_state['benchmark'] = {
             'rags': {},
-            'queries': pd.DataFrame(data={'query': [], 'answer': []}),
+            'queries': [],
             'load': False
         }
     if 'custom_rags' not in st.session_state:
@@ -136,7 +139,7 @@ def _init_defaults(st):
     if 'rags_to_merge' not in st.session_state:
         st.session_state['rags_to_merge'] = {
             'rags': {},
-            'queries': pd.DataFrame(data={'query': [], 'answer': []}),
+            'queries': [],
             'load': False
         }
     if 'success' not in st.session_state:
@@ -145,6 +148,8 @@ def _init_defaults(st):
         st.session_state['all_databases'] = []
         st.session_state['chat_database_name'] = None
         st.session_state['benchmark_database'] = []
+    if 'hf_token' not in st.session_state:
+        st.session_state['hf_token'] = None
 
 
 def _init_api_client(st):
@@ -173,8 +178,8 @@ def _init_config(st, force=False):
                     'generation_system_prompt_name': 'default'
                 })
                 st.session_state['config_server_last_update'] = current_time
-            except APIError:
-                pass
+            except APIError as e:
+                logger.warning("Failed to fetch config: %s", e)
 
 
 def _init_rag_name(st):
@@ -198,8 +203,8 @@ def _init_providers(st, force=False):
             try:
                 st.session_state['providers_infos'] = st.session_state['api_client'].get_providers()
                 st.session_state['providers_infos_last_update'] = current_time
-            except APIError:
-                pass
+            except APIError as e:
+                logger.warning("Failed to fetch providers: %s", e)
 
 
 def _init_api_key(st):
@@ -224,8 +229,8 @@ def _init_models(st, force=False):
             try:
                 st.session_state['models_infos'] = st.session_state['api_client'].get_models()
                 st.session_state['models_infos_last_update'] = current_time
-            except APIError:
-                pass
+            except APIError as e:
+                logger.warning("Failed to fetch models: %s", e)
 
 
 def _init_all_rags(st, force=False):
@@ -242,8 +247,8 @@ def _init_all_rags(st, force=False):
             try:
                 st.session_state['all_rags'] = st.session_state['api_client'].get_all_rags()
                 st.session_state['all_rags_last_update'] = current_time
-            except APIError:
-                pass
+            except APIError as e:
+                logger.warning("Failed to fetch all_rags: %s", e)
 
 
 def _init_benchmark(st):
@@ -252,7 +257,7 @@ def _init_benchmark(st):
         list_rags = list(st.session_state['all_rags'].keys())
         list_rags = set(list_rags)
         st.session_state['benchmark']['rags'] = dict(zip(list_rags, [False for _ in range(len(list_rags))]))
-        st.session_state['benchmark']['queries'] = pd.DataFrame(data={'query': [], 'answer': []})
+        st.session_state['benchmark']['queries'] = []
         st.session_state['benchmark']['load'] = False
 
 
@@ -275,7 +280,7 @@ def _init_merge_rags(st):
         list_rags = list(st.session_state['all_rags'].keys())
         list_rags = set(list_rags)
         st.session_state['rags_to_merge']['rags'] = dict(zip(list_rags, [False for _ in range(len(list_rags))]))
-        st.session_state['rags_to_merge']['queries'] = pd.DataFrame(data={'query': [], 'answer': []})
+        st.session_state['rags_to_merge']['queries'] = []
         st.session_state['rags_to_merge']['load'] = False
 
 

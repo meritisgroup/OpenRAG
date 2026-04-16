@@ -1,3 +1,4 @@
+import time
 from typing import Any, Dict, Optional
 from datetime import datetime
 import uuid
@@ -12,6 +13,19 @@ from factory import RAGFactory
 
 
 agent_cache: Dict[str, Dict[str, Any]] = {}
+SESSION_TTL = 3600
+_last_cleanup = time.time()
+
+
+def _cleanup_expired_sessions():
+    global _last_cleanup
+    now = time.time()
+    if now - _last_cleanup < 300:
+        return
+    _last_cleanup = now
+    expired = [sid for sid, data in agent_cache.items() if now - data.get('_last_access', 0) > SESSION_TTL]
+    for sid in expired:
+        del agent_cache[sid]
 
 
 @asynccontextmanager
@@ -29,8 +43,9 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8501", "http://127.0.0.1:8501"],
+    allow_origins=["http://localhost:8501", "http://localhost:8502", "http://127.0.0.1:8501", "http://127.0.0.1:8502"],
     allow_credentials=True,
+
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -42,12 +57,14 @@ def create_session() -> str:
         'agent': None,
         'created_at': datetime.now(),
         'rag_method': None,
-        'databases': None
+        'databases': None,
+        '_last_access': time.time()
     }
     return session_id
 
 
 def get_agent(session_id: str) -> Any:
+    _cleanup_expired_sessions()
     if session_id not in agent_cache:
         raise ValueError(f"Session {session_id} not found")
     return agent_cache[session_id].get('agent')
@@ -59,14 +76,17 @@ def set_agent(session_id: str, agent: Any, rag_method: str = None, databases: li
             'agent': None,
             'created_at': datetime.now(),
             'rag_method': None,
-            'databases': None
+            'databases': None,
+            '_last_access': time.time()
         }
     agent_cache[session_id]['agent'] = agent
     agent_cache[session_id]['rag_method'] = rag_method
     agent_cache[session_id]['databases'] = databases
+    agent_cache[session_id]['_last_access'] = time.time()
 
 
 def delete_session(session_id: str) -> bool:
+    _cleanup_expired_sessions()
     if session_id in agent_cache:
         del agent_cache[session_id]
         return True
@@ -74,10 +94,12 @@ def delete_session(session_id: str) -> bool:
 
 
 def session_exists(session_id: str) -> bool:
+    _cleanup_expired_sessions()
     return session_id in agent_cache
 
 
 def get_session_info(session_id: str) -> Optional[Dict[str, Any]]:
+    _cleanup_expired_sessions()
     if session_id not in agent_cache:
         return None
     return {
@@ -95,7 +117,8 @@ def set_indexation_status(session_id: str, status: str, progress: float, message
             'agent': None,
             'created_at': datetime.now(),
             'rag_method': None,
-            'databases': None
+            'databases': None,
+            '_last_access': time.time()
         }
     agent_cache[session_id]['indexation_status'] = {
         'status': status,
@@ -105,9 +128,11 @@ def set_indexation_status(session_id: str, status: str, progress: float, message
         'sub_message': sub_message,
         'error': error
     }
+    agent_cache[session_id]['_last_access'] = time.time()
 
 
 def get_indexation_status(session_id: str) -> Dict[str, Any]:
+    _cleanup_expired_sessions()
     if session_id not in agent_cache:
         return {
             'status': 'idle',
@@ -128,6 +153,7 @@ def get_indexation_status(session_id: str) -> Dict[str, Any]:
 
 
 def reset_indexation_status(session_id: str) -> None:
+    _cleanup_expired_sessions()
     if session_id in agent_cache:
         agent_cache[session_id]['indexation_status'] = {
             'status': 'idle',
@@ -159,6 +185,7 @@ def health_check():
 
 @app.get("/api/info", tags=["Info"])
 def get_system_info():
+    _cleanup_expired_sessions()
     return {
         "rag_methods": RAGFactory.list_available_rags(),
         "active_sessions": len(agent_cache)

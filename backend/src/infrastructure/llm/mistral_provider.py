@@ -1,8 +1,11 @@
 from typing import Dict, List, Any, Optional, Union
 import concurrent.futures
+import logging
 from mistralai import Mistral
 from pydantic import BaseModel
 import numpy as np
+
+logger = logging.getLogger(__name__)
 from core.interfaces.llm_provider import LLMProvider
 from core.error_handler import LLMError
 from utils.threading_utils import get_executor_threads
@@ -102,6 +105,7 @@ class MistralProvider(LLMProvider):
                         response.impacts.energy.unit
                     ]
             except Exception:
+                logger.debug('Failed to extract ecologits impacts')
                 pass
 
             return {

@@ -2,13 +2,13 @@ import json
 from factory import RAGFactory
 from factory.rag_registry import RAG_REGISTRY
 
-_factory = RAGFactory()
+from core.paths import CONFIG_PATH
 
 
 def change_config_server(rag_name, config_server):
-    if rag_name not in ('copali', 'vlm'):
-        if config_server['type_retrieval'] not in ['embeddings', 'bm25', 'hybrid']:
-            config_server['type_retrieval'] = 'embeddings'
+    config_server = config_server.copy()
+    if config_server['type_retrieval'] not in ['embeddings', 'bm25', 'hybrid']:
+        config_server['type_retrieval'] = 'embeddings'
     return config_server
 
 
@@ -31,7 +31,9 @@ def put_default_local_parameters():
         json.dump(config, file, indent=4)
 
 
-def get_rag_agent(rag_name, config_server, models_infos, databases_name=['']):
+def get_rag_agent(rag_name, config_server, models_infos, databases_name=None):
+    if databases_name is None:
+        databases_name = ['']
     return _factory.get_agent(
         rag_name=rag_name,
         config_server=config_server,
@@ -41,7 +43,9 @@ def get_rag_agent(rag_name, config_server, models_infos, databases_name=['']):
     )
 
 
-def get_custom_rag_agent(base_rag_name, config_server, models_infos, databases_name=['']):
+def get_custom_rag_agent(base_rag_name, config_server, models_infos, databases_name=None):
+    if databases_name is None:
+        databases_name = ['']
     return _factory.get_agent(
         rag_name=base_rag_name,
         config_server=config_server,

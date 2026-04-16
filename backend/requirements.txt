@@ -6,7 +6,7 @@ polars==1.39.2
 
 # === LLM Providers ===
 openai==2.29.0
-mistralai<2.0.0
+mistralai==1.12.4
 anthropic==0.39.0
 cohere==5.13.0
 
@@ -21,6 +21,7 @@ openpyxl==3.1.5
 python-docx==1.2.0
 unidecode==1.4.0
 Pillow==12.1.1
+pandas==3.0.1
 
 # === RAG / NLP ===
 langchain_community==0.4.1
@@ -56,4 +57,4 @@ requests==2.32.5
 ecologits==0.10.0
 
 # === PDF Generation ===
-reportlab>=4.0.0
+reportlab==4.4.10

@@ -53,7 +53,7 @@ def run_contextual(agent, model, doc_chunks, doc_content, language='EN', first_p
     for i in range(len(contexts['texts'])):
         context = contexts['texts'][i]
         if first_process:
-            new_chunk = f'<Chunk_context>\n {context}</Chunk_context> \n\n<Chunk>\n {doc_chunks[i].text}\n<Chunk>'
+            new_chunk = f'<Chunk_context>\n {context}</Chunk_context> \n\n<Chunk>\n {doc_chunks[i].text}\n</Chunk>'
         else:
             new_chunk = f'<Chunk_context>\n {context}</Chunk_context> \n\n {doc_chunks[i].text}'
         chunk_with_context.append(new_chunk)

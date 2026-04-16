@@ -1,5 +1,4 @@
 import streamlit as st
-import pandas as pd
 import re
 import zipfile
 import io
@@ -62,8 +61,8 @@ if database_name is not None:
     try:
         document_list = _client.get_database_documents(database_name)
         if document_list:
-            display_db = pd.DataFrame(data={'Doc Name': document_list})
-            st.write(display_db)
+            display_db = [{'Doc Name': doc} for doc in document_list]
+            st.table(display_db)
         else:
             st.info('No documents in this database.')
     except APIError as e:

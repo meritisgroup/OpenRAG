@@ -1,6 +1,5 @@
 from base_classes import RagAgent
 from methods.advanced_rag.agent import AdvancedRag
-from methods.advanced_rag.agent import AdvancedRag
 from database.database_class import get_management_data
 from utils.agent import get_Agent
 from .prompts import prompts
@@ -29,7 +28,7 @@ class AgenticRagAgent(AdvancedRag):
         new_query = agent.predict(system_prompt=system_prompt, prompt=user_prompt, model=self.llm_model)
         return new_query
 
-    def concatene(self, answer_init: str, answer_add: str, query: str, agent, options_generation=None) -> str:
+    def concatenate(self, answer_init: str, answer_add: str, query: str, agent, options_generation=None) -> str:
         system_prompt = self.prompts['concatenete']['SYSTEM_PROMPT']
         user_prompt = self.prompts['concatenete']['QUERY_TEMPLATE'].format(query=query, answer_init=answer_init, answer_add=answer_add)
         final_answer = agent.predict(system_prompt=system_prompt, prompt=user_prompt, model=self.llm_model, options_generation=options_generation)
@@ -37,15 +36,15 @@ class AgenticRagAgent(AdvancedRag):
 
     def generate_answer(self, query: str, nb_chunks: int=5, max_iter=0, options_generation=None) -> str:
         agent = self.agent
-        iter = 0
+        iteration = 0
         info = super().generate_answer(query, nb_chunks=nb_chunks, options_generation=options_generation)
         answer = info['answer']
         nb_input_tokens = info['nb_input_tokens']
         nb_output_tokens = info['nb_output_tokens']
         context_tot = info['context']
         (impacts, energies) = (info['impacts'], info['energy'])
-        while iter <= max_iter and (not self.evaluate(query, answer, agent)):
-            iter += 1
+        while iteration <= max_iter and (not self.evaluate(query, answer, agent)):
+            iteration += 1
             query_additional = self.reformulate(query, answer, agent)['texts']
             info = super().generate_answer(query_additional, nb_chunks=nb_chunks, options_generation=options_generation)
             answer_additional = info['answer']
@@ -58,5 +57,5 @@ class AgenticRagAgent(AdvancedRag):
             energies[0] += info['energy'][0]
             energies[1] += info['energy'][1]
             energies[2] = info['energy'][2]
-            answer = self.concatene(answer, answer_additional, query, agent, options_generation=options_generation)
+            answer = self.concatenate(answer, answer_additional, query, agent, options_generation=options_generation)
         return {'answer': answer, 'nb_input_tokens': nb_input_tokens, 'nb_output_tokens': nb_output_tokens, 'context': context_tot, 'impacts': impacts, 'energy': energies, 'original_query': query}

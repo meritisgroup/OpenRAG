@@ -2,9 +2,13 @@ import pandas as pd
 import shutil
 import json
 import os
+import logging
 import fitz
 import re
 import unidecode
+
+logger = logging.getLogger(__name__)
+
 from pptx import Presentation
 from openpyxl import load_workbook
 
@@ -13,14 +17,16 @@ def list_files(path_folder: str) -> list:
         files = [file for file in os.listdir(path_folder) if os.path.isfile(os.path.join(path_folder, file))]
         return files
     else:
-        return f"Le dossier {path_folder} n'existe pas."
+        logger.warning(f"Folder {path_folder} does not exist.")
+        return []
 
 def list_folders(path_folder: str) -> list:
     if os.path.exists(path_folder):
-        folders = [folder for folder in os.listdir(path_folder) if os.path.isdir(os.path.join(path_folder, folder))]
+        folders = [f for f in os.listdir(path_folder) if os.path.isdir(os.path.join(path_folder, f))]
         return folders
     else:
-        return f"Le dossier {path_folder} n'existe pas."
+        logger.warning(f"Folder {path_folder} does not exist.")
+        return []
 
 def open_queries(path_queries: str) -> list[str]:
     with open(path_queries, 'r', encoding='utf-8') as f:
@@ -50,14 +56,14 @@ def check_path(path_input: str, path_output: str) -> str:
                 if file != 'queries.txt' and file != 'answers.txt':
                     shutil.move(former_path_input + file, path_input)
         except Exception as e:
-            pass
+            logger.warning(f'Path setup failed: {e}')
     try:
         os.mkdir(path_input.replace('raw_docs', 'txt_docs'))
-    except Exception as e:
+    except FileExistsError:
         pass
     try:
         os.mkdir(path_input.replace('raw_docs', 'entities_docs'))
-    except Exception as e:
+    except FileExistsError:
         pass
     return (path_input, path_output)
 

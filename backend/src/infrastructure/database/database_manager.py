@@ -65,7 +65,7 @@ class DataBase:
         try:
             return self.query(table_class).filter_by(title=title).first()
         except Exception as e:
-            print(f'An error "{e}" occurred when trying to retrieve the instance by title')
+            logger.error(f'An error "{e}" occurred when trying to retrieve the instance by title')
         return None
 
     def get_list_path_documents(self) -> List[str]:
@@ -77,16 +77,16 @@ class DataBase:
         return all_files
 
     def create_merged_entities_table(self, agent: Agent=None, overall: bool=True):
-        print(f'[DEBUG] DataBase.create_merged_entities_table: START')
+        logger.debug('DataBase.create_merged_entities_table: START')
         entity_names = set([res[0] for res in self.query(Entity.name)])
-        print(f'[DEBUG] create_merged_entities_table: Found {len(entity_names)} unique entity names in Entity table')
+        logger.debug(f'create_merged_entities_table: Found {len(entity_names)} unique entity names in Entity table')
 
         if overall:
             self.add_table(MergeEntityOverall)
             already_in_entities = [res[0] for res in self.query(MergeEntityOverall.name)]
-            print(f'[DEBUG] create_merged_entities_table: Already merged {len(already_in_entities)} entities in MergeEntityOverall')
+            logger.debug(f'create_merged_entities_table: Already merged {len(already_in_entities)} entities in MergeEntityOverall')
             entities_to_process = [entity_name for entity_name in entity_names if entity_name not in already_in_entities]
-            print(f'[DEBUG] create_merged_entities_table: Entities to process: {len(entities_to_process)}')
+            logger.debug(f'create_merged_entities_table: Entities to process: {len(entities_to_process)}')
             if len(entities_to_process) > 0:
                 with tqdm(entities_to_process) as progress_bar:
                     for (k, entity_name) in enumerate(progress_bar):
@@ -102,7 +102,7 @@ class DataBase:
                         if k == len(progress_bar) - 1:
                             progress_bar.set_description('Merging multiples occurences - ✅')
             final_count = len([res[0] for res in self.query(MergeEntityOverall.name)])
-            print(f'[DEBUG] create_merged_entities_table: Final count in MergeEntityOverall: {final_count}')
+            logger.debug(f'create_merged_entities_table: Final count in MergeEntityOverall: {final_count}')
 
 class DatabaseManager:
 

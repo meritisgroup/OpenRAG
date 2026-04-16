@@ -1,8 +1,11 @@
 from typing import Dict, List, Any, Optional, Union
 import concurrent.futures
+import logging
 import anthropic
 from pydantic import BaseModel
 import numpy as np
+
+logger = logging.getLogger(__name__)
 from core.interfaces.llm_provider import LLMProvider
 from core.error_handler import LLMError
 from utils.threading_utils import get_executor_threads
@@ -101,6 +104,7 @@ class AnthropicProvider(LLMProvider):
                         response.impacts.energy.unit
                     ]
             except Exception:
+                logger.debug('Failed to extract ecologits impacts')
                 pass
             
             return {
@@ -303,7 +307,8 @@ class AnthropicProvider(LLMProvider):
                 try:
                     parsed = json.loads(answer)
                     return json_format.model_validate(parsed)
-                except Exception:
+                except Exception as e:
+                    logger.debug(f"Failed to parse JSON response: {e}")
                     return None
             
             return {

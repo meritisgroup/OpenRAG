@@ -9,6 +9,7 @@ from database.rag_classes import Document, Tokens
 class ContextualRetrievalRagAgent(AdvancedRag):
 
     def __init__(self, config_server: dict, models_infos: dict, dbs_name: list[str], data_folders_name: list[str]) -> None:
+        config_server = config_server.copy()
         config_server['ProcessorChunks'] = ['Contextual']
         config_server['reranker_model'] = None
         config_server['reformulate_query'] = False

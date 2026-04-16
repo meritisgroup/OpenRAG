@@ -7,7 +7,9 @@ class Reranker:
         self.agent = agent
         self.reranking_model = reranking_model
 
-    def rerank(self, query, chunk_list: list[Chunk], additional_data={}, max_contexts=5) -> list[Chunk]:
+    def rerank(self, query, chunk_list: list[Chunk], additional_data=None, max_contexts=5) -> list[Chunk]:
+        if additional_data is None:
+            additional_data = {}
         scores = self.agent.reranking(query=query, chunk_list=chunk_list, model=self.reranking_model)
         nb_input_tokens = np.sum(scores['nb_input_tokens'])
         scores = scores['scores']

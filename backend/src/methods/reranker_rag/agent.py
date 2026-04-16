@@ -9,7 +9,10 @@ from utils.chunk_lists_merger import merge_chunk_lists
 
 class RerankerRag(AdvancedRag):
 
-    def __init__(self, config_server: dict, models_infos: dict, dbs_name: list[str], data_folders_name: list[str], type_processor_chunks: list[str]=[]) -> None:
+    def __init__(self, config_server: dict, models_infos: dict, dbs_name: list[str], data_folders_name: list[str], type_processor_chunks: list[str]=None) -> None:
+        if type_processor_chunks is None:
+            type_processor_chunks = []
+        config_server = config_server.copy()
         config_server['reformulate_query'] = False
         config_server['ProcessorChunks'] = []
         super().__init__(config_server=config_server, models_infos=models_infos, dbs_name=dbs_name, data_folders_name=data_folders_name)

@@ -1,11 +1,17 @@
 import json
 import os
+import logging
 from datetime import datetime
 from typing import Dict, Any, Optional
 
+logger = logging.getLogger(__name__)
+
+
+from core.paths import REPORT_PATH
+
 
 class ProgressTracker:
-    REPORT_PATH = 'data/report'
+    REPORT_PATH = REPORT_PATH
     
     def __init__(self, benchmark_id: str):
         self.benchmark_id = benchmark_id
@@ -110,7 +116,8 @@ class ProgressTracker:
     def _read_logs_with_fallback(self) -> Dict[str, Any]:
         try:
             return self.read_log()
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Failed to read log: {e}")
             return {}
     
     def _calculate_detailed_progress(self, base_progress: float = 60) -> Optional[float]:

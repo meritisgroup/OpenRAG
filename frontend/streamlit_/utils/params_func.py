@@ -1,9 +1,12 @@
 from dotenv import load_dotenv, find_dotenv, set_key
+import logging
 import os
 
 from streamlit_.api_client import APIClient
 from streamlit_.api_client.exceptions import APIError
 from streamlit_.core.config import API_BASE_URL
+
+logger = logging.getLogger(__name__)
 
 _client = APIClient(API_BASE_URL)
 
@@ -53,8 +56,8 @@ def get_config_rag(rag_name):
             all_rags = _client.get_all_rags()
             if rag_name in all_rags:
                 return _client.get_custom_rag(rag_name)
-    except APIError:
-        pass
+    except APIError as e:
+        logger.warning("Failed to get config for rag '%s': %s", rag_name, e)
     
     try:
         config_response = _client.get_config()

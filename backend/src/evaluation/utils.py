@@ -40,7 +40,9 @@ def process_prompts_to_json(prompts: List[str], system_prompts: List[str], model
     failed_prompts = [prompt for (prompt, result) in zip(prompts, evaluation) if result is None]
     if not failed_prompts:
         return evaluation
-    retry_eval = process_prompts_to_json(prompts=failed_prompts, system_prompts=system_prompts, model=model, max_retry=max_retry - 1, agent=agent, json_format=json_format)
+    failed_indices = [i for (i, result) in enumerate(evaluation) if result is None]
+    failed_system_prompts = [system_prompts[i] for i in failed_indices]
+    retry_eval = process_prompts_to_json(prompts=failed_prompts, system_prompts=failed_system_prompts, model=model, max_retry=max_retry - 1, agent=agent, json_format=json_format)
     if retry_eval is not None:
         merged = []
         i_retry = 0

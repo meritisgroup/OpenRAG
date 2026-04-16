@@ -381,6 +381,6 @@ class PlotGenerator:
         if isinstance(query, str):
             try:
                 return ast.literal_eval(query)
-            except:
+            except Exception:
                 return {}
         return {}

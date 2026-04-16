@@ -1,3 +1,4 @@
+import logging
 from typing import List, Dict, Any, Optional
 import numpy as np
 from base_classes import RagAgent
@@ -10,6 +11,8 @@ from infrastructure.llm.llm_provider_factory import LLMProviderFactory
 from utils.agent_functions import get_system_prompt
 from infrastructure.database.coordinated_data_manager import get_management_data
 from methods.query_reformulation.query_reformulation import query_reformulation
+
+logger = logging.getLogger(__name__)
 
 class BaseRAGAgent(RagAgent, TokenCounterMixin):
 
@@ -42,7 +45,7 @@ class BaseRAGAgent(RagAgent, TokenCounterMixin):
             self.reformulater = query_reformulation(agent=self.agent, language=self.language, model=self.llm_model)
         except ImportError:
             self.reformulate_query = False
-            print('Warning: Query reformulation requested but module not available')
+            logger.warning('Query reformulation requested but module not available')
 
     @property
     def nb_input_tokens(self) -> int:

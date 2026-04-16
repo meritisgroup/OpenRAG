@@ -4,8 +4,11 @@ from .crawler import web_search
 from utils.splitter import get_splitter
 from utils.progress import tqdm
 import numpy as np
+import logging
 from .prompts import prompts
 from methods.query_reformulation.query_reformulation import query_reformulation
+
+logger = logging.getLogger(__name__)
 
 class CragAgent(NaiveRagAgent):
 
@@ -71,7 +74,8 @@ class CragAgent(NaiveRagAgent):
     def web_search(self, query):
         try:
             results = self.websearch.search(query)
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Web search failed for query '{query}': {e}")
             results = []
         return results
 
@@ -81,7 +85,7 @@ class CragAgent(NaiveRagAgent):
             context += '------------\n{}'.format(contexts[i])
         return context
 
-    def generate_answer(self, query: str, nb_chunks: str=5, batch: bool=True, options_generation=None) -> str:
+    def generate_answer(self, query: str, nb_chunks: int=5, batch: bool=True, options_generation=None) -> str:
         agent = self.agent
         nb_input_tokens = 0
         nb_output_tokens = 0
@@ -105,7 +109,7 @@ class CragAgent(NaiveRagAgent):
             scores = agent.multiple_predict(prompts=prompts, system_prompt=system_prompt, model=self.llm_model)
             if 'nb_input_tokens' in scores.keys():
                 nb_input_tokens += np.sum(scores['nb_input_tokens'])
-            if nb_output_tokens in scores.keys():
+            if 'nb_output_tokens' in scores.keys():
                 nb_output_tokens += np.sum(scores['nb_output_tokens'])
             impacts[2] = scores['impacts'][2]
             impacts[0] += scores['impacts'][0]
@@ -115,26 +119,22 @@ class CragAgent(NaiveRagAgent):
             energies[1] += scores['energy'][1]
             scores = scores['texts']
             for j in range(len(contexts)):
-                if 'relevant' in scores[j].lower() and 'irrelevant' not in scores[j].lower():
+                if ('relevant' in scores[j].lower() and 'irrelevant' not in scores[j].lower()) or ('pertinent' in scores[j].lower() and 'non pertinent' not in scores[j].lower()):
                     useful_contexts.append(contexts[j].text)
-                elif 'ambiguous' in scores[j].lower():
-                    ambiguous_contexts.append(contexts[j].text)
-                if 'pertinent' in scores[j].lower() and 'non pertinent' not in scores[j].lower():
-                    useful_contexts.append(contexts[j].text)
-                elif 'ambigu' in scores[j].lower():
+                elif 'ambiguous' in scores[j].lower() or 'ambigu' in scores[j].lower():
                     ambiguous_contexts.append(contexts[j].text)
         else:
             for (i, context) in enumerate(contexts):
                 prompt = self.prompts['document_relevance2']['QUERY_TEMPLATE'].format(context=contexts[i].text, query=query)
                 system_prompt = self.prompts['document_relevance2']['SYSTEM_PROMPT']
                 score = agent.predict(prompt=prompt, system_prompt=system_prompt, model=self.llm_model)
-                nb_input_tokens += np.sum(scores['nb_input_tokens'])
-                nb_output_tokens += np.sum(scores['nb_output_tokens'])
+                nb_input_tokens += np.sum(score['nb_input_tokens'])
+                nb_output_tokens += np.sum(score['nb_output_tokens'])
                 impacts[0] += score['impacts'][0]
                 impacts[1] += score['impacts'][1]
                 energies[0] += score['energy'][0]
                 energies[1] += score['energy'][1]
-                score = score['text']
+                score = score['texts']
                 if 'relevant' in score.lower() and 'irrelevant' not in score.lower():
                     useful_contexts.append(context.text)
                 elif 'ambiguous' in score.lower():
@@ -168,8 +168,8 @@ class CragAgent(NaiveRagAgent):
             prompt = self.prompts['rewrite_web_query']['QUERY_TEMPLATE'].format(query=query)
             system_prompt = self.prompts['rewrite_web_query']['SYSTEM_PROMPT']
             query_web = agent.predict(prompt=prompt, system_prompt=system_prompt, model=self.llm_model)
-            nb_input_tokens += query_web['nb_input_tokens'] if type(query_web['nb_input_tokens']) is type(0) else query_web['nb_input_tokens'][0]
-            nb_output_tokens += query_web['nb_output_tokens'] if type(query_web['nb_output_tokens']) is type(0) else query_web['nb_output_tokens'][0]
+            nb_input_tokens += query_web['nb_input_tokens'] if isinstance(query_web['nb_input_tokens'], int) else query_web['nb_input_tokens'][0]
+            nb_output_tokens += query_web['nb_output_tokens'] if isinstance(query_web['nb_output_tokens'], int) else query_web['nb_output_tokens'][0]
             impacts[0] += query_web['impacts'][0]
             impacts[1] += query_web['impacts'][1]
             energies[0] += query_web['energy'][0]
@@ -193,8 +193,8 @@ class CragAgent(NaiveRagAgent):
             options_generation = self.config_server['options_generation']
         system_prompt = self.prompts['smooth_generation']['SYSTEM_PROMPT']
         answer = agent.predict(prompt=prompt, system_prompt=system_prompt, options_generation=options_generation, model=self.llm_model)
-        nb_input_tokens += answer['nb_input_tokens'] if type(answer['nb_input_tokens']) is type(0) else answer['nb_input_tokens'][0]
-        nb_output_tokens += answer['nb_output_tokens'] if type(answer['nb_output_tokens']) is type(0) else answer['nb_output_tokens'][0]
+        nb_input_tokens += answer['nb_input_tokens'] if isinstance(answer['nb_input_tokens'], int) else answer['nb_input_tokens'][0]
+        nb_output_tokens += answer['nb_output_tokens'] if isinstance(answer['nb_output_tokens'], int) else answer['nb_output_tokens'][0]
         impacts[0] += answer['impacts'][0]
         impacts[1] += answer['impacts'][1]
         energies[0] += answer['energy'][0]

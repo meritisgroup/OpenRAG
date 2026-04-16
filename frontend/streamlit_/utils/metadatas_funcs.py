@@ -109,7 +109,7 @@ def init_metadata(database_name: str) -> bool:
 
 
 def delete_database_metadata(database_name: str):
-    pass
+    return init_metadata(database_name)
 
 
 def delete_button():

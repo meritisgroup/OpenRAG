@@ -3,17 +3,19 @@ from fastapi import APIRouter, HTTPException, UploadFile, File
 
 from api.schemas.database import DocumentUploadResponse
 from utils.open_doc import Opener
+from utils.path_utils import safe_join
 
 router = APIRouter()
 
-DOCUMENTS_PATH = 'data/documents'
+from core.paths import DOCUMENTS_DIR as DOCUMENTS_PATH
 
 
 @router.post("/process")
 async def process_document(file: UploadFile = File(...)):
     content = await file.read()
     
-    temp_path = os.path.join(DOCUMENTS_PATH, f"temp_{file.filename}")
+    filename = os.path.basename(file.filename or "unnamed")
+    temp_path = os.path.join(DOCUMENTS_PATH, f"temp_{filename}")
     os.makedirs(DOCUMENTS_PATH, exist_ok=True)
     
     with open(temp_path, 'wb') as f:
@@ -38,7 +40,8 @@ async def upload_document(file: UploadFile = File(...)):
     if not os.path.exists(DOCUMENTS_PATH):
         os.makedirs(DOCUMENTS_PATH, exist_ok=True)
     
-    file_path = os.path.join(DOCUMENTS_PATH, file.filename)
+    filename = os.path.basename(file.filename or "unnamed")
+    file_path = safe_join(DOCUMENTS_PATH, filename)
     
     content = await file.read()
     with open(file_path, 'wb') as f:
@@ -54,7 +57,7 @@ async def upload_document(file: UploadFile = File(...)):
 
 @router.get("/{document_id}/content")
 def get_document_content(document_id: str):
-    file_path = os.path.join(DOCUMENTS_PATH, document_id)
+    file_path = safe_join(DOCUMENTS_PATH, document_id)
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Document not found")
     
@@ -67,7 +70,7 @@ def get_document_content(document_id: str):
 
 @router.delete("/{document_id}")
 def delete_document(document_id: str):
-    file_path = os.path.join(DOCUMENTS_PATH, document_id)
+    file_path = safe_join(DOCUMENTS_PATH, document_id)
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Document not found")
     

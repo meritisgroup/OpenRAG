@@ -1,8 +1,7 @@
+import logging
 from openai import OpenAI
 from mistralai import Mistral
-import requests
 import numpy as np
-import json
 import cv2
 import io
 from pydantic import BaseModel
@@ -15,6 +14,8 @@ import concurrent.futures
 from .progress import ProgressBar
 from .threading_utils import get_executor_threads
 from .ecologits_init import init_ecologits
+
+logger = logging.getLogger(__name__)
 
 def np_array_to_file(image_np: np.ndarray, format: str='jpeg'):
     (success, encoded_image) = cv2.imencode(f'.{format}', image_np)
@@ -54,9 +55,9 @@ def predict_json(system_prompt: str, prompt: str, model: str, client: OpenAI, js
         if json_response.parsed:
             return json_response.parsed
         else:
-            print('refusal ', json_response.refusal)
+            logger.warning('refusal %s', json_response.refusal)
     except Exception as e:
-        print(f'Error: {e}')
+        logger.error(f'Error: {e}')
     return None
 
 def predict_image(prompt: str, model: str, img, client: OpenAI, json_format: Optional[type[BaseModel]]=None, temperature: Optional[float]=None) -> Any:
@@ -90,7 +91,7 @@ def predict_images(prompts: List[str], model: str, images: List[np.ndarray], cli
                 result = future.result()
                 unordered_results.append((original_index, result))
             except Exception as exc:
-                print(f'La tâche {original_index} a généré une exception: {exc}')
+                logger.error(f'La tâche {original_index} a généré une exception: {exc}')
         unordered_results.sort(key=lambda x: x[0])
         answers = [result for (index, result) in unordered_results]
         return answers
@@ -110,13 +111,13 @@ def predict(system_prompt: str, prompt: str, model: str, client: OpenAI, tempera
         response = client.beta.chat.completions.parse(**params)
         answer = response.choices[0].message.content
     except Exception as e:
-        print('Error in answer generation but still running: ', e)
+        logger.error('Error in answer generation but still running: %s', e)
         answer = ''
     try:
         (input_tokens, output_tokens) = (response.usage.prompt_tokens, response.usage.completion_tokens)
-    except Exception:
+    except Exception as e:
         (input_tokens, output_tokens) = (0, 0)
-        print('Error with token count but still running')
+        logger.error('Error with token count but still running: %s', e)
     try:
         impacts = [response.impacts.gwp.value.min, response.impacts.gwp.value.max, response.impacts.gwp.unit]
     except Exception as e:
@@ -170,18 +171,19 @@ def predict_mistral(system_prompt: str, prompt: str, model: str, api_key: str, t
         response = mistral.chat.complete(model=model, messages=[{'role': 'system', 'content': system_prompt}, {'role': 'user', 'content': prompt}], temperature=temperature)
     try:
         answer = response.choices[0].message.content
-    except Exception:
-        print('Error in answer generation but still running')
+    except Exception as e:
+        logger.error('Error in answer generation but still running: %s', e)
         answer = ''
     try:
         (input_tokens, output_tokens) = (response.usage.prompt_tokens, response.usage.completion_tokens)
-    except Exception:
+    except Exception as e:
         (input_tokens, output_tokens) = (0, 0)
-        print('Error with token count but still running')
+        logger.error('Error with token count but still running: %s', e)
     try:
         impacts = [response.impacts.gwp.value.min, response.impacts.gwp.value.max, response.impacts.gwp.unit]
-    except Exception:
+    except Exception as e:
         impacts = [0, 0, '']
+        logger.debug('Failed to extract ecologits impacts: %s', e)
     try:
         energy = [response.impacts.energy.value.min, response.impacts.energy.value.max, response.impacts.energy.unit]
     except Exception as e:
@@ -192,9 +194,9 @@ def multiple_predict_mistral(system_prompts: list[str], prompts: list[str], mode
     if options_generation is not None and options_generation['type_generation'] == 'no_generation':
         return {'texts': ['' for k in range(len(prompts))], 'nb_input_tokens': 0, 'nb_output_tokens': 0, 'impacts': [0, 0, ''], 'energy': [0, 0, '']}
     (answers, input_tokens, output_tokens, impacts, energy) = ([], 0, 0, [0, 0, ''], [0, 0, ''])
-    if type(prompts) is type('str'):
+    if isinstance(prompts, str):
         prompts = [prompts]
-    if type(system_prompts) is type('str'):
+    if isinstance(system_prompts, str):
         system_prompts = [system_prompts]
     progress_bar = ProgressBar(prompts)
     for (k, (prompt, system_prompt)) in enumerate(zip(prompts, system_prompts)):
@@ -203,8 +205,10 @@ def multiple_predict_mistral(system_prompts: list[str], prompts: list[str], mode
         answers.append(answer['texts'])
         input_tokens += answer['nb_input_tokens']
         output_tokens += answer['nb_output_tokens']
-        impacts = answer['impacts']
-        energy = answer['energy']
+        impacts[0] += answer['impacts'][0]
+        impacts[1] += answer['impacts'][1]
+        energy[0] += answer['energy'][0]
+        energy[1] += answer['energy'][1]
     progress_bar.clear()
     return {'texts': answers, 'nb_input_tokens': input_tokens, 'nb_output_tokens': output_tokens, 'impacts': impacts, 'energy': energy}
 
@@ -224,16 +228,19 @@ def rerank(system_prompt: str, prompt: str, model: str, client: Union[OpenAI, Mi
         params = {'model': model, 'messages': [{'role': 'system', 'content': system_prompt}, {'role': 'user', 'content': prompt}], 'response_format': RerankedChunk}
         if temperature is not None:
             params['temperature'] = temperature
-        if type(client) is OpenAI:
+        if isinstance(client, OpenAI):
             params.pop('impacts', None)
             scores = client.beta.chat.completions.parse(**params)
+        else:
+            logger.error('Unsupported client type for rerank: %s', type(client).__name__)
+            return None
         json_response = scores.choices[0].message
         nb_input_tokens = scores.usage.prompt_tokens
         if json_response.parsed:
             return (json_response.parsed, nb_input_tokens)
         else:
-            print('refusal ', json_response.refusal)
+            logger.warning('refusal %s', json_response.refusal)
             return None
     except Exception as e:
-        print(f'Error: {e}')
+        logger.error(f'Error: {e}')
         return None

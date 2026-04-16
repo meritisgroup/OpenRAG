@@ -1,7 +1,6 @@
 import streamlit as st
 import json
 import re
-import pandas as pd
 from streamlit_.api_client import APIClient
 from streamlit_.api_client.exceptions import APIError
 from streamlit_.core.config import API_BASE_URL
@@ -14,7 +13,7 @@ def get_rag_model_requirements(rag_base: str, models_infos: dict) -> dict:
     """Retourne les modèles disponibles par type pour un RAG donné"""
     
     rags_with_reranker = ['advanced_rag', 'agentic', 'agentic_router', 'reranker_rag']
-    rags_with_embedding = ['naive', 'advanced_rag', 'agentic', 'agentic_router', 'reranker_rag', 'query_reformulation', 'semantic_chunking', 'graph', 'corrective_rag', 'contextual_retrieval', 'query_based']
+    rags_with_embedding = ['naive', 'advanced_rag', 'agentic', 'agentic_router', 'reranker_rag', 'query_reformulation_rag', 'semantic_chunking', 'graph', 'crag', 'contextual_retrieval', 'query_based', 'self', 'hyde']
     
     requirements = {
         'model': [],
@@ -117,7 +116,8 @@ if config_new_rag['base'] != 'naive_chatbot' and model_requirements['model']:
         index=model_requirements['model'].index(st.session_state['config_server'].get('model', model_requirements['model'][0])) if st.session_state['config_server'].get('model') in model_requirements['model'] else 0
     )
 
-if config_new_rag['base'] != 'naive_chatbot' and model_requirements['embedding_model']:
+needs_embedding = type_retrieval in ['embeddings', 'hybrid']
+if config_new_rag['base'] != 'naive_chatbot' and model_requirements['embedding_model'] and needs_embedding:
     config_new_rag['embedding_model'] = st.selectbox(
         label='**Choose embedding model**',
         options=model_requirements['embedding_model'],
@@ -222,7 +222,7 @@ if rag_to_del in st.session_state['custom_rags']:
             display_config['Reranker model'] = [config['reranker_model']]
         display_config['Nb chunks'] = [str(config['nb_chunks'])]
         display_config['Chunk length'] = [str(config['chunk_length'])]
-        st.write(pd.DataFrame(display_config))
+        st.dataframe(display_config)
     except APIError as e:
         st.error(f"Error loading custom RAG config: {e}")
     
@@ -296,7 +296,7 @@ if right.button(label='Delete indexation', use_container_width=True, type='prima
                 _client.delete_elasticsearch_index(st.session_state.indexation)
                 _client.delete_storage_by_prefix(st.session_state.indexation)
             
-            st.session_state['rerun_managed_run'] = False
+            st.session_state['rerun_managed_rag'] = False
             st.session_state.indexation = None
             st.rerun()
         except APIError as e:

@@ -1,24 +1,26 @@
 import os
 import json
 import shutil
+import logging
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from elasticsearch import Elasticsearch
+
+logger = logging.getLogger(__name__)
 
 from api.schemas.database import (
     DatabaseInfo, DatabaseCreateRequest, DatabaseListResponse,
     MetadatasResponse, MetadatasUpdateRequest, DatabaseDocumentUploadResponse
 )
 from database.utils import get_list_path_documents
+from utils.path_utils import safe_join
 
 router = APIRouter()
 
-DATABASES_PATH = 'data/databases'
-STORAGE_PATH = 'storage'
+from core.paths import CONFIG_PATH, DATABASES_DIR as DATABASES_PATH, STORAGE_DIR as STORAGE_PATH
 
 
 def _get_elasticsearch_client():
-    config_path = 'data/base_config_server.json'
-    with open(config_path, 'r') as f:
+    with open(CONFIG_PATH, 'r') as f:
         config = json.load(f)
     
     params = config.get('params_vectorbase', {})
@@ -54,7 +56,7 @@ def list_databases():
 
 @router.post("")
 def create_database(request: DatabaseCreateRequest):
-    db_path = os.path.join(DATABASES_PATH, request.name)
+    db_path = safe_join(DATABASES_PATH, request.name)
     if os.path.exists(db_path):
         raise HTTPException(status_code=400, detail="Database already exists")
     
@@ -70,7 +72,7 @@ def create_database(request: DatabaseCreateRequest):
 
 @router.delete("/{name}")
 def delete_database(name: str):
-    db_path = os.path.join(DATABASES_PATH, name)
+    db_path = safe_join(DATABASES_PATH, name)
     if not os.path.exists(db_path):
         raise HTTPException(status_code=404, detail="Database not found")
     
@@ -82,7 +84,7 @@ def delete_database(name: str):
             if name in index_name:
                 es.indices.delete(index=index_name)
     except Exception as e:
-        pass
+        logger.warning(f'Failed to clean Elasticsearch indices: {e}')
     
     if os.path.exists(STORAGE_PATH):
         for storage_file in os.listdir(STORAGE_PATH):
@@ -94,7 +96,7 @@ def delete_database(name: str):
 
 @router.get("/{name}", response_model=DatabaseInfo)
 def get_database(name: str):
-    db_path = os.path.join(DATABASES_PATH, name)
+    db_path = safe_join(DATABASES_PATH, name)
     if not os.path.exists(db_path):
         raise HTTPException(status_code=404, detail="Database not found")
     
@@ -113,7 +115,7 @@ def get_database(name: str):
 
 @router.get("/{name}/documents")
 def list_database_documents(name: str):
-    db_path = os.path.join(DATABASES_PATH, name)
+    db_path = safe_join(DATABASES_PATH, name)
     if not os.path.exists(db_path):
         raise HTTPException(status_code=404, detail="Database not found")
     
@@ -126,11 +128,11 @@ def list_database_documents(name: str):
 
 @router.post("/{name}/documents/upload", response_model=DatabaseDocumentUploadResponse)
 async def upload_database_document(name: str, file: UploadFile = File(...)):
-    db_path = os.path.join(DATABASES_PATH, name)
+    db_path = safe_join(DATABASES_PATH, name)
     if not os.path.exists(db_path):
         raise HTTPException(status_code=404, detail="Database not found")
     
-    filename = file.filename or "unnamed"
+    filename = os.path.basename(file.filename or "unnamed")
     
     docs_path = os.path.join(db_path, 'documents')
     os.makedirs(docs_path, exist_ok=True)
@@ -151,7 +153,7 @@ async def upload_database_document(name: str, file: UploadFile = File(...)):
 
 @router.get("/{name}/metadatas", response_model=MetadatasResponse)
 def get_database_metadatas(name: str):
-    db_path = os.path.join(DATABASES_PATH, name)
+    db_path = safe_join(DATABASES_PATH, name)
     if not os.path.exists(db_path):
         raise HTTPException(status_code=404, detail="Database not found")
     
@@ -168,7 +170,7 @@ def get_database_metadatas(name: str):
 
 @router.put("/{name}/metadatas", response_model=MetadatasResponse)
 def update_database_metadatas(name: str, request: MetadatasUpdateRequest):
-    db_path = os.path.join(DATABASES_PATH, name)
+    db_path = safe_join(DATABASES_PATH, name)
     if not os.path.exists(db_path):
         raise HTTPException(status_code=404, detail="Database not found")
     
@@ -182,11 +184,11 @@ def update_database_metadatas(name: str, request: MetadatasUpdateRequest):
 
 @router.delete("/{name}/documents/{document_name}")
 def delete_database_document(name: str, document_name: str):
-    db_path = os.path.join(DATABASES_PATH, name)
+    db_path = safe_join(DATABASES_PATH, name)
     if not os.path.exists(db_path):
         raise HTTPException(status_code=404, detail="Database not found")
     
-    doc_path = os.path.join(db_path, 'documents', document_name)
+    doc_path = safe_join(os.path.join(db_path, 'documents'), document_name)
     if not os.path.exists(doc_path):
         raise HTTPException(status_code=404, detail="Document not found")
     

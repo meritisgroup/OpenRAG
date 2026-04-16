@@ -5,7 +5,9 @@ import numpy as np
 
 class Processor_chunks:
 
-    def __init__(self, agent, type_processor_chunks=[], language='EN'):
+    def __init__(self, agent, type_processor_chunks=None, language='EN'):
+        if type_processor_chunks is None:
+            type_processor_chunks = []
         self.agent = agent
         self.type_processor_chunks = type_processor_chunks
         if type(self.type_processor_chunks) == str:
@@ -97,10 +99,10 @@ def run_global_sum_up(chunks, agent, model, doc_content, language):
         contexts = agent.predict(prompt=prompt, system_prompt=system_prompt, model=model)
         nb_output_tokens += np.sum(contexts['nb_output_tokens'])
         nb_input_tokens += np.sum(contexts['nb_input_tokens'])
-        impacts[0] += impacts[0]
-        impacts[1] += impacts[1]
-        energy[0] += energy[0]
-        energy[1] += energy[1]
+        impacts[0] += contexts['impacts'][0]
+        impacts[1] += contexts['impacts'][1]
+        energy[0] += contexts['energy'][0]
+        energy[1] += contexts['energy'][1]
         context_text = contexts['texts']
     else:
         context_text = contexts['texts'][0]

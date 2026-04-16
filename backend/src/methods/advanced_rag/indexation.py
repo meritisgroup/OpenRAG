@@ -26,7 +26,9 @@ def process_single_doc(data_manager, processor_chunks, model: str, path_doc: str
 
 class AdvancedIndexation:
 
-    def __init__(self, data_manager, agent: Agent, embedding_model: str, llm_model: str, data_preprocessing: str, language: str='EN', type_text_splitter: str='TextSplitter', type_processor_chunks: list[str]=[]) -> None:
+    def __init__(self, data_manager, agent: Agent, embedding_model: str, llm_model: str, data_preprocessing: str, language: str='EN', type_text_splitter: str='TextSplitter', type_processor_chunks: list[str]=None) -> None:
+        if type_processor_chunks is None:
+            type_processor_chunks = []
         self.data_manager = data_manager
         self.agent = agent
         self.embedding_model = embedding_model

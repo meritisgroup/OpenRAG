@@ -80,11 +80,11 @@ class ContextualRetrievalIndexation:
         index = 0
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {executor.submit(process_single_doc, self.data_manager, self.agent, path_doc, model, i, config_server, self.splitter, chunk_size, chunk_overlap, reset_preprocess): path_doc for (i, path_doc) in enumerate(docs_to_process)}
-        for future in concurrent.futures.as_completed(futures):
-            path_doc = futures[future]
-            result = future.result()
-            new_doc = Document(name=result['name'], path=result['path'], embedding_tokens=result['embedding_tokens'], input_tokens=result['input_tokens'], output_tokens=result['output_tokens'])
-            progress_bar.update(index)
-            index += 1
-            self.data_manager.add_instance(instance=new_doc, path=result['parent_path'])
+            for future in concurrent.futures.as_completed(futures):
+                path_doc = futures[future]
+                result = future.result()
+                new_doc = Document(name=result['name'], path=result['path'], embedding_tokens=result['embedding_tokens'], input_tokens=result['input_tokens'], output_tokens=result['output_tokens'])
+                progress_bar.update(index)
+                index += 1
+                self.data_manager.add_instance(instance=new_doc, path=result['parent_path'])
         progress_bar.clear()

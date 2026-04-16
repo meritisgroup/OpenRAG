@@ -6,17 +6,18 @@ import os
 from pathlib import Path
 from sqlalchemy.orm import DeclarativeMeta
 from typing import Type
-from .rag_classes import Chunk
-from .rag_classes import Chunk, Base, Entity, Relation, MergeEntityDocument, MergeEntityOverall
+from .rag_classes import Base, Chunk, Entity, Relation, MergeEntityDocument, MergeEntityOverall
 from .clean import DescriptionClean, Agent
-from .rag_classes import Document, Chunk, Tokens
+from .rag_classes import Document, Tokens
 from utils.progress import tqdm
 from typing import Union
+import logging
+logger = logging.getLogger(__name__)
 
 def get_management_data(dbs_name, storage_path, data_folders_name, config_server: dict, agent: Agent=None):
     db = Merger_Database_Vectorbase(dbs_name=dbs_name, storages_path=storage_path, agent=agent, config_server=config_server, storage_path=storage_path)
     for i in range(len(dbs_name)):
-        if type(config_server['embedding_model']) == list:
+        if isinstance(config_server['embedding_model'], list):
             db.add_database(db_name=dbs_name[i], data_folder_name=data_folders_name[i], embedding_model=config_server['embedding_model'][i])
         else:
             db.add_database(db_name=dbs_name[i], data_folder_name=data_folders_name[i], embedding_model=config_server['embedding_model'])
@@ -42,7 +43,7 @@ class Merger_Database_Vectorbase:
                 candidate.relative_to(base_dir)
                 return db_name
             except ValueError:
-                None
+                pass
 
     def create_engine_connection(self):
         for db_name in self.databases.keys():
@@ -168,7 +169,9 @@ class Merger_Database_Vectorbase:
                     name_delete = None
                 self.vectorbases[vb_name]['vectorbase'].delete_collection(vb_name=name_delete)
 
-    def create_collection(self, vb_name: str=None, name: str=None, add_fields=[]) -> None:
+    def create_collection(self, vb_name: str=None, name: str=None, add_fields=None) -> None:
+        if add_fields is None:
+            add_fields = []
         if vb_name is not None:
             if name is not None:
                 name_create = vb_name + '_' + name
@@ -208,7 +211,9 @@ class Merger_Database_Vectorbase:
         if vb_name is not None:
             return self.vectorbases[vb_name]['vectorbase'].add_str_batch_elements(chunks=chunks, display_message=display_message, collection_name=collection_name)
 
-    def k_search(self, queries: Union[str, list[str]], k: int, output_fields: list[str]=['text'], filters: dict=None, collection_name=None, vb_name: str=None, type_output=Chunk):
+    def k_search(self, queries: Union[str, list[str]], k: int, output_fields: list[str] | None = None, filters: dict=None, collection_name=None, vb_name: str=None, type_output=Chunk):
+        if output_fields is None:
+            output_fields = ['text']
         if vb_name is not None:
             if collection_name is not None:
                 collection_name = vb_name + '_' + collection_name
@@ -260,14 +265,14 @@ class DataBase:
         if table_class.__tablename__ not in inspector.get_table_names():
             table_class.__table__.create(self.engine, checkfirst=True)
         else:
-            print(f'The table "{table_class.__tablename__}" already exists.')
+            logger.info(f'The table "{table_class.__tablename__}" already exists.')
 
     def remove_table(self, table_class: Base) -> None:
         inspector = inspect(self.engine)
         if table_class.__tablename__ in inspector.get_table_names():
             table_class.__table__.drop(self.engine, checkfirst=True)
         else:
-            print(f'''Impossible to drop "{table_class.__tablename__}" because it doesn't exist in data base.''')
+            logger.warning(f'''Impossible to drop "{table_class.__tablename__}" because it doesn't exist in data base.''')
 
     def add_instance(self, instance: Base) -> None:
         try:
@@ -275,14 +280,14 @@ class DataBase:
             self.session.commit()
         except Exception as e:
             self.session.rollback()
-            print(f'An error "{e}" occured when trying to add the instance')
+            logger.error(f'An error "{e}" occured when trying to add the instance')
 
     def update_instance(self) -> None:
         try:
             self.session.commit()
         except Exception as e:
             self.session.rollback()
-            print(f'An error "{e}" occurred when trying to update the instance')
+            logger.error(f'An error "{e}" occurred when trying to update the instance')
 
     def delete_instance(self, instance: Base) -> None:
         try:
@@ -290,13 +295,13 @@ class DataBase:
             self.session.commit()
         except Exception as e:
             self.session.rollback()
-            print(f'An error "{e}" occurred when trying to delete the instance.')
+            logger.error(f'An error "{e}" occurred when trying to delete the instance.')
 
     def get_instance_by_title(self, table_class: Base, title: str):
         try:
             return self.session.query(table_class).filter_by(title=title).first()
         except Exception as e:
-            print(f'An error "{e}" occurred when trying to retrieve the instance by title')
+            logger.error(f'An error "{e}" occurred when trying to retrieve the instance by title')
         return None
 
     def query(self, table_class: Base):
@@ -353,10 +358,10 @@ class DataBase:
             with self.engine.begin() as conn:
                 for table in reversed(meta.sorted_tables):
                     conn.execute(delete(table))
-            print(f"Successfully cleaned {len(meta.tables)} tables: {', '.join(meta.tables)}")
+            logger.info(f"Successfully cleaned {len(meta.tables)} tables: {', '.join(meta.tables)}")
         except Exception as e:
             self.session.rollback()
-            print(f'An error "{e}" occurred when trying to clean the database')
+            logger.error(f'An error "{e}" occurred when trying to clean the database')
 
     def get_list_path_documents(self):
         return get_list_path_documents(path_data=self.path_data)
@@ -383,7 +388,7 @@ class ContextDatabase:
                 ins = rag_table.insert().values(query=query, context=dict_chunks)
                 conn.execute(ins)
             else:
-                print(f"Query already exists in table '{rag_table.name}', skipping insert.")
+                logger.info(f"Query already exists in table '{rag_table.name}', skipping insert.")
 
     def complete_context_database(self, rag_name: str, queries: list[str], answers: list[dict]):
         table = self.create_rag_table(rag_name)

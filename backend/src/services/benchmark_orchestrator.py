@@ -1,15 +1,17 @@
 import concurrent.futures
 import os
 import json
-import pickle
 import random
 import re
 import traceback
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
+import logging
 import pandas as pd
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 from factory import RAGFactory
 from evaluation.agent_evaluator import DataFramePreparator, AgentEvaluator
@@ -17,6 +19,7 @@ from evaluation import end_to_end_evaluators
 from database.utils import get_list_path_documents
 from utils.agent import get_Agent
 from utils.open_doc import Opener
+from utils.serialization import save_results_json, load_results_json
 from .progress_tracker import ProgressTracker
 from .plot_generator import PlotGenerator
 from utils.pdf_report_generator import generate_benchmark_report
@@ -276,7 +279,7 @@ class BenchmarkOrchestrator:
         try:
             plots = self.plot_generator.generate_all_plots(results, benchmark_type)
         except Exception as e:
-            print(f"Error generating plots: {e}")
+            logger.error(f"Error generating plots: {e}")
             plots = {}
         
         return plots
@@ -292,20 +295,20 @@ class BenchmarkOrchestrator:
             self._create_plot_report(plots, self.report_dir)
             pdf_path = os.path.join(self.report_dir, 'plot_report.pdf')
             if os.path.exists(pdf_path):
-                print(f"PDF report generated successfully: {pdf_path}")
+                logger.info(f"PDF report generated successfully: {pdf_path}")
             else:
-                print(f"Warning: PDF report was not created at {pdf_path}")
+                logger.warning(f"Warning: PDF report was not created at {pdf_path}")
         except Exception as e:
             import traceback
-            print(f"Error generating PDF report: {e}")
-            print(traceback.format_exc())
+            logger.error(f"Error generating PDF report: {e}")
+            logger.error(traceback.format_exc())
     
     def _create_plot_report(self, plots: Dict[str, Any], report_dir: str) -> None:
         pdf_path = generate_benchmark_report(plots, report_dir)
         if os.path.exists(pdf_path):
-            print(f'PDF created successfully: {pdf_path}')
+            logger.info(f'PDF created successfully: {pdf_path}')
         else:
-            print(f'PDF file not created at {pdf_path}')
+            logger.warning(f'PDF file not created at {pdf_path}')
     
     def _save_results(
         self,
@@ -314,9 +317,8 @@ class BenchmarkOrchestrator:
     ) -> Dict[str, str]:
         self.tracker.update(95, 'Saving results', 'running')
         
-        results_file = os.path.join(self.report_dir, 'results_bench.pkl')
-        with open(results_file, 'wb') as f:
-            pickle.dump(results, f)
+        results_file = os.path.join(self.report_dir, 'results_bench.json')
+        save_results_json(results_file, results)
         
         df = results.get('df')
         if df is not None:
@@ -443,7 +445,7 @@ class BenchmarkOrchestrator:
         all_files = []
         for db_path in databases_path:
             if not os.path.exists(db_path):
-                print(f"Warning: Database path does not exist: {db_path}")
+                logger.warning(f"Database path does not exist: {db_path}")
                 continue
             files = get_list_path_documents(db_path)
             for f in files:
@@ -451,9 +453,9 @@ class BenchmarkOrchestrator:
                 if os.path.exists(abs_f):
                     all_files.append(abs_f)
                 else:
-                    print(f"Warning: File listed but does not exist: {abs_f}")
+                    logger.warning(f"File listed but does not exist: {abs_f}")
         
-        print(f"Found {len(all_files)} valid files in databases")
+        logger.info(f"Found {len(all_files)} valid files in databases")
         if not all_files:
             raise ValueError(f"No documents found in databases: {databases}. Checked paths: {databases_path}")
         
@@ -528,7 +530,7 @@ class BenchmarkOrchestrator:
                     questions.append(result)
                 except Exception as e:
                     error_msg = f"Error generating question: {e}"
-                    print(error_msg)
+                    logger.error(error_msg)
                     errors.append(error_msg)
         
         if not questions and errors:

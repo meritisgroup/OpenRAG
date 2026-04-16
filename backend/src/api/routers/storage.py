@@ -3,6 +3,7 @@ from typing import List, Optional
 from fastapi import APIRouter, HTTPException
 
 from api.schemas.storage import StorageFile, StorageListResponse, StorageDeleteResponse
+from utils.path_utils import safe_join
 
 router = APIRouter()
 
@@ -28,7 +29,7 @@ def list_storage_files(prefix: Optional[str] = None):
 
 @router.delete("/{filename}")
 def delete_storage_file(filename: str):
-    file_path = os.path.join(STORAGE_PATH, filename)
+    file_path = safe_join(STORAGE_PATH, filename)
     
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Storage file not found")
@@ -42,9 +43,10 @@ def delete_storage_by_prefix(prefix: str):
     if not os.path.exists(STORAGE_PATH):
         return StorageDeleteResponse(status="deleted", deleted_count=0, deleted_files=[])
     
+    safe_prefix = prefix.replace('..', '').replace('/', '').replace('\\', '')
     deleted_files = []
     for filename in os.listdir(STORAGE_PATH):
-        if filename.startswith(prefix) and filename.endswith('.db'):
+        if filename.startswith(safe_prefix) and filename.endswith('.db'):
             file_path = os.path.join(STORAGE_PATH, filename)
             os.remove(file_path)
             deleted_files.append(filename)

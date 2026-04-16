@@ -2,7 +2,10 @@ from abc import ABC, abstractmethod
 from utils.agent import Agent
 from typing import List, Dict, Any, Optional
 import concurrent.futures
+import logging
 from utils.threading_utils import get_executor_threads
+
+logger = logging.getLogger(__name__)
 
 class Indexation(ABC):
 
@@ -39,9 +42,9 @@ class RagAgent(ABC):
                         self.nb_input_tokens += result.get('nb_input_tokens', 0)
                         self.nb_output_tokens += result.get('nb_output_tokens', 0)
                 except Exception as exc:
-                    query_that_failed = future_to_query[future]
+                    logger.warning(f"Error generating answer for query: {exc}")
         query_map = {query: i for (i, query) in enumerate(queries)}
-        answers.sort(key=lambda x: query_map.get(x.get('original_query', ''), 0))
+        answers.sort(key=lambda x: query_map.get(x.get('original_query', ''), float('inf')) if x else float('inf'))
         return answers
 
 class Search(ABC):

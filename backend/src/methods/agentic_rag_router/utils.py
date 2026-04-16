@@ -2,6 +2,7 @@
 Utilitaires pour le traitement parallèle et le parsing de confiance.
 """
 import re
+import json
 from typing import Dict, Any
 
 class ConfidenceParser:

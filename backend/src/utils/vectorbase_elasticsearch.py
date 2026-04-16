@@ -10,6 +10,9 @@ from database.rag_classes import Chunk
 from sqlalchemy.orm import DeclarativeMeta
 from sqlalchemy import Integer, String
 from typing import Type
+import logging
+
+logger = logging.getLogger(__name__)
 
 def get_mapping_vb_embedding(class_: Type[DeclarativeMeta], vector_dims: int) -> dict:
     es_properties = {}
@@ -73,7 +76,9 @@ class VectorBase_embeddings_elasticsearch(VectorBase):
     def build_connection(self):
         self.client = Elasticsearch(self.url_elasticsearch, basic_auth=self.auth, request_timeout=60, max_retries=3, connections_per_node=50, retry_on_timeout=True, verify_certs=False, ssl_show_warn=False)
 
-    def create_collection(self, name=None, add_fields=[]) -> None:
+    def create_collection(self, name=None, add_fields=None) -> None:
+        if add_fields is None:
+            add_fields = []
         if name is None:
             name = self.vb_name
         mapping = get_mapping_vb_embedding(class_=Chunk, vector_dims=self.dimension)
@@ -85,11 +90,12 @@ class VectorBase_embeddings_elasticsearch(VectorBase):
         if not self.check_collection_exist(collection_name=name):
             self.client.indices.create(index=name, body=mapping)
         else:
-            print(f'The collection "{name}" already exists')
+            logger.info(f'The collection "{name}" already exists')
 
     def check_collection_exist(self, collection_name):
-        print(f'[DEBUG] Checking collection: {collection_name}')
+        logger.debug(f'Checking collection: {collection_name}')
         return self.client.indices.exists(index=collection_name)
+
 
     def check_element_exist(self, element, collection_name=None):
         if collection_name is None:
@@ -112,7 +118,7 @@ class VectorBase_embeddings_elasticsearch(VectorBase):
                 texts = [chunk.text for chunk in chunks]
                 embeddings = self.agent.embeddings(texts=texts, model=self.embedding_model)
             except Exception as e:
-                print(f'ERROR DURING embedding insertion: {e}')
+                logger.error(f'ERROR DURING embedding insertion: {e}')
                 encoding = tiktoken.encoding_for_model('text-embedding-3-small')
                 valid_chunks = [c for c in chunks if len(encoding.encode(c.text)) < 8000]
                 chunks = valid_chunks
@@ -120,7 +126,7 @@ class VectorBase_embeddings_elasticsearch(VectorBase):
                 try:
                     embeddings = self.agent.embeddings(texts=texts, model=self.embedding_model)
                 except Exception as e:
-                    print(f'Second embedding attempt failed: {e}')
+                    logger.error(f'Second embedding attempt failed: {e}')
                     return 0
             nb_embeddings_tokens = embeddings['nb_tokens']
             if type(nb_embeddings_tokens) is list:
@@ -131,7 +137,7 @@ class VectorBase_embeddings_elasticsearch(VectorBase):
                 data.append(temp)
             res = helpers.bulk(self.client, data)
             if display_message:
-                print(f'{len(data)} elements have been successfully added in the vector base')
+                logger.info(f'{len(data)} elements have been successfully added in the vector base')
             self.nb_tokens_embeddings += nb_embeddings_tokens
             return nb_embeddings_tokens
         elif not chunks:
@@ -142,7 +148,7 @@ class VectorBase_embeddings_elasticsearch(VectorBase):
             collection_name = self.vb_name
         if not chunks:
             if display_message:
-                print('No chunks to add.')
+                logger.warning('No chunks to add.')
             return
         if not self.check_collection_exist(collection_name=collection_name):
             self.create_collection(name=collection_name)
@@ -157,13 +163,15 @@ class VectorBase_embeddings_elasticsearch(VectorBase):
                 data = chunk_to_dict_vb_embedding(chunk=chunk, embedding=embeddings['embeddings'][k])
                 res = self.client.index(index=collection_name, document=data)
             if display_message:
-                print(f'{len(data)} elements have been successfuly added to the vector base')
+                logger.info(f'{len(data)} elements have been successfuly added to the vector base')
         elif display_message:
-            print(f'All the elements already were in the collection {collection_name}')
+            logger.info(f'All the elements already were in the collection {collection_name}')
         self.nb_tokens_embeddings += nb_embeddings_tokens
         return nb_embeddings_tokens
 
-    def k_search(self, queries: Union[str, list[str]], k: int, output_fields: list[str]=['text'], filters: dict=None, collection_name=None, type_output=Chunk):
+    def k_search(self, queries: Union[str, list[str]], k: int, output_fields: list[str] | None = None, filters: dict=None, collection_name=None, type_output=Chunk):
+        if output_fields is None:
+            output_fields = ['text']
         if collection_name is None:
             collection_name = self.vb_name
         data = self.agent.embeddings(texts=queries, model=self.embedding_model)
@@ -175,9 +183,7 @@ class VectorBase_embeddings_elasticsearch(VectorBase):
                 response = self.client.search(index=collection_name, body=body)
                 res.append(response)
             except Exception as e:
-                print('ELASTICSEARCH ERROR')
-                print('Error type:', type(e))
-                print('Error message:', str(e))
+                logger.error(f'ELASTICSEARCH ERROR: type={type(e)}, message={e}')
                 raise
         results = []
         for l in range(len(res)):
@@ -192,12 +198,12 @@ class VectorBase_embeddings_elasticsearch(VectorBase):
         if vb_name is None:
             vb_name = self.vb_name
         if not self.check_collection_exist(vb_name):
-            print('The collection does not exist')
+            logger.warning('The collection does not exist')
         try:
             self.client.indices.delete(index=vb_name)
-            print('the collection have been deleted')
+            logger.info('the collection have been deleted')
         except Exception as e:
-            print(f'Error while deleting the collection : {e}')
+            logger.error(f'Error while deleting the collection : {e}')
 
 class VectorBase_BM25_elasticsearch(VectorBase):
 
@@ -211,7 +217,9 @@ class VectorBase_BM25_elasticsearch(VectorBase):
     def build_connection(self):
         self.client = Elasticsearch(self.url_elasticsearch, basic_auth=self.auth, request_timeout=60, connections_per_node=50, max_retries=3, retry_on_timeout=True, verify_certs=False, ssl_show_warn=False)
 
-    def create_collection(self, name=None, add_fields=[]) -> None:
+    def create_collection(self, name=None, add_fields=None) -> None:
+        if add_fields is None:
+            add_fields = []
         if name is None:
             name = self.vb_name
         mapping = get_mapping_to_bm25(class_=Chunk)
@@ -223,7 +231,7 @@ class VectorBase_BM25_elasticsearch(VectorBase):
         if not self.check_collection_exist(collection_name=name):
             self.client.indices.create(index=name, body=mapping)
         else:
-            print(f'The collection "{name}" already exists')
+            logger.info(f'The collection "{name}" already exists')
 
     def check_collection_exist(self, collection_name):
         return self.client.indices.exists(index=collection_name)
@@ -252,9 +260,9 @@ class VectorBase_BM25_elasticsearch(VectorBase):
                 data.append(temp)
             helpers.bulk(self.client, data)
             if display_message:
-                print(f'{len(data)} elements have been successfuly added to the vector base')
+                logger.info(f'{len(data)} elements have been successfuly added to the vector base')
         elif display_message:
-            print(f'All the elements already were in the collection {collection_name}')
+            logger.info(f'All the elements already were in the collection {collection_name}')
         return nb_embedding_tokens
 
     def add_str_elements(self, chunks=list[Chunk], display_message: bool=True, collection_name=None) -> None:
@@ -267,14 +275,16 @@ class VectorBase_BM25_elasticsearch(VectorBase):
         if chunks != []:
             for (k, chunk) in enumerate(chunks):
                 data = chunk_to_dict_vb_bm25(chunk)
-            self.client.index(index=collection_name, document=data)
+                self.client.index(index=collection_name, document=data)
             if display_message:
-                print(f'{len(data)} elements have been successfuly added to the vector base')
+                logger.info(f'{len(data)} elements have been successfuly added to the vector base')
         elif display_message:
-            print(f'All the elements already were in the collection {collection_name}')
+            logger.info(f'All the elements already were in the collection {collection_name}')
         return nb_embedding_tokens
 
-    def k_search(self, queries: Union[str, list[str]], k: int, output_fields: list[str]=['text'], filters: dict=None, collection_name=None, type_output=Chunk):
+    def k_search(self, queries: Union[str, list[str]], k: int, output_fields: list[str] | None = None, filters: dict=None, collection_name=None, type_output=Chunk):
+        if output_fields is None:
+            output_fields = ['text']
         if collection_name is None:
             collection_name = self.vb_name
         res = []
@@ -294,20 +304,22 @@ class VectorBase_BM25_elasticsearch(VectorBase):
         if vb_name is None:
             vb_name = self.vb_name
         if not self.check_collection_exist(vb_name):
-            print('The collection does not exist')
+            logger.warning('The collection does not exist')
         try:
             self.client.indices.delete(index=vb_name)
-            print('the collection have been deleted')
+            logger.info('the collection have been deleted')
         except Exception as e:
-            print(f'Error while deleting the collection : {e}')
+            logger.error(f'Error while deleting the collection : {e}')
 
 class VectorBase_hybrid_elasticsearch(VectorBase_embeddings_elasticsearch):
 
     def __init__(self, vb_name: str, url_elasticsearch: str, agent, auth, embedding_model: str):
         super().__init__(vb_name=vb_name, url_elasticsearch=url_elasticsearch, embedding_model=embedding_model, agent=agent, auth=auth)
 
-    def k_search(self, queries: Union[str, list[str]], k: int, output_fields: list[str]=['text'], filters: dict=None, collection_name=None, type_output=Chunk) -> list[Chunk]:
-        if type(queries) is type(''):
+    def k_search(self, queries: Union[str, list[str]], k: int, output_fields: list[str] | None = None, filters: dict=None, collection_name=None, type_output=Chunk) -> list[Chunk]:
+        if output_fields is None:
+            output_fields = ['text']
+        if isinstance(queries, str):
             queries = [queries]
         if collection_name is None:
             collection_name = self.vb_name
@@ -330,12 +342,12 @@ class VectorBase_hybrid_elasticsearch(VectorBase_embeddings_elasticsearch):
         if vb_name is None:
             vb_name = self.vb_name
         if not self.check_collection_exist(vb_name):
-            print('The collection does not exist')
+            logger.warning('The collection does not exist')
         try:
             self.client.indices.delete(index=vb_name)
-            print('the collection have been deleted')
+            logger.info('the collection have been deleted')
         except Exception as e:
-            print(f'Error while deleting the collection : {e}')
+            logger.error(f'Error while deleting the collection : {e}')
 
 class VectorBaseVlm_elasticsearch:
 
@@ -363,7 +375,7 @@ class VectorBaseVlm_elasticsearch:
         if not self.check_collection_exist(collection_name=name):
             self.client.indices.create(index=name, body=mapping)
         else:
-            print(f'The collection "{name}" already exists')
+            logger.info(f'The collection "{name}" already exists')
 
     def check_collection_exist(self, collection_name):
         return self.client.indices.exists(index=collection_name)
@@ -387,20 +399,25 @@ class VectorBaseVlm_elasticsearch:
         data = []
         if filtered_elements != []:
             images = []
+            valid_indices = []
             for i in range(len(filtered_elements)):
                 (image, is_empty) = load_element(filtered_elements[i])
                 if not is_empty:
                     images.append(image)
+                    valid_indices.append(i)
             if len(images) > 0:
                 embeddings = self.agent.embeddings_vlm(images=images, model=self.embedding_model, mode='vlm')['embeddings']
-                data = {'doc_id': doc_id, 'vector': embeddings[i], 'path': filtered_elements[i]}
-                res = self.client.index(index=collection_name, document=data)
+                for j, emb in enumerate(embeddings):
+                    data = {'doc_id': doc_id, 'vector': emb, 'path': filtered_elements[valid_indices[j]]}
+                    self.client.index(index=collection_name, document=data)
             if display_message:
-                print(f'{len(data)} elements have been successfuly added in the vector base')
+                logger.info(f'{len(data)} elements have been successfuly added in the vector base')
         elif display_message:
-            print(f'All the elements already were in the collection {collection_name}')
+            logger.info(f'All the elements already were in the collection {collection_name}')
 
-    def k_search(self, queries: Union[str, list[str]], k: int, output_fields: list[str]=['text'], filters: dict=None, collection_name=None):
+    def k_search(self, queries: Union[str, list[str]], k: int, output_fields: list[str] | None = None, filters: dict=None, collection_name=None):
+        if output_fields is None:
+            output_fields = ['text']
         if collection_name is None:
             collection_name = self.vb_name
         if type(queries) is str:
@@ -421,9 +438,9 @@ class VectorBaseVlm_elasticsearch:
 
     def delete_collection(self):
         if not self.check_collection_exist(self.vb_name):
-            print('The collection does not exist')
+            logger.warning('The collection does not exist')
         try:
             self.client.indices.delete(index=self.vb_name)
-            print('the collection have been deleted')
+            logger.info('the collection have been deleted')
         except Exception as e:
-            print(f'Error while deleting the collection : {e}')
+            logger.error(f'Error while deleting the collection : {e}')

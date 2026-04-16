@@ -1,8 +1,11 @@
+import logging
 from sqlalchemy import String, Integer, JSON, Float
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from utils.open_doc import Opener
 from utils.splitter import TextSplitter
 from utils.base_classes import Splitter
+
+logger = logging.getLogger(__name__)
 
 class Base(DeclarativeBase):
     pass
@@ -13,7 +16,7 @@ class Chunk(Base):
     position_in_doc: Mapped[int] = mapped_column(Integer(), primary_key=True)
     document: Mapped[str] = mapped_column(String(), primary_key=True)
     text: Mapped[str] = mapped_column(String())
-    rerank_score: Mapped[float] = mapped_column(String(), default=None)
+    rerank_score: Mapped[float] = mapped_column(Float(), default=None)
 
     def __repr__(self) -> str:
         return f'Chunk(id={self.id!r}, document={self.document!r}, text={self.text!r}, position_in_doc={self.position_in_doc!r}, metadata={self.metadata!r})'
@@ -28,9 +31,9 @@ class Chunk_query(Base):
     document: Mapped[str] = mapped_column(String(), primary_key=True)
     text: Mapped[str] = mapped_column(String())
     text_doc: Mapped[str] = mapped_column(String())
-    rerank_score: Mapped[str] = mapped_column(String(), default=None)
+    rerank_score: Mapped[float] = mapped_column(Float(), default=None)
 
-    def __init__(self, id: str, position_in_doc: int, document: str, text: str, text_doc: str, rerank_score: str=None):
+    def __init__(self, id: str, position_in_doc: int, document: str, text: str, text_doc: str, rerank_score: float=None):
         self.id = id
         self.position_in_doc = position_in_doc
         self.document = document
@@ -58,7 +61,7 @@ class Document(Base):
     output_tokens: Mapped[int] = mapped_column(Integer())
 
     def __repr__(self) -> str:
-        return f'Document(id={self.id!r}, name={self.name!r}, tokens={self.tokens!r}, input tokens = {self.input_tokens!r}, output tokens = {self.output_tokens!r})'
+        return f'Document(id={self.id!r}, name={self.name!r}, embedding_tokens={self.embedding_tokens!r}, input tokens = {self.input_tokens!r}, output tokens = {self.output_tokens!r})'
 
 class DocumentPath(Base):
     __tablename__ = 'documents_image'
@@ -77,7 +80,7 @@ class DocumentText:
             self.content = Opener(save=False).open_doc(path)
         except Exception as e:
             self.content = ''
-            print(f'Error "{e}" while trying to open doc {self.name_with_extension}')
+            logger.error(f'Error "{e}" while trying to open doc {self.name_with_extension}')
         self.name = '.'.join(self.name_with_extension.split('.')[:-1])
         self.path = path
         self.extension = '.' + self.name_with_extension.split('.')[-1]
@@ -189,6 +192,24 @@ class CommunityRelation(Base):
 
     def __repr__(self) -> str:
         return f'CommunityRelation(id={self.id!r}, entity_src={self.source!r}, entity_cbl={self.target!r}, relation_description={self.description!r})'
+
+class Section(Base):
+    __tablename__ = 'sections'
+    id: Mapped[str] = mapped_column(String(), primary_key=True)
+    parent_id: Mapped[str] = mapped_column(String())
+    document: Mapped[str] = mapped_column(String())
+    level: Mapped[int] = mapped_column(Integer())
+    title: Mapped[str] = mapped_column(String())
+    summary: Mapped[str] = mapped_column(String())
+    text: Mapped[str] = mapped_column(String())
+    position: Mapped[int] = mapped_column(Integer())
+
+    def __repr__(self) -> str:
+        return f'Section(id={self.id!r}, document={self.document!r}, level={self.level!r}, title={self.title!r}, position={self.position!r})'
+
+    def to_dict(self) -> dict:
+        return {'id': self.id, 'parent_id': self.parent_id, 'document': self.document, 'level': self.level, 'title': self.title, 'summary': self.summary, 'text': self.text, 'position': self.position}
+
 
 class CommunityEntity(Base):
     __tablename__ = 'communities_entities'

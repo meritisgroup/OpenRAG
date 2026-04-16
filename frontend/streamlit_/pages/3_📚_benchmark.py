@@ -1,5 +1,4 @@
 import streamlit as st
-import pandas as pd
 import plotly.graph_objects as go
 from streamlit_.services import BenchmarkService, RAGService
 from streamlit_.api_client import APIClient
@@ -125,8 +124,8 @@ if st.session_state['benchmark']['queries_doc_name'] is not None and \
         query_data = _client.get_query_file(st.session_state['benchmark']['queries_doc_name'])
         queries_list = query_data.get('queries', [])
         if queries_list:
-            st.session_state['benchmark']['queries'] = pd.DataFrame(queries_list)
-            st.write(st.session_state['benchmark']['queries'])
+            st.session_state['benchmark']['queries'] = queries_list
+            st.table(queries_list)
     except APIError as e:
         st.error(f"Error loading query file: {e}")
 

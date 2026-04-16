@@ -6,11 +6,13 @@ from utils.agent import Agent
 from .prompts import PROMPTS
 from database.rag_classes import Chunk
 from statistics import fmean
+import logging
+logger = logging.getLogger(__name__)
 
 class ContextRelevanceEvaluator(Evaluator):
 
-    def __init__(self, agent: Agent, model: str, max_attemps: int=5, batch_size: int=10) -> None:
-        super().__init__(agent=agent, model=model, max_attempts=max_attemps, batch_size=batch_size)
+    def __init__(self, agent: Agent, model: str, max_attempts: int=5, batch_size: int=10) -> None:
+        super().__init__(agent=agent, model=model, max_attempts=max_attempts, batch_size=batch_size)
         self.system_prompt: str = PROMPTS[self.language]['rate_context_relevance']['SYSTEM_PROMPT']
         self.prompt_template: str = PROMPTS[self.language]['rate_context_relevance']['QUERY_TEMPLATE']
 
@@ -60,7 +62,7 @@ class ContextFaithfulnessEvaluator(Evaluator):
 
     def format_statements(self, statement_list: list[str]) -> list[str]:
         formated_statement_list = ''
-        for (i, statement) in range(statement_list):
+        for (i, statement) in enumerate(statement_list):
             formated_statement_list += f'statement {i}: {statement} \n'
         return formated_statement_list
 
@@ -113,7 +115,7 @@ class ContextFaithfulnessEvaluator(Evaluator):
                     else:
                         return None
                 except Exception as e:
-                    print(f'Encountered a problem while evaluating the faithfulness of the context of the query {queries[i]}')
+                    logger.error(f'Encountered a problem while evaluating the faithfulness of the context of the query {queries[i]}')
                     return None
         return int(mean_score * 100) if valid_queries > 0 else None
 

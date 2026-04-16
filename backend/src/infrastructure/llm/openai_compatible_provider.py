@@ -1,4 +1,5 @@
 import concurrent.futures
+import logging
 import time
 from typing import Dict, List, Any, Optional, Union
 import requests
@@ -10,6 +11,8 @@ from core.interfaces.llm_provider import LLMProvider
 from core.error_handler import LLMError
 from utils.agent_functions import predict, multiple_predict, predict_json, predict_images, predict_image, rerank, RerankedChunk
 from utils.threading_utils import get_executor_threads
+
+logger = logging.getLogger(__name__)
 
 class OpenAICompatibleProvider(LLMProvider):
 
@@ -128,7 +131,7 @@ class OpenAICompatibleProvider(LLMProvider):
                             (json_response, nb_input_tokens) = future.result()
                             unordered_results.append((original_index, json_response.score, nb_input_tokens))
                         except Exception as exc:
-                            print(f'Task {original_index} failed: {exc}')
+                            logger.error(f'Task {original_index} failed: {exc}')
                     unordered_results.sort(key=lambda x: x[0])
                     scores = [result[1] for result in unordered_results]
                     input_tokens = [result[2] for result in unordered_results]

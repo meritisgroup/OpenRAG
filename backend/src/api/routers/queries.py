@@ -2,14 +2,17 @@ import os
 from typing import List
 from fastapi import APIRouter, HTTPException, UploadFile, File
 import pandas as pd
+import logging
 
 from api.schemas.queries import (
     QueryFile, QueryFileListResponse, QueryFileContent, QueryUploadResponse
 )
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
 
-QUERIES_PATH = 'data/queries'
+from core.paths import QUERIES_DIR as QUERIES_PATH
 
 
 @router.get("", response_model=QueryFileListResponse)
@@ -27,7 +30,8 @@ def list_query_files():
                     filename=filename,
                     query_count=len(df)
                 ))
-            except Exception:
+            except Exception as e:
+                logger.warning(f"Failed to read query file {filename}: {e}")
                 queries.append(QueryFile(
                     filename=filename,
                     query_count=0
@@ -52,7 +56,8 @@ async def upload_query_file(file: UploadFile = File(...)):
     try:
         df = pd.read_excel(file_path, index_col=0)
         query_count = len(df)
-    except Exception:
+    except Exception as e:
+        logger.warning(f"Failed to parse uploaded query file: {e}")
         query_count = 0
     
     return QueryUploadResponse(
