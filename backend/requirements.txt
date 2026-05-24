@@ -13,6 +13,7 @@ cohere==5.13.0
 # === Vector Stores ===
 elasticsearch==8.17.2
 pymilvus==2.6.10
+faiss-cpu>=1.7.4
 
 # === Document Processing ===
 pymupdf==1.27.2
