@@ -4,6 +4,7 @@ from methods.advanced_rag.agent import AdvancedRag
 from database.database_class import get_management_data
 from utils.agent import get_Agent
 from .prompts import prompts
+import copy
 import numpy as np
 from pydantic import BaseModel
 from methods.query_reformulation.query_reformulation import query_reformulation
@@ -14,6 +15,10 @@ class CompareQueryAnswer(BaseModel):
 class AgenticRagAgent(AdvancedRag):
 
     def __init__(self, config_server: dict, models_infos: dict, dbs_name: list[str], data_folders_name: list[str]) -> None:
+        config_server = copy.deepcopy(config_server)
+        config_server['params_vectorbase'] = config_server.get('params_vectorbase', {})
+        config_server['params_vectorbase']['backend'] = 'faiss'
+        config_server['type_retrieval'] = 'embeddings'
         super().__init__(config_server=config_server, models_infos=models_infos, dbs_name=dbs_name, data_folders_name=data_folders_name)
         self.prompts = prompts[self.language]
 
