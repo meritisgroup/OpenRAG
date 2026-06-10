@@ -8,23 +8,61 @@ from typing import Dict, Any, List, Optional
 from elasticsearch import Elasticsearch
 
 from api.schemas.rag import (
-    CreateAgentRequest, GenerateRequest, GenerateResponse,
-    IndexRequest, RAGMethod, AgentStatus, ChunkInfo,
-    ModelValidationResult, RAGValidationResponse, IndexationStatusResponse,
-    RAGAvailabilityRequest, RAGAvailabilityItem, RAGAvailabilityResponse
+    CreateAgentRequest,
+    GenerateRequest,
+    GenerateResponse,
+    IndexRequest,
+    RAGMethod,
+    AgentStatus,
+    ChunkInfo,
+    ModelValidationResult,
+    RAGValidationResponse,
+    IndexationStatusResponse,
+    RAGAvailabilityRequest,
+    RAGAvailabilityItem,
+    RAGAvailabilityResponse,
+    LintRequest,
+    LintReportResponse,
 )
-from api.main import set_agent, session_exists, get_agent, get_session_info, set_indexation_status, get_indexation_status
+from api.main import (
+    set_agent,
+    session_exists,
+    get_agent,
+    get_session_info,
+    set_indexation_status,
+    get_indexation_status,
+)
 from factory_RagAgent import get_rag_agent, get_custom_rag_agent, change_config_server
 from factory import RAGFactory
 from utils.factory_name_dataset_vectorbase import get_name
 
 router = APIRouter()
 
+CONFIG_PATH = 'data/base_config_server.json'
+ALL_RAGS_PATH = 'data/all_rags.json'
+CUSTOM_RAGS_DIR = 'data/custom_rags'
+MERGE_RAGS_DIR = 'data/merge'
+
+
+def _get_elasticsearch_client(request_timeout: Optional[int] = None) -> Elasticsearch:
+    with open(CONFIG_PATH, "r") as f:
+        config = json.load(f)
+    params = config.get("params_vectorbase", {})
+    auth = params.get("auth") or ["elastic", ""]
+    kwargs = dict(
+        basic_auth=(auth[0] or "elastic", auth[1] or ""),
+        verify_certs=False,
+        ssl_show_warn=False,
+    )
+    if request_timeout is not None:
+        kwargs["request_timeout"] = request_timeout
+    return Elasticsearch([params.get("url", "http://localhost:9200")], **kwargs)
+
 
 class GenerateNamesRequest(BaseModel):
     rag_name: str
     config: Dict[str, Any]
-    additional_name: str = ''
+    additional_name: str = ""
 
 
 class CustomRagRequest(BaseModel):
@@ -42,9 +80,8 @@ class MergeRagRequest(BaseModel):
 @router.get("/methods", response_model=list[RAGMethod])
 def list_rag_methods():
     methods = []
-    all_rags_path = 'data/all_rags.json'
-    if os.path.exists(all_rags_path):
-        with open(all_rags_path, 'r') as f:
+    if os.path.exists(ALL_RAGS_PATH):
+        with open(ALL_RAGS_PATH, "r") as f:
             all_rags = json.load(f)
         for method_id, method_name in all_rags.items():
             methods.append(RAGMethod(id=method_id, name=method_name))
@@ -58,71 +95,73 @@ def list_rag_methods():
 def get_available_rags(request: RAGAvailabilityRequest):
     from .config import _test_model_availability
     from utils.rag_model_requirements import get_required_models_for_rag
-    
-    all_rags_path = 'data/all_rags.json'
-    if os.path.exists(all_rags_path):
-        with open(all_rags_path, 'r') as f:
+
+    if os.path.exists(ALL_RAGS_PATH):
+        with open(ALL_RAGS_PATH, "r") as f:
             all_rags = json.load(f)
     else:
         all_rags = {r: r for r in RAGFactory.list_available_rags()}
-    
+
     unique_models = {}
     rag_requirements = {}
-    
+
     for rag_id in all_rags.keys():
-        custom_rags_path = f'data/custom_rags/{rag_id}.json'
-        merge_rags_path = f'data/merge/{rag_id}.json'
-        
+        custom_rags_path = os.path.join(CUSTOM_RAGS_DIR, f"{rag_id}.json")
+        merge_rags_path = os.path.join(MERGE_RAGS_DIR, f"{rag_id}.json")
+
         if os.path.exists(custom_rags_path):
-            with open(custom_rags_path, 'r') as f:
+            with open(custom_rags_path, "r") as f:
                 rag_config = json.load(f)
         elif os.path.exists(merge_rags_path):
-            with open(merge_rags_path, 'r') as f:
+            with open(merge_rags_path, "r") as f:
                 rag_config = json.load(f)
         else:
             rag_config = request.config
-        
+
         requirements = get_required_models_for_rag(rag_id, rag_config)
-        all_model_keys = requirements['required'] + requirements.get('optional', [])
+        all_model_keys = requirements["required"] + requirements.get("optional", [])
         rag_requirements[rag_id] = {}
-        
+
         for model_key in all_model_keys:
-            model_name = rag_config.get(model_key, request.config.get(model_key, ''))
-            model_type = 'reranker' if 'reranker' in model_key else \
-                         'embedding' if 'embedding' in model_key else 'llm'
-            
+            model_name = rag_config.get(model_key, request.config.get(model_key, ""))
+            model_type = (
+                "reranker"
+                if "reranker" in model_key
+                else "embedding"
+                if "embedding" in model_key
+                else "llm"
+            )
+
             model_info = request.models_infos.get(model_name, {}).copy()
-            model_info['type'] = model_type
-            
+            model_info["type"] = model_type
+
             unique_models[(model_name, model_type)] = model_info
             rag_requirements[rag_id][model_key] = (model_name, model_type)
-    
+
     test_results = {}
     for (model_name, model_type), model_info in unique_models.items():
         if not model_name:
             test_results[(model_name, model_type)] = {
-                'available': False,
-                'error': 'Modèle non configuré'
+                "available": False,
+                "error": "Modèle non configuré",
             }
         else:
             test_results[(model_name, model_type)] = _test_model_availability(
                 model_name, model_info, timeout=5
             )
-    
+
     results = {}
     for rag_id, rag_name in all_rags.items():
         missing = {}
         for model_key, (model_name, model_type) in rag_requirements[rag_id].items():
             result = test_results.get((model_name, model_type), {})
-            if not result.get('available', False):
-                missing[model_key] = result.get('error', 'Non disponible')
-        
+            if not result.get("available", False):
+                missing[model_key] = result.get("error", "Non disponible")
+
         results[rag_id] = RAGAvailabilityItem(
-            name=rag_name,
-            available=len(missing) == 0,
-            missing_models=missing
+            name=rag_name, available=len(missing) == 0, missing_models=missing
         )
-    
+
     return RAGAvailabilityResponse(rags=results)
 
 
@@ -130,74 +169,71 @@ def get_available_rags(request: RAGAvailabilityRequest):
 def create_agent(request: CreateAgentRequest):
     if not session_exists(request.session_id):
         raise HTTPException(status_code=404, detail="Session not found")
-    
-    # Valider les modèles si demandé
+
     if request.validate_models:
         from .config import _validate_rag_models
-        
+
         validation_result = _validate_rag_models(
             rag_name=request.rag_method,
             config=request.config,
             models_infos=request.models_infos,
-            timeout=10
+            timeout=10,
         )
-        
-        if not validation_result['all_available']:
+
+        if not validation_result["all_available"]:
             raise HTTPException(
                 status_code=400,
                 detail={
                     "error": "Certains modèles nécessaires ne sont pas disponibles",
-                    "validation": validation_result
-                }
+                    "validation": validation_result,
+                },
             )
-    
-    # Créer l'agent (logique existante)
-    custom_rags_path = f'data/custom_rags/{request.rag_method}.json'
-    merge_rags_path = f'data/merge/{request.rag_method}.json'
-    
+
+    custom_rags_path = os.path.join(CUSTOM_RAGS_DIR, f"{request.rag_method}.json")
+    merge_rags_path = os.path.join(MERGE_RAGS_DIR, f"{request.rag_method}.json")
+
     if os.path.exists(custom_rags_path):
-        with open(custom_rags_path, 'r') as f:
+        with open(custom_rags_path, "r") as f:
             custom_config = json.load(f)
-        custom_config['params_host_llm'] = request.config.get('params_host_llm', {})
+        custom_config["params_host_llm"] = request.config.get("params_host_llm", {})
         agent = get_rag_agent(
-            rag_name=custom_config.get('base', request.rag_method),
+            rag_name=custom_config.get("base", request.rag_method),
             config_server=custom_config,
             models_infos=request.models_infos,
-            databases_name=request.databases
+            databases_name=request.databases,
         )
     elif os.path.exists(merge_rags_path):
-        with open(merge_rags_path, 'r') as f:
+        with open(merge_rags_path, "r") as f:
             merge_config = json.load(f)
-        merge_config['params_host_llm'] = request.config.get('params_host_llm', {})
+        merge_config["params_host_llm"] = request.config.get("params_host_llm", {})
         agent = get_rag_agent(
-            rag_name='merger',
+            rag_name="merger",
             config_server=merge_config,
             models_infos=request.models_infos,
-            databases_name=request.databases
+            databases_name=request.databases,
         )
     else:
         config = change_config_server(
-            rag_name=request.rag_method,
-            config_server=request.config
+            rag_name=request.rag_method, config_server=request.config
         )
         agent = get_rag_agent(
             rag_name=request.rag_method,
             config_server=config,
             models_infos=request.models_infos,
-            databases_name=request.databases
+            databases_name=request.databases,
         )
-    
+
     set_agent(
         session_id=request.session_id,
         agent=agent,
         rag_method=request.rag_method,
-        databases=request.databases
+        databases=request.databases,
     )
-    
+
     return {
         "status": "created",
         "session_id": request.session_id,
-        "rag_method": request.rag_method
+        "rag_method": request.rag_method,
     }
 
 
@@ -206,27 +242,36 @@ def run_indexation(request: IndexRequest, background_tasks: BackgroundTasks):
     agent = get_agent(request.session_id)
     if agent is None:
         raise HTTPException(status_code=404, detail="Agent not found for session")
-    
+
     set_indexation_status(request.session_id, "running", 0.0, "Starting indexation...")
-    
+
     def run_indexation_task():
         try:
             agent.indexation_phase(
                 reset_index=request.reset_index,
                 reset_preprocess=request.reset_preprocess,
-                progress_callback=lambda progress, message, sub_progress=0.0, sub_message="": 
-                    set_indexation_status(request.session_id, "running", progress, message, sub_progress, sub_message)
+                progress_callback=lambda progress, message, sub_progress=0.0, sub_message="": (
+                    set_indexation_status(
+                        request.session_id,
+                        "running",
+                        progress,
+                        message,
+                        sub_progress,
+                        sub_message,
+                    )
+                ),
             )
-            set_indexation_status(request.session_id, "completed", 100.0, "Indexation completed", 0.0, "")
+            set_indexation_status(
+                request.session_id, "completed", 100.0, "Indexation completed", 0.0, ""
+            )
         except Exception as e:
-            set_indexation_status(request.session_id, "error", 0.0, "Indexation failed", 0.0, "", str(e))
-    
+            set_indexation_status(
+                request.session_id, "error", 0.0, "Indexation failed", 0.0, "", str(e)
+            )
+
     background_tasks.add_task(run_indexation_task)
-    
-    return {
-        "status": "started",
-        "session_id": request.session_id
-    }
+
+    return {"status": "started", "session_id": request.session_id}
 
 
 @router.post("/generate", response_model=GenerateResponse)
@@ -234,42 +279,43 @@ def generate_answer(request: GenerateRequest):
     agent = get_agent(request.session_id)
     if agent is None:
         raise HTTPException(status_code=404, detail="Agent not found for session")
-    
+
     start_time = time.time()
-    
+
     result = agent.generate_answer(
         query=request.query,
         nb_chunks=request.nb_chunks,
-        options_generation=request.options_generation
+        options_generation=request.options_generation,
     )
-    
+
     end_time = time.time()
-    
+
     info = get_session_info(request.session_id)
-    
-    context = result.get('context', [])
+
+    context = result.get("context", [])
     if isinstance(context, list):
         context_data = [
             ChunkInfo(
-                text=chunk.text if hasattr(chunk, 'text') else str(chunk),
-                document=getattr(chunk, 'document', None),
-                rerank_score=getattr(chunk, 'rerank_score', None),
-                chunk_id=getattr(chunk, 'chunk_id', None)
-            ) for chunk in context
+                text=chunk.text if hasattr(chunk, "text") else str(chunk),
+                document=getattr(chunk, "document", None),
+                rerank_score=getattr(chunk, "rerank_score", None),
+                chunk_id=getattr(chunk, "chunk_id", None),
+            )
+            for chunk in context
         ]
     else:
         context_data = context
-    
+
     return GenerateResponse(
-        answer=result.get('answer', ''),
-        nb_input_tokens=result.get('nb_input_tokens', 0),
-        nb_output_tokens=result.get('nb_output_tokens', 0),
+        answer=result.get("answer", ""),
+        nb_input_tokens=result.get("nb_input_tokens", 0),
+        nb_output_tokens=result.get("nb_output_tokens", 0),
         context=context_data,
-        impacts=result.get('impacts', [0, 0, '']),
-        energy=result.get('energy', [0, 0, '']),
+        impacts=result.get("impacts", [0, 0, ""]),
+        energy=result.get("energy", [0, 0, ""]),
         original_query=request.query,
         time=end_time - start_time,
-        databases=info.get('databases', []) if info else []
+        databases=info.get("databases", []) if info else [],
     )
 
 
@@ -278,18 +324,22 @@ def get_agent_status(session_id: str):
     info = get_session_info(session_id)
     if info is None:
         raise HTTPException(status_code=404, detail="Session not found")
-    
+
     agent = get_agent(session_id)
     if agent is None:
         raise HTTPException(status_code=404, detail="Agent not found for session")
-    
+
     return AgentStatus(
         session_id=session_id,
-        rag_method=info.get('rag_method', 'unknown'),
-        databases=info.get('databases', []),
-        total_tokens=agent.total_tokens if hasattr(agent, 'total_tokens') else 0,
-        nb_input_tokens=agent.nb_input_tokens if hasattr(agent, 'nb_input_tokens') else 0,
-        nb_output_tokens=agent.nb_output_tokens if hasattr(agent, 'nb_output_tokens') else 0
+        rag_method=info.get("rag_method", "unknown"),
+        databases=info.get("databases", []),
+        total_tokens=agent.total_tokens if hasattr(agent, "total_tokens") else 0,
+        nb_input_tokens=agent.nb_input_tokens
+        if hasattr(agent, "nb_input_tokens")
+        else 0,
+        nb_output_tokens=agent.nb_output_tokens
+        if hasattr(agent, "nb_output_tokens")
+        else 0,
     )
 
 
@@ -304,127 +354,100 @@ def generate_names(request: GenerateNamesRequest):
     names = get_name(
         rag_name=request.rag_name,
         config_server=request.config,
-        additionnal_name=request.additional_name
+        additionnal_name=request.additional_name,
     )
     return {"names": names}
+
+
+@router.post("/lint", response_model=LintReportResponse)
+def lint_wiki(request: LintRequest):
+    agent = get_agent(request.session_id)
+    if agent is None:
+        raise HTTPException(status_code=404, detail="Agent not found for session")
+
+    if not hasattr(agent, "lint"):
+        raise HTTPException(
+            status_code=400, detail="Agent does not support lint operation"
+        )
+
+    report = agent.lint(fix=request.fix)
+    return LintReportResponse(**report.to_dict())
 
 
 @router.get("/elasticsearch/health")
 def check_elasticsearch_health():
     """Check Elasticsearch connection health"""
-    config_path = 'data/base_config_server.json'
     try:
-        with open(config_path, 'r') as f:
-            config = json.load(f)
+        es = _get_elasticsearch_client(request_timeout=5)
 
-        params = config.get('params_vectorbase', {})
-        auth = params.get('auth') or ['elastic', '']
-        basic_auth = (auth[0] or 'elastic', auth[1] or '')
-
-        es = Elasticsearch(
-            [params.get('url', 'http://localhost:9200')],
-            basic_auth=basic_auth,
-            verify_certs=False,
-            ssl_show_warn=False,
-            request_timeout=5
-        )
-
-        # Try to ping Elasticsearch
         if es.ping():
             es_info = es.info()
+            with open(CONFIG_PATH, "r") as f:
+                config = json.load(f)
+            params = config.get("params_vectorbase", {})
             return {
                 "status": "connected",
-                "url": params.get('url', 'http://localhost:9200'),
-                "version": es_info.get('version', {}).get('number', 'unknown')
+                "url": params.get("url", "http://localhost:9200"),
+                "version": es_info.get("version", {}).get("number", "unknown"),
             }
         else:
+            with open(CONFIG_PATH, "r") as f:
+                config = json.load(f)
+            params = config.get("params_vectorbase", {})
             return {
                 "status": "disconnected",
-                "url": params.get('url', 'http://localhost:9200'),
-                "error": "Ping failed"
+                "url": params.get("url", "http://localhost:9200"),
+                "error": "Ping failed",
             }
     except Exception as e:
-        return {
-            "status": "error",
-            "url": "unknown",
-            "error": str(e)
-        }
+        return {"status": "error", "url": "unknown", "error": str(e)}
 
 
 @router.get("/elasticsearch/indices")
 def list_elasticsearch_indices(prefix: Optional[str] = None):
-    config_path = 'data/base_config_server.json'
     try:
-        with open(config_path, 'r') as f:
-            config = json.load(f)
-        
-        params = config.get('params_vectorbase', {})
-        auth = params.get('auth') or ['elastic', '']
-        basic_auth = (auth[0] or 'elastic', auth[1] or '')
-        
-        es = Elasticsearch(
-            [params.get('url', 'http://localhost:9200')],
-            basic_auth=basic_auth,
-            verify_certs=False,
-            ssl_show_warn=False
-        )
-        
-        indices = list(es.indices.get_alias(index='*').keys())
+        es = _get_elasticsearch_client()
+        indices = list(es.indices.get_alias(index="*").keys())
     except Exception as e:
         return {"indices": [], "error": str(e)}
-    
+
     if prefix:
         indices = [idx for idx in indices if idx.startswith(prefix)]
-    
+
     return {"indices": indices}
 
 
 @router.delete("/elasticsearch/indices/batch")
 def delete_elasticsearch_indices_by_prefix(prefix: str):
-    config_path = 'data/base_config_server.json'
     try:
-        with open(config_path, 'r') as f:
-            config = json.load(f)
-        
-        params = config.get('params_vectorbase', {})
-        auth = params.get('auth') or ['elastic', '']
-        basic_auth = (auth[0] or 'elastic', auth[1] or '')
-        
-        es = Elasticsearch(
-            [params.get('url', 'http://localhost:9200')],
-            basic_auth=basic_auth,
-            verify_certs=False,
-            ssl_show_warn=False
-        )
+        es = _get_elasticsearch_client()
     except Exception as e:
         return {"status": "error", "error": str(e), "deleted_count": 0, "indices": []}
-    
+
     deleted = []
     try:
-        for index_name in es.indices.get_alias(index='*').keys():
+        for index_name in es.indices.get_alias(index="*").keys():
             if index_name.startswith(prefix):
                 es.indices.delete(index=index_name)
                 deleted.append(index_name)
     except Exception as e:
-        return {"status": "error", "error": str(e), "deleted_count": len(deleted), "indices": deleted}
-    
+        return {
+            "status": "error",
+            "error": str(e),
+            "deleted_count": len(deleted),
+            "indices": deleted,
+        }
+
     return {"status": "deleted", "deleted_count": len(deleted), "indices": deleted}
 
 
 @router.delete("/elasticsearch/indices/{index_name}")
 def delete_elasticsearch_index(index_name: str):
-    config_path = 'data/base_config_server.json'
-    with open(config_path, 'r') as f:
-        config = json.load(f)
-    
-    params = config.get('params_vectorbase', {})
-    es = Elasticsearch(
-        [params.get('url', 'http://localhost:9200')],
-        basic_auth=(params.get('auth', ['elastic', ''])[0], params.get('auth', ['', ''])[1]),
-        verify_certs=False,
-        ssl_show_warn=False
-    )
-    
+    try:
+        es = _get_elasticsearch_client()
+    except Exception as e:
+        return {"status": "error", "error": str(e), "index": index_name}
+
     try:
         if es.indices.exists(index=index_name):
             es.indices.delete(index=index_name)
@@ -436,129 +459,129 @@ def delete_elasticsearch_index(index_name: str):
 
 @router.get("/custom")
 def list_custom_rags():
-    custom_rags_path = 'data/custom_rags'
-    if not os.path.exists(custom_rags_path):
+    if not os.path.exists(CUSTOM_RAGS_DIR):
         return {"custom_rags": []}
-    
-    custom_rags = [f.replace('.json', '') for f in os.listdir(custom_rags_path) if f.endswith('.json')]
+
+    custom_rags = [
+        f.replace(".json", "")
+        for f in os.listdir(CUSTOM_RAGS_DIR)
+        if f.endswith(".json")
+    ]
     return {"custom_rags": custom_rags}
 
 
 @router.post("/custom")
 def create_custom_rag(request: CustomRagRequest):
-    custom_rags_path = 'data/custom_rags'
-    os.makedirs(custom_rags_path, exist_ok=True)
-    
-    file_path = os.path.join(custom_rags_path, f"{request.name}.json")
-    with open(file_path, 'w') as f:
+    os.makedirs(CUSTOM_RAGS_DIR, exist_ok=True)
+
+    file_path = os.path.join(CUSTOM_RAGS_DIR, f"{request.name}.json")
+    with open(file_path, "w") as f:
         json.dump(request.config, f, indent=4, ensure_ascii=False)
-    
-    all_rags_path = 'data/all_rags.json'
-    if os.path.exists(all_rags_path):
-        with open(all_rags_path, 'r') as f:
+
+    if os.path.exists(ALL_RAGS_PATH):
+        with open(ALL_RAGS_PATH, "r") as f:
             all_rags = json.load(f)
     else:
         all_rags = {}
-    
+
     all_rags[request.name] = request.name
-    with open(all_rags_path, 'w') as f:
+    with open(ALL_RAGS_PATH, "w") as f:
         json.dump(all_rags, f, indent=4, ensure_ascii=False)
-    
+
     return {"status": "created", "name": request.name}
 
 
 @router.delete("/custom/{name}")
 def delete_custom_rag(name: str):
-    file_path = f'data/custom_rags/{name}.json'
+    file_path = os.path.join(CUSTOM_RAGS_DIR, f"{name}.json")
     if os.path.exists(file_path):
         os.remove(file_path)
-    
-    all_rags_path = 'data/all_rags.json'
-    if os.path.exists(all_rags_path):
-        with open(all_rags_path, 'r') as f:
+
+    if os.path.exists(ALL_RAGS_PATH):
+        with open(ALL_RAGS_PATH, "r") as f:
             all_rags = json.load(f)
         if name in all_rags:
             del all_rags[name]
-        with open(all_rags_path, 'w') as f:
+        with open(ALL_RAGS_PATH, "w") as f:
             json.dump(all_rags, f, indent=4, ensure_ascii=False)
-    
+
     return {"status": "deleted", "name": name}
 
 
 @router.get("/custom/{name}")
 def get_custom_rag(name: str):
-    file_path = f'data/custom_rags/{name}.json'
+    file_path = os.path.join(CUSTOM_RAGS_DIR, f"{name}.json")
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Custom RAG not found")
-    
-    with open(file_path, 'r') as f:
+
+    with open(file_path, "r") as f:
         config = json.load(f)
     return config
 
 
 @router.get("/merge")
 def list_merge_rags():
-    merge_rags_path = 'data/merge'
-    if not os.path.exists(merge_rags_path):
+    if not os.path.exists(MERGE_RAGS_DIR):
         return {"merge_rags": []}
-    
-    merge_rags = [f.replace('.json', '') for f in os.listdir(merge_rags_path) if f.endswith('.json')]
+
+    merge_rags = [
+        f.replace(".json", "")
+        for f in os.listdir(MERGE_RAGS_DIR)
+        if f.endswith(".json")
+    ]
     return {"merge_rags": merge_rags}
 
 
 @router.get("/merge/{name}")
 def get_merge_rag(name: str):
-    file_path = f'data/merge/{name}.json'
+    file_path = os.path.join(MERGE_RAGS_DIR, f"{name}.json")
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Merge RAG not found")
-    
-    with open(file_path, 'r') as f:
+
+    with open(file_path, "r") as f:
         config = json.load(f)
     return config
 
 
 @router.post("/merge")
 def create_merge_rag(request: MergeRagRequest):
-    merge_rags_path = 'data/merge'
-    os.makedirs(merge_rags_path, exist_ok=True)
-    
+    os.makedirs(MERGE_RAGS_DIR, exist_ok=True)
+
     merge_config = request.config.copy()
-    merge_config['name'] = request.name
-    merge_config['base'] = 'merger'
-    merge_config['rag_list'] = request.rag_list
-    merge_config['rag_config_list'] = request.rag_config_list
-    
-    file_path = os.path.join(merge_rags_path, f"{request.name}.json")
-    with open(file_path, 'w') as f:
+    merge_config["name"] = request.name
+    merge_config["base"] = "merger"
+    merge_config["rag_list"] = request.rag_list
+    merge_config["rag_config_list"] = request.rag_config_list
+
+    file_path = os.path.join(MERGE_RAGS_DIR, f"{request.name}.json")
+    with open(file_path, "w") as f:
         json.dump(merge_config, f, indent=4, ensure_ascii=False)
-    
-    all_rags_path = 'data/all_rags.json'
-    if os.path.exists(all_rags_path):
-        with open(all_rags_path, 'r') as f:
+
+    if os.path.exists(ALL_RAGS_PATH):
+        with open(ALL_RAGS_PATH, "r") as f:
             all_rags = json.load(f)
     else:
         all_rags = {}
-    
+
     all_rags[request.name] = request.name
-    with open(all_rags_path, 'w') as f:
+    with open(ALL_RAGS_PATH, "w") as f:
         json.dump(all_rags, f, indent=4, ensure_ascii=False)
-    
+
     return {"status": "created", "name": request.name}
 
 
 @router.delete("/merge/{name}")
 def delete_merge_rag(name: str):
-    file_path = f'data/merge/{name}.json'
+    file_path = os.path.join(MERGE_RAGS_DIR, f"{name}.json")
     if os.path.exists(file_path):
         os.remove(file_path)
-    
-    all_rags_path = 'data/all_rags.json'
-    if os.path.exists(all_rags_path):
-        with open(all_rags_path, 'r') as f:
+
+    if os.path.exists(ALL_RAGS_PATH):
+        with open(ALL_RAGS_PATH, "r") as f:
             all_rags = json.load(f)
         if name in all_rags:
             del all_rags[name]
-        with open(all_rags_path, 'w') as f:
+        with open(ALL_RAGS_PATH, "w") as f:
             json.dump(all_rags, f, indent=4, ensure_ascii=False)
-    
+
     return {"status": "deleted", "name": name}

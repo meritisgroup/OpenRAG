@@ -26,17 +26,21 @@ class CreateAgentRequest(BaseModel):
     rag_method: str
     config: Dict[str, Any]
     models_infos: Dict[str, Any]
-    databases: List[str] = ['']
+    databases: List[str] = [""]
     validate_models: bool = True
+
 
 class ModelValidationResult(BaseModel):
     """Résultat de validation d'un modèle"""
+
     name: Optional[str]
     available: bool
     error: Optional[str] = None
 
+
 class RAGValidationResponse(BaseModel):
     """Réponse de validation des modèles pour un RAG"""
+
     all_available: bool
     models: Dict[str, ModelValidationResult]
     errors: List[str]
@@ -105,3 +109,25 @@ class RAGAvailabilityItem(BaseModel):
 
 class RAGAvailabilityResponse(BaseModel):
     rags: Dict[str, RAGAvailabilityItem]
+
+
+class LintRequest(BaseModel):
+    session_id: str
+    fix: bool = False
+
+
+class LintIssueResponse(BaseModel):
+    category: str
+    page: str
+    description: str
+    fixable: bool = False
+
+
+class LintReportResponse(BaseModel):
+    health_score: int
+    orphans: List[Any]
+    broken_links: List[Any]
+    missing_pages: List[Any]
+    contradictions: List[Any]
+    stale_pages: List[Any]
+    suggestions: List[str]

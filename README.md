@@ -391,7 +391,7 @@ You've successfully:
 | Service | URL |
 |---------|-----|
 | OpenRAG UI | http://localhost:8502 |
-| Backend API | http://localhost:8000 |
+| Backend API | http://localhost:9000 |
 | Elasticsearch | http://localhost:9200 |
 | Ollama (if used) | http://localhost:11434 |
 
@@ -450,7 +450,7 @@ backend/data/providers_infos.json     # Provider API keys
 1. Check backend is running: `docker ps | grep openrag-backend`
 2. View logs: `docker logs openrag-backend`
 3. Restart: `cd backend && docker compose restart`
-4. Verify port 8000 is free: `lsof -i :8000`
+4. Verify port 9000 is free: `lsof -i :9000`
 
 </details>
 

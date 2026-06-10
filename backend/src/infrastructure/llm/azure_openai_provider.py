@@ -15,7 +15,7 @@ class AzureOpenAIProvider(OpenAICompatibleProvider):
         clients = {}
         for deployment_name, config in self.models_infos.items():
             api_key = config.get('api_key')
-            endpoint = config.get('azure_endpoint') or self.azure_endpoint
+            endpoint = config.get('url') or self.azure_endpoint
             api_ver = config.get('api_version') or self.api_version
             
             if api_key and endpoint:

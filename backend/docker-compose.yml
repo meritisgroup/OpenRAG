@@ -1,16 +1,17 @@
 services:
   backend:
     image: openrag_backend
+    container_name: openrag-backend
     build:
       context: ..
       dockerfile: backend/Dockerfile
     ports:
-      - "8000:8000"
+      - "9000:9000"
     volumes:
       - ../backend/data:/app/data
       - ../backend/storage:/app/storage
     environment:
-      - API_BASE_URL=http://localhost:8000
+      - API_BASE_URL=http://localhost:9000
     logging:
       driver: "json-file"
       options:
@@ -18,7 +19,7 @@ services:
         max-file: "3"
         compress: "true"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
       interval: 30s
       timeout: 10s
       retries: 3

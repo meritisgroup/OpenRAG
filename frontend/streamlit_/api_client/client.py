@@ -5,7 +5,7 @@ from .exceptions import APIError, SessionNotFoundError, AgentNotFoundError
 
 
 class APIClient:
-    def __init__(self, base_url: str = "http://localhost:8000"):
+    def __init__(self, base_url: str = "http://localhost:9000"):
         self.base_url = base_url.rstrip('/')
         self._session_id: Optional[str] = None
     

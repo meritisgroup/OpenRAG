@@ -6,9 +6,9 @@ _factory = RAGFactory()
 
 
 def change_config_server(rag_name, config_server):
-    if rag_name not in ('copali', 'vlm'):
-        if config_server['type_retrieval'] not in ['embeddings', 'bm25', 'hybrid']:
-            config_server['type_retrieval'] = 'embeddings'
+    config_server = config_server.copy()
+    if config_server.get('type_retrieval', 'embeddings') not in ['embeddings', 'bm25', 'hybrid']:
+        config_server['type_retrieval'] = 'embeddings'
     return config_server
 
 

@@ -16,6 +16,6 @@ RUN python3 -m nltk.downloader punkt_tab
 
 COPY backend/ .
 
-EXPOSE 8000
+EXPOSE 9000
 
-CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "9000"]

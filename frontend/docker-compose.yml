@@ -1,13 +1,14 @@
 services:
   frontend:
     image: openrag_frontend
+    container_name: openrag-frontend
     build:
       context: ..
       dockerfile: frontend/Dockerfile
     ports:
       - "8502:8502"
     environment:
-      - API_BASE_URL=http://host.docker.internal:8000
+      - API_BASE_URL=http://host.docker.internal:9000
     logging:
       driver: "json-file"
       options:

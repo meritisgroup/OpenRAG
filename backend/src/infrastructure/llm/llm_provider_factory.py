@@ -13,6 +13,23 @@ from .deepseek_provider import DeepSeekProvider
 from .kimi_provider import KimiProvider
 from .glm_provider import GLMProvider
 from .groq_provider import GroqProvider
+from .xai_provider import XAIProvider
+from .together_provider import TogetherProvider
+from .fireworks_provider import FireworksProvider
+from .perplexity_provider import PerplexityProvider
+from .ai21_provider import AI21Provider
+from .sambanova_provider import SambaNovaProvider
+from .cerebras_provider import CerebrasProvider
+from .dashscope_provider import DashScopeProvider
+from .siliconflow_provider import SiliconFlowProvider
+from .novita_provider import NovitaProvider
+from .lepton_provider import LeptonProvider
+from .volcengine_provider import VolcengineProvider
+from .baidu_provider import BaiduProvider
+from .minimax_provider import MinimaxProvider
+from .yi_provider import YiProvider
+from .stepfun_provider import StepFunProvider
+from .baichuan_provider import BaichuanProvider
 from .composite_provider import CompositeProvider
 
 class LLMProviderFactory:
@@ -28,6 +45,23 @@ class LLMProviderFactory:
         'kimi': KimiProvider,
         'glm': GLMProvider,
         'groq': GroqProvider,
+        'xai': XAIProvider,
+        'together': TogetherProvider,
+        'fireworks': FireworksProvider,
+        'perplexity': PerplexityProvider,
+        'ai21': AI21Provider,
+        'sambanova': SambaNovaProvider,
+        'cerebras': CerebrasProvider,
+        'dashscope': DashScopeProvider,
+        'siliconflow': SiliconFlowProvider,
+        'novita': NovitaProvider,
+        'lepton': LeptonProvider,
+        'volcengine': VolcengineProvider,
+        'baidu': BaiduProvider,
+        'minimax': MinimaxProvider,
+        'yi': YiProvider,
+        'stepfun': StepFunProvider,
+        'baichuan': BaichuanProvider,
         'custom': OpenAICompatibleProvider,
         'default': OpenAICompatibleProvider
     }

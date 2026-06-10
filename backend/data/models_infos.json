@@ -6,7 +6,7 @@
     },
     "gpt-4.1-nano-2025-04-14": {
         "url": "http://host.docker.internal:30000",
-        "api_key": "vllm"
+        "api_key": "***"
     },
     "text-embedding-3-large": {
         "url": null,
@@ -34,7 +34,7 @@
         "type": "embedding"
     },
     "BAAI/bge-m3": {
-        "url": "http://host.docker.internal:30001",
+        "url": "http://host.docker.internal:30002",
         "api_key": "",
         "type": "embedding",
         "provider": "custom"
@@ -53,8 +53,14 @@
     },
     "all-minilm:33m": {
         "url": "http://host.docker.internal:11434",
-        "api_key": "ollama",
+        "api_key": "***",
         "type": "embedding",
+        "provider": "custom"
+    },
+    "openai/gpt-oss-safeguard-20b": {
+        "url": "http://host.docker.internal:30001",
+        "api_key": "",
+        "type": "llm",
         "provider": "custom"
     }
 }

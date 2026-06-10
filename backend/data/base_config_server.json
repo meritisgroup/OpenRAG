@@ -1,5 +1,5 @@
 {
-    "model": "openai/gpt-oss-20b",
+    "model": "openai/gpt-oss-safeguard-20b",
     "embedding_model": "BAAI/bge-m3",
     "reranker_model": "BAAI/bge-reranker-v2-m3",
     "model_for_image": null,
@@ -13,7 +13,7 @@
     "reformulate_query": false,
     "data_preprocessing": "pdf_text_extraction",
     "ProcessorChunks": [],
-    "type_retrieval": "hybrid",
+    "type_retrieval": "embeddings",
     "params_vectorbase": {
         "backend": "elasticsearch",
         "url": "http://host.docker.internal:9200",
