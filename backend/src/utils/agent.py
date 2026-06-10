@@ -36,7 +36,9 @@ class Agent_openai(Agent):
         for key in self.models_infos.keys():
             if 'api_key' in self.models_infos[key].keys() and 'url' in self.models_infos[key].keys():
                 if self.models_infos[key]['url'] is not None:
-                    url = self.models_infos[key]['url'] + '/v1'
+                    url = self.models_infos[key]['url'].rstrip('/')
+                    if not any(url.endswith(s) for s in ('/v1', '/v2', '/v3', '/v4', '/v1beta/openai', '/openai/v1', '/inference/v1', '/compatible-mode/v1', '/studio/v1', '/v3/openai', '/api/v1', '/api/v3')):
+                        url = url + '/v1'
                 else:
                     url = None
                 self.clients[key] = OpenAI(api_key=self.models_infos[key]['api_key'], base_url=url)
@@ -73,7 +75,10 @@ class Agent_openai(Agent):
             EcoLogits._initialized = True
         if self.models_infos[model]['type'] == 'reranker':
             documents = [chunk.text for chunk in chunk_list]
-            url = self.models_infos[model]['url'] + '/v1/rerank'
+            rerank_base = self.models_infos[model]['url'].rstrip('/')
+            if not any(rerank_base.endswith(s) for s in ('/v1', '/v2', '/v3', '/v4', '/v1beta/openai', '/openai/v1', '/inference/v1', '/compatible-mode/v1', '/studio/v1', '/v3/openai', '/api/v1', '/api/v3')):
+                rerank_base = rerank_base + '/v1'
+            url = rerank_base + '/rerank'
             payload = {'model': model, 'query': query, 'documents': documents}
             headers = {'accept': 'application/json', 'Content-Type': 'application/json'}
             a = time.time()

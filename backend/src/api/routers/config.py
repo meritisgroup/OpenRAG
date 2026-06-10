@@ -61,19 +61,26 @@ def _test_model_availability(model_name: str, model_info: dict, timeout: int = 1
         dict: {'available': bool, 'error': Optional[str]}
     """
     import requests
-    from openai import OpenAI, APIError, APIConnectionError
+    from openai import OpenAI, AzureOpenAI, APIError, APIConnectionError
 
     try:
         url = model_info.get('url')
         api_key = model_info.get('api_key', '')
         model_type = model_info.get('type', 'llm')
+        provider = model_info.get('provider', 'openai').lower()
 
-        if url:
-            base_url = url + '/v1' if not url.endswith('/v1') else url
+        if provider == 'azure':
+            api_version = model_info.get('api_version', '2024-02-01')
+            client = AzureOpenAI(api_key=api_key, api_version=api_version, azure_endpoint=url, timeout=timeout)
         else:
-            base_url = None
-
-        client = OpenAI(api_key=api_key, base_url=base_url, timeout=timeout)
+            if url:
+                url = url.rstrip('/')
+                if not any(url.endswith(s) for s in ('/v1', '/v2', '/v3', '/v4', '/v1beta/openai', '/openai/v1', '/inference/v1', '/compatible-mode/v1', '/studio/v1', '/v3/openai', '/api/v1', '/api/v3')):
+                    url = url + '/v1'
+                base_url = url
+            else:
+                base_url = None
+            client = OpenAI(api_key=api_key, base_url=base_url, timeout=timeout)
 
         # Vérifier d'abord si le modèle existe dans la liste des modèles disponibles
         # SAUF pour les rerankers (ils n'ont généralement pas l'endpoint /v1/models)
@@ -101,7 +108,9 @@ def _test_model_availability(model_name: str, model_info: dict, timeout: int = 1
             response = client.embeddings.create(input="test", model=model_name)
             return {'available': True, 'error': None}
         elif model_type == 'reranker':
-            rerank_url = url + '/v1/rerank'
+            _rerank_suffixes = ('/v1', '/v2', '/v3', '/v4', '/v1beta/openai', '/openai/v1', '/inference/v1', '/compatible-mode/v1', '/studio/v1', '/v3/openai', '/api/v1', '/api/v3')
+            rerank_base = url + '/v1' if url and not any(url.endswith(s) for s in _rerank_suffixes) else (url or '')
+            rerank_url = rerank_base + '/rerank'
             payload = {'model': model_name, 'query': 'test', 'documents': ['test']}
             response = requests.post(rerank_url, json=payload, timeout=timeout)
 
@@ -313,7 +322,7 @@ def test_configured_models():
     Fait une requête bidon à chaque modèle configuré pour vérifier s'il est disponible
     """
     import requests
-    from openai import OpenAI, APIError, APIConnectionError
+    from openai import OpenAI, AzureOpenAI, APIError, APIConnectionError
 
     config = _load_json(CONFIG_PATH)
     models_infos = _load_json(MODELS_PATH)
@@ -341,13 +350,21 @@ def test_configured_models():
         model_type = model_info.get('type', 'llm')
         url = model_info.get('url')
         api_key = model_info.get('api_key', '')
+        provider = model_info.get('provider', 'openai').lower()
 
         try:
-            if url:
-                base_url = url + '/v1' if not url.endswith('/v1') else url
+            if provider == 'azure':
+                api_version = model_info.get('api_version', '2024-02-01')
+                client = AzureOpenAI(api_key=api_key, api_version=api_version, azure_endpoint=url, timeout=10)
             else:
-                base_url = None
-            client = OpenAI(api_key=api_key, base_url=base_url, timeout=10)
+                if url:
+                    url = url.rstrip('/')
+                    if not any(url.endswith(s) for s in ('/v1', '/v2', '/v3', '/v4', '/v1beta/openai', '/openai/v1', '/inference/v1', '/compatible-mode/v1', '/studio/v1', '/v3/openai', '/api/v1', '/api/v3')):
+                        url = url + '/v1'
+                    base_url = url
+                else:
+                    base_url = None
+                client = OpenAI(api_key=api_key, base_url=base_url, timeout=10)
         except Exception as e:
             results[key] = {
                 'name': model_name,
@@ -392,7 +409,9 @@ def test_configured_models():
                     'type': model_type
                 }
             elif model_type == 'reranker':
-                rerank_url = url + '/v1/rerank'
+                _rerank_suffixes = ('/v1', '/v2', '/v3', '/v4', '/v1beta/openai', '/openai/v1', '/inference/v1', '/compatible-mode/v1', '/studio/v1', '/v3/openai', '/api/v1', '/api/v3')
+                rerank_base = url + '/v1' if url and not any(url.endswith(s) for s in _rerank_suffixes) else (url or '')
+                rerank_url = rerank_base + '/rerank'
                 payload = {
                     'model': model_name,
                     'query': 'test query',

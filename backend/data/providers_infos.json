@@ -30,5 +30,73 @@
     "groq": {
         "url": "https://api.groq.com/openai/v1",
         "api_key": ""
+    },
+    "xai": {
+        "url": "https://api.x.ai/v1",
+        "api_key": ""
+    },
+    "together": {
+        "url": "https://api.together.xyz/v1",
+        "api_key": ""
+    },
+    "fireworks": {
+        "url": "https://api.fireworks.ai/inference/v1",
+        "api_key": ""
+    },
+    "perplexity": {
+        "url": "https://api.perplexity.ai",
+        "api_key": ""
+    },
+    "ai21": {
+        "url": "https://api.ai21.com/studio/v1",
+        "api_key": ""
+    },
+    "sambanova": {
+        "url": "https://api.sambanova.ai/v1",
+        "api_key": ""
+    },
+    "cerebras": {
+        "url": "https://api.cerebras.ai/v1",
+        "api_key": ""
+    },
+    "dashscope": {
+        "url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "api_key": ""
+    },
+    "siliconflow": {
+        "url": "https://api.siliconflow.cn/v1",
+        "api_key": ""
+    },
+    "novita": {
+        "url": "https://api.novita.ai/v3/openai",
+        "api_key": ""
+    },
+    "lepton": {
+        "url": "https://llama2-7b.lepton.run/api/v1",
+        "api_key": ""
+    },
+    "volcengine": {
+        "url": "https://ark.cn-beijing.volces.com/api/v3",
+        "api_key": ""
+    },
+    "baidu": {
+        "url": "https://qianfan.baidubce.com/v2",
+        "api_key": ""
+    },
+    "minimax": {
+        "url": "https://api.minimax.chat/v1",
+        "api_key": ""
+    },
+    "yi": {
+        "url": "https://api.lingyiwanwu.com/v1",
+        "api_key": ""
+    },
+    "stepfun": {
+        "url": "https://api.stepfun.com/v1",
+        "api_key": ""
+    },
+    "baichuan": {
+        "url": "https://api.baichuan-ai.com/v1",
+        "api_key": ""
     }
 }

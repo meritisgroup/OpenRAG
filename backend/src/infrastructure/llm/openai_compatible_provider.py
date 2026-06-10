@@ -35,7 +35,9 @@ class OpenAICompatibleProvider(LLMProvider):
                 url = url.strip() if url.strip() else None
             
             if url:
-                url = url + '/v1' if not url.endswith('/v1') else url
+                url = url.rstrip('/')
+                if not any(url.endswith(s) for s in ('/v1', '/v2', '/v3', '/v4', '/v1beta/openai', '/openai/v1', '/inference/v1', '/compatible-mode/v1', '/studio/v1', '/v3/openai', '/api/v1', '/api/v3')):
+                    url = url + '/v1'
                 clients[key] = OpenAI(api_key=api_key or 'dummy', base_url=url)
             elif api_key:
                 clients[key] = OpenAI(api_key=api_key)
@@ -91,7 +93,9 @@ class OpenAICompatibleProvider(LLMProvider):
             model_type = self.models_infos[model].get('type', 'llm')
             if model_type == 'reranker':
                 documents = [chunk.text for chunk in chunk_list]
-                url = self.models_infos[model]['url'] + '/v1/rerank'
+                base = self.models_infos[model]['url'].rstrip('/')
+                rerank_base = base + '/v1' if not any(base.endswith(s) for s in ('/v1', '/v2', '/v3', '/v4', '/v1beta/openai', '/openai/v1', '/inference/v1', '/compatible-mode/v1', '/studio/v1', '/v3/openai', '/api/v1', '/api/v3')) else base
+                url = rerank_base + '/rerank'
                 payload = {'model': model, 'query': query, 'documents': documents}
                 headers = {'accept': 'application/json', 'Content-Type': 'application/json'}
                 response = requests.post(url, json=payload, headers=headers).json()

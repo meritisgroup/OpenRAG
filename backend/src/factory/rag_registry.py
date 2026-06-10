@@ -18,7 +18,6 @@ from methods.naive_chatbot.agent import NaiveChatbot
 from methods.hyde_rag.agent import HydeRagAgent
 from methods.reasoning_rag.agent import ReasoningRagAgent
 
-
 @dataclass
 class RAGConfig:
     agent_class: Type
@@ -28,70 +27,39 @@ class RAGConfig:
 
 
 RAG_REGISTRY: dict[str, RAGConfig] = {
-    'naive': RAGConfig(
-        agent_class=NaiveRagAgent,
-        aliases=['naive_rag']
+    "naive": RAGConfig(agent_class=NaiveRagAgent, aliases=["naive_rag"]),
+    "agentic": RAGConfig(agent_class=AgenticRagAgent, aliases=["agentic_rag"]),
+    "agentic_router": RAGConfig(
+        agent_class=AgenticRouterRAG, aliases=["agentic_rag_router"]
     ),
-    'agentic': RAGConfig(
-        agent_class=AgenticRagAgent,
-        aliases=['agentic_rag']
-    ),
-    'agentic_router': RAGConfig(
-        agent_class=AgenticRouterRAG,
-        aliases=['agentic_rag_router']
-    ),
-    'merger': RAGConfig(
+    "merger": RAGConfig(
         agent_class=MergerRagAgent,
-        aliases=['merger_rag'],
-        supported_in_custom=False  # Ne peut pas être utilisé directement, doit être créé via l'interface merge
+        aliases=["merger_rag"],
+        supported_in_custom=False,
     ),
-    'naive_chatbot': RAGConfig(
-        agent_class=NaiveChatbot,
-        requires_database=False,
-        supported_in_custom=False
+    "naive_chatbot": RAGConfig(
+        agent_class=NaiveChatbot, requires_database=False, supported_in_custom=False
     ),
-    'reranker_rag': RAGConfig(
-        agent_class=RerankerRag,
-        aliases=['reranker']
+    "reranker_rag": RAGConfig(agent_class=RerankerRag, aliases=["reranker"]),
+    "advanced_rag": RAGConfig(agent_class=AdvancedRag, aliases=["advanced"]),
+    "query_reformulation_rag": RAGConfig(
+        agent_class=QueryReformulationRag, aliases=["query_reformulation"]
     ),
-    'advanced_rag': RAGConfig(
-        agent_class=AdvancedRag,
-        aliases=['advanced']
+    "graph": RAGConfig(agent_class=GraphRagAgent, aliases=["graph_rag"]),
+    "query_based": RAGConfig(
+        agent_class=QueryBasedRagAgent, aliases=["query_based_rag"]
     ),
-    'query_reformulation_rag': RAGConfig(
-        agent_class=QueryReformulationRag,
-        aliases=['query_reformulation']
+    "self": RAGConfig(agent_class=SelfRagAgent, aliases=["self_rag"]),
+    "crag": RAGConfig(agent_class=CragAgent, aliases=["corrective_rag"]),
+    "semantic_chunking": RAGConfig(
+        agent_class=SemanticChunkingRagAgent, aliases=["semantic_chunking_rag"]
     ),
-    'graph': RAGConfig(
-        agent_class=GraphRagAgent,
-        aliases=['graph_rag']
+    "contextual_retrieval": RAGConfig(
+        agent_class=ContextualRetrievalRagAgent, aliases=["contextual_retrieval_rag"]
     ),
-    'query_based': RAGConfig(
-        agent_class=QueryBasedRagAgent,
-        aliases=['query_based_rag']
-    ),
-    'self': RAGConfig(
-        agent_class=SelfRagAgent,
-        aliases=['self_rag']
-    ),
-    'crag': RAGConfig(
-        agent_class=CragAgent,
-        aliases=['corrective_rag']
-    ),
-    'semantic_chunking': RAGConfig(
-        agent_class=SemanticChunkingRagAgent,
-        aliases=['semantic_chunking_rag']
-    ),
-    'contextual_retrieval': RAGConfig(
-        agent_class=ContextualRetrievalRagAgent,
-        aliases=['contextual_retrieval_rag']
-    ),
-    'hyde': RAGConfig(
-        agent_class=HydeRagAgent,
-        aliases=['hyde_rag']
-    ),
-    'reasoning': RAGConfig(
+    "hyde": RAGConfig(agent_class=HydeRagAgent, aliases=["hyde_rag"]),
+    "reasoning": RAGConfig(
         agent_class=ReasoningRagAgent,
-        aliases=['reasoning_rag']
+        aliases=["reasoning_rag"],
     ),
 }

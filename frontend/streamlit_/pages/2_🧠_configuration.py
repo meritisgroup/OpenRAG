@@ -2,7 +2,6 @@ import streamlit as st
 from urllib.parse import urlparse
 from streamlit_.services import ConfigService
 from streamlit_.api_client.exceptions import APIError
-from streamlit_.utils.chat_funcs import get_chat_agent
 from streamlit_.utils.params_func import get_custom_rags_name, modify_env
 
 st.markdown('# Set Configuration')
@@ -36,11 +35,41 @@ if selected_model_name != '➕ Add a new model':
             st.session_state['edit_model_type'] = selected_model.get('type', 'llm')
             st.session_state['edit_model_api_key'] = selected_model.get('api_key', '')
             st.session_state['edit_model_url'] = selected_model.get('url', '')
-            st.session_state['edit_azure_endpoint'] = selected_model.get('azure_endpoint', '')
             st.session_state['edit_api_version'] = selected_model.get('api_version', '2024-02-01')
             st.session_state['selected_model_prev'] = selected_model_name
-PROVIDERS_WITH_URL = ['OpenAI SDK compatible (ollama, vllm, lm studio, ...)', 'cohere']
-PROVIDERS_WITH_AZURE_ENDPOINT = ['azure']
+PROVIDERS_WITHOUT_URL = ['anthropic', 'mistral']
+
+PROVIDER_DEFAULT_URLS = {
+    'openai': 'https://api.openai.com/v1',
+    'gemini': 'https://generativelanguage.googleapis.com/v1beta/openai',
+    'openrouter': 'https://openrouter.ai/api/v1',
+    'deepseek': 'https://api.deepseek.com',
+    'kimi': 'https://api.moonshot.cn/v1',
+    'glm': 'https://open.bigmodel.cn/api/paas/v4',
+    'groq': 'https://api.groq.com/openai/v1',
+    'xai': 'https://api.x.ai/v1',
+    'together': 'https://api.together.xyz/v1',
+    'fireworks': 'https://api.fireworks.ai/inference/v1',
+    'perplexity': 'https://api.perplexity.ai',
+    'ai21': 'https://api.ai21.com/studio/v1',
+    'sambanova': 'https://api.sambanova.ai/v1',
+    'cerebras': 'https://api.cerebras.ai/v1',
+    'dashscope': 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    'siliconflow': 'https://api.siliconflow.cn/v1',
+    'novita': 'https://api.novita.ai/v3/openai',
+    'lepton': 'https://llama2-7b.lepton.run/api/v1',
+    'volcengine': 'https://ark.cn-beijing.volces.com/api/v3',
+    'baidu': 'https://qianfan.baidubce.com/v2',
+    'minimax': 'https://api.minimax.chat/v1',
+    'yi': 'https://api.lingyiwanwu.com/v1',
+    'stepfun': 'https://api.stepfun.com/v1',
+    'baichuan': 'https://api.baichuan-ai.com/v1',
+}
+
+PROVIDER_OPTIONS = [
+    'OpenAI SDK compatible (ollama, vllm, lm studio, ...)',
+    'ai21', 'anthropic', 'azure', 'baichuan', 'baidu', 'cerebras', 'cohere', 'dashscope', 'deepseek', 'fireworks', 'gemini', 'glm', 'groq', 'kimi', 'lepton', 'minimax', 'mistral', 'novita', 'openai', 'openrouter', 'perplexity', 'sambanova', 'siliconflow', 'stepfun', 'together', 'volcengine', 'xai', 'yi',
+]
 
 def get_provider_internal_name(display_name: str) -> str:
     if display_name == 'OpenAI SDK compatible (ollama, vllm, lm studio, ...)':
@@ -50,13 +79,14 @@ def get_provider_internal_name(display_name: str) -> str:
 if selected_model_name == '➕ Add a new model':
         new_model_name = st.text_input('Model name (deployment name for Azure)', key='new_model_name')
         new_model_type = st.selectbox('Model type', ['llm', 'reranker', 'embedding'])
-        new_model_provider = st.selectbox('Provider', ['OpenAI SDK compatible (ollama, vllm, lm studio, ...)', 'openai', 'azure', 'anthropic', 'mistral', 'cohere', 'gemini', 'openrouter', 'deepseek', 'kimi', 'glm', 'groq'], key='new_model_provider')
+        new_model_provider = st.selectbox('Provider', PROVIDER_OPTIONS, key='new_model_provider')
         
         if new_model_provider == 'azure':
-            new_azure_endpoint = st.text_input('Azure Endpoint', placeholder='https://your-resource.openai.azure.com', key='new_azure_endpoint')
+            new_azure_url = st.text_input('URL', placeholder='https://your-resource.openai.azure.com', key='new_azure_url')
             new_api_version = st.text_input('API Version', value='2024-02-01', key='new_api_version')
-        elif new_model_provider in PROVIDERS_WITH_URL:
-            new_model_url = st.text_input('Model URL', key='new_model_url')
+        elif new_model_provider not in PROVIDERS_WITHOUT_URL:
+            default_url = PROVIDER_DEFAULT_URLS.get(get_provider_internal_name(new_model_provider), '')
+            new_model_url = st.text_input('URL', value=default_url, key='new_model_url')
         new_model_api_key = st.text_input('API Key', type='password', key='new_model_api_key')
         
         if st.button('Add model'):
@@ -67,13 +97,13 @@ if selected_model_name == '➕ Add a new model':
                 else:
                     if new_model_provider == 'azure':
                         models_infos[model_name_val] = {
-                            'azure_endpoint': st.session_state.get('new_azure_endpoint', ''),
+                            'url': st.session_state.get('new_azure_url', ''),
                             'api_version': st.session_state.get('new_api_version', '2024-02-01'),
                             'api_key': st.session_state.get('new_model_api_key', ''),
                             'type': new_model_type,
                             'provider': 'azure'
                         }
-                    elif new_model_provider in PROVIDERS_WITH_URL:
+                    elif new_model_provider not in PROVIDERS_WITHOUT_URL:
                         models_infos[model_name_val] = {
                             'url': st.session_state.get('new_model_url', ''),
                             'api_key': st.session_state.get('new_model_api_key', ''),
@@ -101,7 +131,7 @@ else:
                 with col2:
                     new_api_key = st.text_input('API Key', value=selected_model.get('api_key', ''), type='password', key='edit_model_api_key')
                 with col3:
-                    provider_options = ['OpenAI SDK compatible (ollama, vllm, lm studio, ...)', 'openai', 'azure', 'anthropic', 'mistral', 'cohere', 'gemini', 'openrouter', 'deepseek', 'kimi', 'glm', 'groq']
+                    provider_options = PROVIDER_OPTIONS
                     current_provider = selected_model.get('provider', 'openai')
                     if current_provider in ['custom']:
                         current_provider = 'OpenAI SDK compatible (ollama, vllm, lm studio, ...)'
@@ -110,20 +140,23 @@ else:
                     new_provider = st.selectbox('Provider', provider_options, index=provider_options.index(current_provider) if current_provider in provider_options else 0, key='edit_model_provider')
             
             if new_provider == 'azure' or selected_model.get('provider') == 'azure':
-                new_azure_endpoint = st.text_input('Azure Endpoint', value=selected_model.get('azure_endpoint', ''), placeholder='https://your-resource.openai.azure.com', key='edit_azure_endpoint')
+                new_url = st.text_input('URL', value=selected_model.get('url', ''), placeholder='https://your-resource.openai.azure.com', key='edit_azure_url')
                 new_api_version = st.text_input('API Version', value=selected_model.get('api_version', '2024-02-01'), key='edit_api_version')
-            elif new_provider in PROVIDERS_WITH_URL or selected_model.get('url'):
-                new_url = st.text_input('URL', value=selected_model.get('url', ''), key='edit_model_url')
+            elif new_provider not in PROVIDERS_WITHOUT_URL or selected_model.get('url'):
+                provider_internal = get_provider_internal_name(new_provider)
+                default_url = PROVIDER_DEFAULT_URLS.get(provider_internal, '')
+                current_url = selected_model.get('url', default_url)
+                new_url = st.text_input('URL', value=current_url, key='edit_model_url')
             
             col_empty, col1_btn, col_empty1, col2_btn, col_empty2 = st.columns([0.5, 2, 0.5, 2, 0.5])
             with col1_btn:
                 if st.button('💾 Save changes', use_container_width=True):
                     current_provider_val = st.session_state.get('edit_model_provider', selected_model.get('provider', 'openai'))
                     if current_provider_val == 'azure':
-                        models_infos[selected_model_name]['azure_endpoint'] = st.session_state.get('edit_azure_endpoint', selected_model.get('azure_endpoint', ''))
+                        models_infos[selected_model_name]['url'] = st.session_state.get('edit_azure_url', selected_model.get('url', ''))
                         models_infos[selected_model_name]['api_version'] = st.session_state.get('edit_api_version', selected_model.get('api_version', '2024-02-01'))
-                        models_infos[selected_model_name].pop('url', None)
-                    elif current_provider_val in PROVIDERS_WITH_URL:
+                        models_infos[selected_model_name].pop('azure_endpoint', None)
+                    elif current_provider_val not in PROVIDERS_WITHOUT_URL:
                         models_infos[selected_model_name]['url'] = st.session_state.get('edit_model_url', selected_model.get('url', ''))
                         models_infos[selected_model_name].pop('azure_endpoint', None)
                         models_infos[selected_model_name].pop('api_version', None)
@@ -388,10 +421,4 @@ if st.button('Save Configuration', type='primary', use_container_width=True):
         st.warning(f"API error: {e}")
 
     ConfigService.update_config(st.session_state['config_server'])
-    
-    st.session_state['custom_rags'] = get_custom_rags_name()
-    rag_method = st.session_state['rag_name']
-    rag_agent = get_chat_agent(rag_method=rag_method, databases_name=[])
     st.session_state['success'] = True
-    st.session_state['rag'] = rag_agent
-    st.session_state['rag_name'] = rag_method
