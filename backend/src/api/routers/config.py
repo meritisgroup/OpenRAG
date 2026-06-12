@@ -145,11 +145,9 @@ def _test_model_availability(model_name: str, model_info: dict, timeout: int = 1
         else:
             params = {
                 'model': model_name,
-                'messages': [{"role": "user", "content": "test"}],
-                'max_tokens': 5
+                'messages': [{"role": "user", "content": "test"}]
             }
-            params.pop('impacts', None)
-            response = client.chat.completions.create(**params)
+            response = client.beta.chat.completions.parse(**params)
             return {'available': True, 'error': None}
     except APIConnectionError as e:
         return {'available': False, 'error': f'Erreur de connexion: {str(e)}'}
@@ -481,11 +479,9 @@ def test_configured_models():
                     'messages': [
                         {"role": "system", "content": "You are a helpful assistant."},
                         {"role": "user", "content": "test"}
-                    ],
-                    'max_tokens': 5
+                    ]
                 }
-                params.pop('impacts', None)
-                response = client.chat.completions.create(**params)
+                response = client.beta.chat.completions.parse(**params)
                 results[key] = {
                     'name': model_name,
                     'available': True,
