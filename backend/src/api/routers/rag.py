@@ -34,7 +34,7 @@ from api.main import (
 )
 from factory_RagAgent import get_rag_agent, get_custom_rag_agent, change_config_server
 from factory import RAGFactory
-from core.paths import CONFIG_PATH, ALL_RAGS_PATH, CUSTOM_RAGS_DIR, MERGE_RAGS_DIR
+from core.paths import CONFIG_PATH, ALL_RAGS_PATH, CUSTOM_RAGS_DIR, MERGE_RAGS_DIR, MODELS_PATH
 from utils.factory_name_dataset_vectorbase import get_name
 
 router = APIRouter()
@@ -43,6 +43,13 @@ CONFIG_PATH = 'data/base_config_server.json'
 ALL_RAGS_PATH = 'data/all_rags.json'
 CUSTOM_RAGS_DIR = 'data/custom_rags'
 MERGE_RAGS_DIR = 'data/merge'
+
+
+def _load_models_infos() -> dict:
+    if os.path.exists(MODELS_PATH):
+        with open(MODELS_PATH, 'r') as f:
+            return json.load(f)
+    return {}
 
 
 def _get_elasticsearch_client(request_timeout: Optional[int] = None) -> Elasticsearch:
@@ -97,6 +104,8 @@ def get_available_rags(request: RAGAvailabilityRequest):
     from .config import _test_model_availability
     from utils.rag_model_requirements import get_required_models_for_rag
 
+    real_models_infos = _load_models_infos()
+
     if os.path.exists(ALL_RAGS_PATH):
         with open(ALL_RAGS_PATH, "r") as f:
             all_rags = json.load(f)
@@ -125,16 +134,11 @@ def get_available_rags(request: RAGAvailabilityRequest):
 
         for model_key in all_model_keys:
             model_name = rag_config.get(model_key, request.config.get(model_key, ""))
-            model_type = (
-                "reranker"
-                if "reranker" in model_key
-                else "embedding"
-                if "embedding" in model_key
-                else "llm"
-            )
 
-            model_info = request.models_infos.get(model_name, {}).copy()
-            model_info["type"] = model_type
+            model_info = real_models_infos.get(model_name, {}).copy()
+            model_type = model_info.get("type", "llm")
+            if not model_type:
+                model_type = "llm"
 
             unique_models[(model_name, model_type)] = model_info
             rag_requirements[rag_id][model_key] = (model_name, model_type)
@@ -148,7 +152,7 @@ def get_available_rags(request: RAGAvailabilityRequest):
             }
         else:
             test_results[(model_name, model_type)] = _test_model_availability(
-                model_name, model_info, timeout=5
+                model_name, model_info, timeout=10
             )
 
     results = {}
@@ -171,14 +175,16 @@ def create_agent(request: CreateAgentRequest):
     if not session_exists(request.session_id):
         raise HTTPException(status_code=404, detail="Session not found")
 
+    real_models_infos = _load_models_infos()
+
     if request.validate_models:
         from .config import _validate_rag_models
 
         validation_result = _validate_rag_models(
             rag_name=request.rag_method,
             config=request.config,
-            models_infos=request.models_infos,
-            timeout=10,
+            models_infos=real_models_infos,
+            timeout=20,
         )
 
         if not validation_result["all_available"]:
@@ -200,7 +206,7 @@ def create_agent(request: CreateAgentRequest):
         agent = get_rag_agent(
             rag_name=custom_config.get("base", request.rag_method),
             config_server=custom_config,
-            models_infos=request.models_infos,
+            models_infos=real_models_infos,
             databases_name=request.databases,
         )
     elif os.path.exists(merge_rags_path):
@@ -210,7 +216,7 @@ def create_agent(request: CreateAgentRequest):
         agent = get_rag_agent(
             rag_name="merger",
             config_server=merge_config,
-            models_infos=request.models_infos,
+            models_infos=real_models_infos,
             databases_name=request.databases,
         )
     else:
@@ -220,7 +226,7 @@ def create_agent(request: CreateAgentRequest):
         agent = get_rag_agent(
             rag_name=request.rag_method,
             config_server=config,
-            models_infos=request.models_infos,
+            models_infos=real_models_infos,
             databases_name=request.databases,
         )
 
@@ -379,7 +385,7 @@ def lint_wiki(request: LintRequest):
 def check_elasticsearch_health():
     """Check Elasticsearch connection health"""
     try:
-        es = _get_elasticsearch_client(request_timeout=5)
+        es = _get_elasticsearch_client(request_timeout=10)
 
         if es.ping():
             es_info = es.info()

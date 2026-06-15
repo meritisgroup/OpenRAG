@@ -28,11 +28,6 @@
         "url": null,
         "api_key": ""
     },
-    "text-embedding-3-small": {
-        "url": null,
-        "api_key": "",
-        "type": "embedding"
-    },
     "BAAI/bge-m3": {
         "url": "http://host.docker.internal:30002",
         "api_key": "",

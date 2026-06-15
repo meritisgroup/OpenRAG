@@ -54,11 +54,11 @@ docker compose -f docker-compose.elasticsearch.yml up -d
 
 Verify it's running:
 ```bash
-curl http://localhost:9200
+curl http://localhost:9201
 ```
 
 **Default credentials:**
-- URL: `http://localhost:9200`
+- URL: `http://localhost:9201`
 - User: `elastic`
 - Password: `openrag`
 
@@ -106,14 +106,14 @@ Navigate to **Configuration page** (⚙️ icon in sidebar or "2_🧠_configurat
 > 
 > | From | To host service | URL example |
 > |------|----------------|-------------|
-> | Host machine | Host service | `http://localhost:9200` |
-> | Docker container | Host service | `http://host.docker.internal:9200` |
+> | Host machine | Host service | `http://localhost:9201` |
+> | Docker container | Host service | `http://host.docker.internal:9201` |
 
 #### 3.1 Configure Elasticsearch
 
 In the **"Vectorbase Configuration"** section (scroll down):
 
-- **URL Elasticsearch:** `http://host.docker.internal:9200`
+- **URL Elasticsearch:** `http://host.docker.internal:9201`
 - **Auth:** `elastic`
 - **Clé API:** `openrag` (or your custom password)
 
@@ -392,7 +392,7 @@ You've successfully:
 |---------|-----|
 | OpenRAG UI | http://localhost:8502 |
 | Backend API | http://localhost:9000 |
-| Elasticsearch | http://localhost:9200 |
+| Elasticsearch | http://localhost:9201 |
 | Ollama (if used) | http://localhost:11434 |
 
 ### Key Configuration Files
@@ -417,10 +417,10 @@ backend/data/providers_infos.json     # Provider API keys
 **Solutions:**
 1. Check Elasticsearch is running:
    ```bash
-   curl http://localhost:9200
+   curl http://localhost:9201
    docker ps | grep elasticsearch
    ```
-2. In OpenRAG config, use `http://host.docker.internal:9200` (not localhost)
+2. In OpenRAG config, use `http://host.docker.internal:9201` (not localhost)
 3. Verify credentials (elastic / openrag)
 4. Check Docker logs: `docker logs openrag-elasticsearch`
 

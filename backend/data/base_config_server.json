@@ -1,7 +1,7 @@
 {
-    "model": "openai/gpt-oss-safeguard-20b",
-    "embedding_model": "BAAI/bge-m3",
-    "reranker_model": "BAAI/bge-reranker-v2-m3",
+    "model": "gpt-5.4",
+    "embedding_model": "text-embedding-3-small",
+    "reranker_model": "gpt-5.4",
     "model_for_image": null,
     "default_mode_provider": "ollama",
     "chunk_length": 200,
@@ -16,7 +16,7 @@
     "type_retrieval": "embeddings",
     "params_vectorbase": {
         "backend": "elasticsearch",
-        "url": "http://host.docker.internal:9200",
+        "url": "http://host.docker.internal:9201",
         "batch": true,
         "auth": [
             "elastic",

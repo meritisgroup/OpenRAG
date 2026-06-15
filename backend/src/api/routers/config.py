@@ -1,6 +1,7 @@
 import json
 import os
 import logging
+import time
 from fastapi import APIRouter, HTTPException
 
 from api.schemas.config import (
@@ -48,7 +49,7 @@ def _save_json(path: str, data: dict) -> None:
         json.dump(data, f, indent=4)
 
 
-def _test_model_availability(model_name: str, model_info: dict, timeout: int = 10) -> dict:
+def _test_model_availability(model_name: str, model_info: dict, timeout: int = 20) -> dict:
     """
     Teste si un modèle est disponible en faisant une requête réelle
 
@@ -60,6 +61,30 @@ def _test_model_availability(model_name: str, model_info: dict, timeout: int = 1
     Returns:
         dict: {'available': bool, 'error': Optional[str]}
     """
+    max_retries = 2
+    last_result = None
+
+    for attempt in range(max_retries):
+        result = _test_model_availability_once(model_name, model_info, timeout)
+        if result['available']:
+            return result
+        last_result = result
+        error_msg = (last_result.get('error') or '').lower()
+        is_transient = any(kw in error_msg for kw in [
+            'connection', 'timeout', 'connexion', 'timed out',
+            'connectionrefused', 'connectionerror', 'network',
+        ])
+        if not is_transient or attempt == max_retries - 1:
+            break
+        wait = 2 ** attempt
+        logger.info("Retry %d/%d for model '%s' after transient error: %s (waiting %ds)",
+                     attempt + 1, max_retries, model_name, last_result['error'], wait)
+        time.sleep(wait)
+
+    return last_result
+
+
+def _test_model_availability_once(model_name: str, model_info: dict, timeout: int = 20) -> dict:
     import requests
     from openai import OpenAI, AzureOpenAI, APIError, APIConnectionError
 
@@ -165,7 +190,7 @@ def _test_model_availability(model_name: str, model_info: dict, timeout: int = 1
         return {'available': False, 'error': f'Erreur inattendue: {str(e)}'}
 
 
-def _validate_rag_models(rag_name: str, config: dict, models_infos: dict, timeout: int = 10) -> dict:
+def _validate_rag_models(rag_name: str, config: dict, models_infos: dict, timeout: int = 20) -> dict:
     """
     Valide les modèles nécessaires pour un type de RAG
     
@@ -319,9 +344,6 @@ def test_configured_models():
     """
     Fait une requête bidon à chaque modèle configuré pour vérifier s'il est disponible
     """
-    import requests
-    from openai import OpenAI, AzureOpenAI, APIError, APIConnectionError
-
     config = _load_json(CONFIG_PATH)
     models_infos = _load_json(MODELS_PATH)
 
@@ -346,189 +368,18 @@ def test_configured_models():
 
         model_info = models_infos[model_name]
         model_type = model_info.get('type', 'llm')
-        url = model_info.get('url')
-        api_key = model_info.get('api_key', '')
-        provider = model_info.get('provider', 'openai').lower()
 
-        try:
-            if provider == 'azure':
-                api_version = model_info.get('api_version', '2024-02-01')
-                client = AzureOpenAI(api_key=api_key, api_version=api_version, azure_endpoint=url, timeout=10)
-            else:
-                if url:
-                    url = url.rstrip('/')
-                    if not any(url.endswith(s) for s in ('/v1', '/v2', '/v3', '/v4', '/v1beta/openai', '/openai/v1', '/inference/v1', '/compatible-mode/v1', '/studio/v1', '/v3/openai', '/api/v1', '/api/v3')):
-                        url = url + '/v1'
-                    base_url = url
-                else:
-                    base_url = None
-                client = OpenAI(api_key=api_key, base_url=base_url, timeout=10)
-        except Exception as e:
-            results[key] = {
-                'name': model_name,
-                'available': False,
-                'error': f'Erreur création client: {str(e)}'
-            }
-            continue
+        test_result = _test_model_availability(model_name, model_info, timeout=10)
 
-        try:
-            # Vérifier d'abord si le modèle existe dans la liste des modèles disponibles
-            model_exists = False
-            available_model_names = []
-            try:
-                available_models = client.models.list()
-                available_model_names = [m.id for m in available_models.data]
-
-                # Vérifier si le modèle demandé est dans la liste (recherche exacte ou partielle)
-                model_exists = (
-                    model_name in available_model_names or
-                    any(model_name.lower() in m.lower() or m.lower() in model_name.lower() for m in available_model_names)
-                )
-
-                if not model_exists:
-                    results[key] = {
-                        'name': model_name,
-                        'available': False,
-                        'error': f'Modèle "{model_name}" non trouvé sur le serveur. Modèles disponibles: {available_model_names[:10]}...' if len(available_model_names) > 10 else f'Modèle "{model_name}" non trouvé sur le serveur. Modèles disponibles: {available_model_names}'
-                    }
-                    continue
-            except Exception as e:
-                # Si la liste des modèles échoue, on continue avec le test normal
-                pass
-
-            if model_type == 'embedding':
-                response = client.embeddings.create(
-                    input="test",
-                    model=model_name
-                )
-                results[key] = {
-                    'name': model_name,
-                    'available': True,
-                    'type': model_type
-                }
-            elif model_type == 'reranker':
-                _rerank_suffixes = ('/v1', '/v2', '/v3', '/v4', '/v1beta/openai', '/openai/v1', '/inference/v1', '/compatible-mode/v1', '/studio/v1', '/v3/openai', '/api/v1', '/api/v3')
-                rerank_base = url + '/v1' if url and not any(url.endswith(s) for s in _rerank_suffixes) else (url or '')
-                rerank_url = rerank_base + '/rerank'
-                payload = {
-                    'model': model_name,
-                    'query': 'test query',
-                    'documents': ['test document']
-                }
-                response = requests.post(rerank_url, json=payload, timeout=10)
-
-                # Vérifier que la réponse est valide et contient des résultats de reranking
-                if response.status_code == 200:
-                    try:
-                        response_data = response.json()
-                        # Vérifier que la réponse contient les champs attendus pour un reranker
-                        if 'results' in response_data or ('data' in response_data and isinstance(response_data['data'], list)):
-                            results[key] = {
-                                'name': model_name,
-                                'available': True,
-                                'type': model_type
-                            }
-                        else:
-                            # Réponse reçue mais pas le format attendu pour un reranker
-                            results[key] = {
-                                'name': model_name,
-                                'available': False,
-                                'error': f'Réponse invalide du serveur rerank (format de réponse incorrect). Vérifiez que l\'URL pointe vers un serveur de reranking'
-                            }
-                    except Exception as e:
-                        logger.debug(f"Invalid JSON in rerank response for {model_name}: {e}")
-                        results[key] = {
-                            'name': model_name,
-                            'available': False,
-                            'error': f'Réponse invalide du serveur rerank. Vérifiez que l\'URL pointe vers un serveur de reranking'
-                        }
-                else:
-                    # Le serveur a répondu avec un code d'erreur
-                    error_detail = f'Code HTTP {response.status_code}'
-                    try:
-                        error_json = response.json()
-                        if 'error' in error_json:
-                            error_detail = error_json['error']
-                        elif 'message' in error_json:
-                            error_detail = error_json['message']
-                    except Exception:
-                        pass
-
-                    # Vérifier si l'erreur indique que le endpoint rerank n'existe pas
-                    if response.status_code == 404:
-                        results[key] = {
-                            'name': model_name,
-                            'available': False,
-                            'error': f'Endpoint /v1/rerank non trouvé. Cette URL ne semble pas être un serveur de reranking'
-                        }
-                    elif 'model' in str(error_detail).lower() and ('not found' in str(error_detail).lower() or 'not support' in str(error_detail).lower()):
-                        results[key] = {
-                            'name': model_name,
-                            'available': False,
-                            'error': f'Modèle "{model_name}" non disponible pour le reranking sur ce serveur'
-                        }
-                    else:
-                        results[key] = {
-                            'name': model_name,
-                            'available': False,
-                            'error': f'Erreur du serveur rerank: {error_detail}'
-                        }
-            else:
-                params = {
-                    'model': model_name,
-                    'messages': [
-                        {"role": "system", "content": "You are a helpful assistant."},
-                        {"role": "user", "content": "test"}
-                    ]
-                }
-                response = client.beta.chat.completions.parse(**params)
-                results[key] = {
-                    'name': model_name,
-                    'available': True,
-                    'type': model_type
-                }
-        except APIConnectionError as e:
-            results[key] = {
-                'name': model_name,
-                'available': False,
-                'error': f'Erreur de connexion: {str(e)}'
-            }
-        except APIError as e:
-            error_msg = str(e).lower()
-            # Vérifier si l'erreur indique que le modèle n'existe pas
-            if 'model' in error_msg and ('not found' in error_msg or 'does not exist' in error_msg or 'invalid' in error_msg):
-                results[key] = {
-                    'name': model_name,
-                    'available': False,
-                    'error': f'Modèle "{model_name}" non disponible sur ce serveur'
-                }
-            else:
-                results[key] = {
-                    'name': model_name,
-                    'available': False,
-                    'error': f'Erreur API (code {e.status_code}): {str(e)}'
-                }
-        except requests.exceptions.RequestException as e:
-            error_msg = str(e).lower()
-            # Vérifier si l'erreur indique que le modèle n'existe pas
-            if 'model' in error_msg and ('not found' in error_msg or 'does not exist' in error_msg):
-                results[key] = {
-                    'name': model_name,
-                    'available': False,
-                    'error': f'Modèle "{model_name}" non disponible sur ce serveur'
-                }
-            else:
-                results[key] = {
-                    'name': model_name,
-                    'available': False,
-                    'error': f'Erreur HTTP: {str(e)}'
-                }
-        except Exception as e:
-            results[key] = {
-                'name': model_name,
-                'available': False,
-                'error': f'Erreur inattendue: {str(e)}'
-            }
+        result = {
+            'name': model_name,
+            'available': test_result['available'],
+        }
+        if test_result['available']:
+            result['type'] = model_type
+        else:
+            result['error'] = test_result['error']
+        results[key] = result
 
     return results
 

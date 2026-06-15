@@ -1,5 +1,7 @@
+import time
 from typing import Dict, Any, List, Optional
 from streamlit_.api_client import APIClient
+from streamlit_.api_client.exceptions import APIError
 from streamlit_.core.config import API_BASE_URL
 
 
@@ -24,20 +26,10 @@ class RAGService:
     @classmethod
     def get_chat_agent(cls, rag_method: str, databases_name: List[str],
                         config_server: Dict[str, Any], models_infos: Dict[str, Any],
-                        validate_models: bool = True, create_new_session: bool = False) -> str:
+                        validate_models: bool = True, create_new_session: bool = False,
+                        max_retries: int = 2) -> str:
         """
-        Crée un agent RAG avec validation optionnelle des modèles
-        
-        Args:
-            rag_method: Type de RAG à créer
-            databases_name: Liste des bases de données
-            config_server: Configuration serveur
-            models_infos: Informations sur les modèles
-            validate_models: Si True, valide les modèles avant création
-            create_new_session: Si True, crée une nouvelle session (utile pour multi-RAG)
-        
-        Returns:
-            session_id: ID de session pour l'agent créé
+        Crée un agent RAG avec validation optionnelle des modèles et retry sur erreurs transitoires
         """
         client = cls.get_client()
         
@@ -48,15 +40,33 @@ class RAGService:
         else:
             session_id = client.session_id
         
-        response = client.create_agent(
-            rag_method=rag_method,
-            config=config_server,
-            models_infos=models_infos,
-            databases=databases_name,
-            validate_models=validate_models,
-            session_id=session_id
-        )
-        return session_id
+        last_error = None
+        for attempt in range(max_retries):
+            try:
+                response = client.create_agent(
+                    rag_method=rag_method,
+                    config=config_server,
+                    models_infos=models_infos,
+                    databases=databases_name,
+                    validate_models=validate_models,
+                    session_id=session_id
+                )
+                return session_id
+            except APIError as e:
+                last_error = e
+                error_data = e.args[0] if e.args else {}
+                if isinstance(error_data, dict):
+                    detail = error_data.get('detail', error_data)
+                    if isinstance(detail, dict) and 'validation' in detail:
+                        raise
+                    status_code = error_data.get('status_code', 0)
+                    if status_code in (404, 400):
+                        raise
+                if attempt < max_retries - 1:
+                    wait = 2 ** attempt
+                    time.sleep(wait)
+        
+        raise last_error
     
     @classmethod
     def run_indexation(cls, session_id: Optional[str] = None, reset_index: bool = False,
